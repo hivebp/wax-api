@@ -47,7 +47,7 @@ class PostgresConsumerConfig(object):
 
 chronicle_settings = dict(
     host='0.0.0.0',
-    port='PORT',
+    port='8801',
 )
 
 contracts = [
