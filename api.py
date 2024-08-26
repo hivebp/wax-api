@@ -190,6 +190,36 @@ def catch_and_respond():
     return decorator
 
 
+@app.route('/api/schemas/<collection>')
+@catch_and_respond()
+def schemas(collection):
+    term = request.args.get('term')
+    schema = request.args.get('schema')
+    limit = request.args.get('limit', 40)
+    offset = request.args.get('offset', 0)
+    verified = request.args.get('verified', 'verified')
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
+    exact_search = request.args.get('exact_search') == 'true'
+
+    if not collection:
+        raise Exception('Collection Required')
+    else:
+        collection = _format_collection(collection)
+
+    try:
+        limit = int(limit)
+        offset = int(offset)
+    except Exception as err:
+        limit = 40
+        offset = 0
+
+    search_res = logic.schemas(
+        term, collection, schema, limit, order_by, exact_search, offset, verified
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/assets')
 @catch_and_respond()
 def assets():

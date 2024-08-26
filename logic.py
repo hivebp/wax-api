@@ -262,6 +262,32 @@ def _format_asset(asset):
     return asset_obj
 
 
+def _format_schema(schema):
+    asset_obj = {
+        'schema': schema['schema'],
+        'stats': {
+            'numTemplates': schema['num_templates'],
+            'numAssets': schema['num_assets'],
+            'numBurned': schema['num_burned'],
+            'volumeWAX': schema['volume_wax'],
+            'volumeUSD': schema['volume_usd'],
+        },
+        'collection': {
+            'collection': schema['collection'],
+            'collectionName': schema['collection_name'],
+            'collectionImage': schema['collection_image'],
+            'tags': _format_tags(schema['tags']) if schema['tags'] else [],
+            'badges': _format_badges(schema['badges']) if schema['badges'] else []
+        },
+        'createdAt': {
+            'date': schema['created_timestamp'].strftime(DATE_FORMAT_STRING),
+            'block': schema['created_block_num'],
+            'globalSequence': schema['created_seq'],
+        }
+    }
+    return asset_obj
+
+
 def _format_assets_object(items):
     assets = []
 
@@ -394,8 +420,130 @@ def _parse_order(order_by):
     return order_dir, order_by
 
 
+def schemas(
+    term=None, collection=None, schema=None, limit=100, order_by='name_asc', exact_search=False, offset=0,
+    verified='verified'
+):
+    session = create_session()
+
+    order_dir, order_by = _parse_order(order_by)
+
+    try:
+        format_dict = {'limit': limit, 'offset': offset}
+
+        limit_clause = 'LIMIT :limit OFFSET :offset'
+
+        search_clause = ''
+        market_clause = ''
+        order_clause = ''
+        personal_blacklist_clause = ''
+        search_category_clause = ''
+
+        if collection:
+            format_dict['collection'] = collection
+
+            search_category_clause += ' AND a.collection = :collection '
+
+            if schema:
+                format_dict['schema'] = schema
+                search_category_clause += ' AND a.schema = :schema '
+            search_clause += search_category_clause
+
+        if term:
+            if exact_search:
+                search_clause += (
+                    ' AND n.name = :search_name '
+                )
+                format_dict['search_name'] = '{}'.format(term)
+            else:
+                search_clause += (
+                    ' AND n.name LIKE :search_name '
+                )
+                format_dict['search_name'] = '%{}%'.format(term)
+
+        source_clause = (
+            'schemas a '
+        )
+
+        columns_clause = (
+            'a.schema, cn.name AS collection_name, a.collection, schema_format, {badges_object}, {tags_obj}, '
+            'ci.image as collection_image, a.timestamp AS created_timestamp, a.block_num AS created_block_num, '
+            'a.seq AS created_seq, ts.num_assets, ts.num_templates, ts.num_burned, ts.volume_wax, '
+            'ts.volume_usd, (SELECT MIN(floor_price) '
+            '   FROM templates t '
+            '   INNER JOIN floor_prices_mv USING(template_id) '
+            '   WHERE t.collection = a.collection AND t.schema = a.schema'
+            ') AS floor_price'.format(
+                badges_object=_get_badges_object(), tags_obj=_get_tags_object()
+            )
+        )
+
+        if verified == 'verified':
+            search_clause += ' AND col.verified '
+        elif verified == 'unverified':
+            search_clause += (
+                ' AND ((ac.verified IS NULL AND ac.blacklisted IS NULL) OR (NOT ac.verified AND NOT ac.blacklisted))'
+            )
+        elif verified == 'all':
+            search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
+        elif verified == 'blacklisted':
+            search_clause += ' AND ac.blacklisted '
+
+        if order_by == 'date':
+            order_clause = 'ORDER BY a.seq {}'.format(order_dir)
+        elif order_by == 'collection':
+            order_clause = (
+                'ORDER BY a.collection {}'
+            ).format(order_dir)
+        elif order_by == 'num_templates':
+            order_clause = 'ORDER BY num_templates ' + order_dir
+        elif order_by == 'num_assets':
+            order_clause = 'ORDER BY num_assets ' + order_dir
+        elif order_by == 'volume':
+            order_clause = 'ORDER BY volume_wax ' + order_dir
+
+        sql = (
+            '   SELECT {columns_clause} '
+            '   FROM {source_clause} '
+            '   LEFT JOIN collections col USING (collection) '
+            '   LEFT JOIN schema_stats_mv ts USING (collection, schema) '
+            '   LEFT JOIN names cn ON (col.name_id = cn.name_id) '
+            '   LEFT JOIN images ci ON (col.image_id = ci.image_id) '
+            '   WHERE TRUE {search_clause} '
+            '   {personal_blacklist_clause} '
+            '   {order_clause} {limit_clause}'.format(
+                columns_clause=columns_clause,
+                source_clause=source_clause,
+                search_clause=search_clause,
+                market_clause=market_clause,
+                order_clause=order_clause,
+                limit_clause=limit_clause,
+                personal_blacklist_clause=personal_blacklist_clause
+            ))
+
+        res = session.execute(sql, format_dict)
+
+        results = []
+
+        for row in res:
+            try:
+                result = _format_schema(row)
+
+                results.append(result)
+            except Exception as e:
+                logging.error(e)
+
+        return results
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def assets(
-    term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='name_asc',
+    term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
     contract=None, offset=0, verified='verified', user='', favorites=False, backed=False, recently_sold=None,
     attributes=None, pfps_only=False
@@ -408,7 +556,6 @@ def assets(
         collection = col
 
     order_dir, order_by = _parse_order(order_by)
-    start_time = time.time()
 
     if (isinstance(term, int) or (isinstance(term, str) and term.isnumeric())) and int(term) < 10000000000000:
         template = session.execute('SELECT template_id FROM templates WHERE template_id = :term', {
@@ -462,12 +609,12 @@ def assets(
                 search_clause += (
                     ' AND n.name = :search_name '
                 )
-                format_dict['search_name'] = '{}'.format(name) if exact_search else '%{}%'.format(name)
+                format_dict['search_name'] = '{}'.format(name)
             else:
                 search_clause += (
                     ' AND n.name LIKE :search_name '
                 )
-                format_dict['search_name'] = '{}'.format(name) if exact_search else '%{}%'.format(name)
+                format_dict['search_name'] = '%{}%'.format(name)
 
         if asset_id:
             format_dict['asset_id'] = '{}'.format(asset_id)
@@ -690,18 +837,10 @@ def assets(
                 personal_blacklist_clause=personal_blacklist_clause
             ))
 
-        print(sql)
-        end_time = time.time()
-        print('Prep Time: {}'.format(end_time - start_time))
-
-        start_time = time.time()
         res = session.execute(sql, format_dict)
-        end_time = time.time()
-        print('Search Time: {}'.format(end_time - start_time))
 
         results = []
 
-        start_time = time.time()
         for row in res:
             try:
                 result = _format_asset(row)
@@ -710,8 +849,6 @@ def assets(
             except Exception as e:
                 logging.error(e)
 
-        end_time = time.time()
-        print('Format Time: {}'.format(end_time - start_time))
         return results
     except SQLAlchemyError as e:
         logging.error(e)
@@ -736,7 +873,6 @@ def listings(
         collection = col
 
     order_dir = 'ASC'
-    start_time = time.time()
 
     if '_asc' in order_by:
         order_dir = 'ASC'
@@ -800,12 +936,12 @@ def listings(
                 search_clause += (
                     ' AND n.name = :search_name '
                 )
-                format_dict['search_name'] = '{}'.format(name) if exact_search else '%{}%'.format(name)
+                format_dict['search_name'] = '{}'.format(name)
             else:
                 search_clause += (
                     ' AND n.name LIKE :search_name '
                 )
-                format_dict['search_name'] = '{}'.format(name) if exact_search else '%{}%'.format(name)
+                format_dict['search_name'] = '%{}%'.format(name)
 
         if asset_id:
             format_dict['asset_id'] = '{}'.format(asset_id)
@@ -876,16 +1012,16 @@ def listings(
                 ' AND l.estimated_wax_price = fp.floor_price '
             )
 
-        #if verified == 'verified':
-        #    search_clause += ' AND col.verified '
-        #elif verified == 'unverified':
-        #    search_clause += (
-        #        ' AND ((ac.verified IS NULL AND ac.blacklisted IS NULL) OR (NOT ac.verified AND NOT ac.blacklisted))'
-        #    )
-        #elif verified == 'all':
-        #    search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
-        #elif verified == 'blacklisted':
-        #    search_clause += ' AND ac.blacklisted '
+        if verified == 'verified':
+            search_clause += ' AND col.verified '
+        elif verified == 'unverified':
+            search_clause += (
+                ' AND ((ac.verified IS NULL AND ac.blacklisted IS NULL) OR (NOT ac.verified AND NOT ac.blacklisted))'
+            )
+        elif verified == 'all':
+            search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
+        elif verified == 'blacklisted':
+            search_clause += ' AND ac.blacklisted '
 
         if recently_sold:
             table = 'recently_sold_month_mv'
@@ -1243,18 +1379,10 @@ def listings(
                 personal_blacklist_clause=personal_blacklist_clause
             ))
 
-        print(sql)
-        end_time = time.time()
-        print('Prep Time: {}'.format(end_time - start_time))
-
-        start_time = time.time()
         res = session.execute(sql, format_dict)
-        end_time = time.time()
-        print('Search Time: {}'.format(end_time - start_time))
 
         results = []
 
-        start_time = time.time()
         for row in res:
             try:
                 result = _format_listings(row)
@@ -1263,8 +1391,6 @@ def listings(
             except Exception as e:
                 logging.error(e)
 
-        end_time = time.time()
-        print('Format Time: {}'.format(end_time - start_time))
         return results
     except SQLAlchemyError as e:
         logging.error(e)
