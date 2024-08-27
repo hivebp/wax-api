@@ -546,7 +546,9 @@ def get_health():
     session = create_session()
     try:
         result = session.execute(
-            'SELECT MAX(block_num) AS block_num FROM chronicle_transactions'
+            'SELECT block_num, timestamp '
+            'FROM chronicle_transactions '
+            'WHERE seq = (SELECT MAX(seq) FROM chronicle_transactions)'
         ).first()
 
         if result:
