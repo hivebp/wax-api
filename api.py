@@ -190,6 +190,12 @@ def catch_and_respond():
     return decorator
 
 
+@app.route('/api/health')
+@catch_and_respond()
+def get_health():
+    return flaskify(oto_response.Response(logic.get_health()))
+
+
 @app.route('/api/schemas/<collection>')
 @catch_and_respond()
 def schemas(collection):

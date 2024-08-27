@@ -542,6 +542,31 @@ def schemas(
         session.remove()
 
 
+def get_health():
+    session = create_session()
+    try:
+        result = session.execute(
+            'SELECT MAX(block_num) AS block_num FROM chronicle_transactions'
+        ).first()
+
+        if result:
+            return {
+                'success': 'true',
+                'block_num': result['block_num'],
+                'timestamp': result['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
+            }
+
+        return {
+            'success': 'false'
+        }
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def assets(
     term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
