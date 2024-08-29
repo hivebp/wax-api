@@ -2132,6 +2132,7 @@ def calc_atomic_mints(session):
     )
 
     session.commit()
+
     return res.rowcount
 
 

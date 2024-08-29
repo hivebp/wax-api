@@ -117,6 +117,19 @@ def _get_tags_object():
     )
 
 
+def _get_attributes_object():
+    return (
+        '(SELECT array_agg(json_build_object(\'attribute_id\', attribute_id, '
+        '\'attribute_name\', attribute_name, \'string_value\', string_value, \'int_value\', int_value, '
+        '\'float_value\', float_value, \'bool_value\', bool_value, \'floor_price\', floor_wax, '
+        '\'rarity_score\', rarity_score, \'total_schema\', total_schema)) '
+        'FROM assets '
+        'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
+        'LEFT JOIN attribute_stats USING(attribute_id) '
+        'WHERE asset_id = a.asset_id) AS traits '
+    )
+
+
 def isfloat(value):
     try:
         float(value)
@@ -213,6 +226,31 @@ def _format_badges(badges):
     return badge_arr
 
 
+def _format_traits(traits):
+    traits_arr = []
+    for trait in traits:
+        if trait['attribute_name']:
+            trait_obj = {
+                'name': trait['attribute_name']
+            }
+            if trait['rarity_score']:
+                trait_obj['rarityScore'] = trait['rarity_score']
+            if trait['total_schema']:
+                trait_obj['totalSchema'] = trait['total_schema']
+            if trait['floor_price']:
+                trait_obj['floorPrice'] = trait['floor_price']
+            if trait['string_value']:
+                trait_obj['value'] = trait['string_value']
+            elif trait['int_value'] or trait['int_value'] == 0:
+                trait_obj['value'] = trait['int_value']
+            elif trait['float_value'] or trait['float_value'] == 0.0:
+                trait_obj['value'] = trait['float_value']
+            else:
+                trait_obj['value'] = trait['bool_value']
+            traits_arr.append(trait_obj)
+    return traits_arr
+
+
 def _format_asset(asset):
     asset_obj = {
         'assetId': asset['asset_id'],
@@ -232,8 +270,13 @@ def _format_asset(asset):
             'date': asset['mint_timestamp'].strftime(DATE_FORMAT_STRING),
             'block': asset['mint_block_num'],
             'globalSequence': asset['mint_seq'],
-        }
+        },
+        'traits': _format_traits(asset['traits']) if asset['traits'] else [],
     }
+    if asset['rarity_score']:
+        asset_obj['rarityScore'] = asset['rarity_score']
+        asset_obj['rank'] = asset['rank']
+        asset_obj['numTraits'] = asset['num_traits']
     if asset['universal_preview_video']:
         asset_obj['universalPreview'] = _format_collection_thumbnail(
             asset['universal_preview_video'], asset['collection'], 240)
@@ -249,7 +292,8 @@ def _format_asset(asset):
                 'averageUsd': asset['avg_usd_price'],
                 'lastSoldWax': asset['last_sold_wax'],
                 'lastSoldUsd': asset['last_sold_usd'],
-                'lastSoldDate': asset['last_sold_timestamp'].strftime(DATE_FORMAT_STRING),
+                'lastSoldDate': asset['last_sold_timestamp'].strftime(
+                    DATE_FORMAT_STRING) if asset['last_sold_timestamp'] else None,
                 'lastSoldListingId': asset['last_sold_listing_id'],
                 'volumeWax': asset['volume_wax'],
                 'volumeUsd': asset['volume_usd'],
@@ -482,12 +526,14 @@ def schemas(
             search_clause += ' AND col.verified '
         elif verified == 'unverified':
             search_clause += (
-                ' AND ((ac.verified IS NULL AND ac.blacklisted IS NULL) OR (NOT ac.verified AND NOT ac.blacklisted))'
+                ' AND ('
+                '   (col.verified IS NULL AND col.blacklisted IS NULL) OR (NOT col.verified AND NOT col.blacklisted)'
+                ') '
             )
         elif verified == 'all':
-            search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
+            search_clause += ' AND (NOT col.blacklisted OR col.blacklisted IS NULL) '
         elif verified == 'blacklisted':
-            search_clause += ' AND ac.blacklisted '
+            search_clause += ' AND col.blacklisted '
 
         if order_by == 'date':
             order_clause = 'ORDER BY a.seq {}'.format(order_dir)
@@ -573,7 +619,7 @@ def assets(
     term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
     contract=None, offset=0, verified='verified', user='', favorites=False, backed=False, recently_sold=None,
-    attributes=None, pfps_only=False
+    attributes=None
 ):
     session = create_session()
 
@@ -604,7 +650,7 @@ def assets(
 
         limit_clause = 'LIMIT :limit OFFSET :offset'
 
-        favorites_clause = (
+        join_clause = (
             'LEFT JOIN favorites f ON ((f.asset_id = a.asset_id OR f.template_id = a.template_id) '
             'AND f.user_name = :user) '
         ) if user else (
@@ -659,24 +705,24 @@ def assets(
         columns_clause = (
             'a.asset_id, a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, '
             'm.data AS mutable_data, i.data AS immutable_data, td.data AS template_immutable_data, ts.num_burned, '
-            'am.mint, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, '
+            'a.mint, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, '
             'ts.last_sold_timestamp AT time zone \'UTC\' AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
             'ts.volume_usd, ts.num_sales, ts.total AS num_minted, t.template_id, img.image, vid.video,'
             'CASE WHEN up1.image_id IS NULL THEN img.image ELSE NULL END AS universal_preview_image, '
             'CASE WHEN up2.video_id IS NULL THEN vid.video ELSE NULL END AS universal_preview_video, '
             'cn.name AS collection_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
-            'a.block_num AS mint_block_num, a.seq AS mint_seq, {badges_object}, {tags_obj}'.format(
-                badges_object=_get_badges_object(), tags_obj=_get_tags_object()
+            'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
+            '{badges_object}, {tags_obj}, {attributes_obj}'.format(
+                badges_object=_get_badges_object(), tags_obj=_get_tags_object(), attributes_obj=_get_attributes_object()
             )
-        )
-
-        group_clause = (
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, '
-            '27, 28, 29, 30, 31, 32 '
         )
         if search_type == 'packs':
             search_clause += (
                 ' AND EXISTS (SELECT template_id FROM packs p WHERE template_id = a.template_id) '
+            )
+        if search_type == 'pfps':
+            search_clause += (
+                'AND p.rarity_score IS NOT NULL '
             )
 
         if verified == 'verified':
@@ -689,6 +735,49 @@ def assets(
             search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
         elif verified == 'blacklisted':
             search_clause += ' AND ac.blacklisted '
+
+        if tags:
+            tag_ids = tags.split(',')
+            if len(tag_ids) == 1:
+                search_clause += (
+                    'AND EXISTS ('
+                    '    SELECT tag_id FROM tags_mv '
+                    '    WHERE collection = a.collection '
+                    '    AND tag_id = :tag_id'
+                    ') '
+                )
+                format_dict['tag_id'] = tag_ids[0]
+            else:
+                tag_int_arr = []
+                for tag_id in tag_ids:
+                    tag_int_arr.append(int(tag_id))
+                with_clause += (
+                    ', matched_collections AS ('
+                    '    SELECT collection FROM collection_tag_ids_mv '
+                    '    WHERE :tag_ids <@ tag_ids'
+                    ')'
+                )
+                source_clause += (
+                    'INNER JOIN matched_collections USING(collection) '
+                )
+                format_dict['tag_ids'] = tag_int_arr
+
+        if min_mint and max_mint:
+            search_clause += (
+                'AND a.mint BETWEEN :min_mint AND :max_mint '
+            )
+            format_dict['min_mint'] = min_mint
+            format_dict['max_mint'] = max_mint
+        elif min_mint:
+            search_clause += (
+                'AND a.mint >= :min_mint '
+            )
+            format_dict['min_mint'] = min_mint
+        elif max_mint:
+            search_clause += (
+                'AND a.mint >= :max_mint '
+            )
+            format_dict['max_mint'] = max_mint
 
         if recently_sold:
             table = 'recently_sold_month_mv'
@@ -742,9 +831,8 @@ def assets(
                     'MIN(a.asset_id) OVER (PARTITION BY a.template_id) AS min_mint, '
                     'MAX(a.asset_id) OVER (PARTITION BY a.template_id) AS max_mint '
                     'FROM assets a '
-                    'INNER JOIN asset_mints am USING (asset_id) '
                     '{personal_blacklist_clause} '
-                    'WHERE owner = :owner AND am.mint > 0 '
+                    'WHERE owner = :owner AND a.mint > 0 '
                     '{search_clause}) '.format(
                         search_clause=search_clause,
                         personal_blacklist_clause=personal_blacklist_clause
@@ -757,12 +845,10 @@ def assets(
             else:
                 search_clause += ' AND a.owner = :owner '
         if order_by == 'rarity_score' and search_type == 'pfps':
-            order_clause = 'ORDER BY t.collection, t.schema, t.rarity_score {}'.format(order_dir)
-            search_clause += ' AND t.rarity_score IS NOT NULL '
+            order_clause = 'ORDER BY p.collection, p.schema, p.rarity_score {}'.format(order_dir)
         elif order_by == 'rarity_score':
-            source_clause += ' INNER JOIN attribute_assets ata USING(asset_id) '
-            order_clause = 'ORDER BY ata.author, ata.schema, ata.rarity_score {}'.format(order_dir)
-            search_clause += ' AND ata.rarity_score IS NOT NULL '
+            order_clause = 'ORDER BY a.collection, a.schema, p.rarity_score {}'.format(order_dir)
+            search_clause += ' AND p.rarity_score IS NOT NULL '
         elif order_by == 'date' and search_type == 'bulk_multi_sell':
             order_clause = 'ORDER BY MAX(a.transferred) {}'.format(order_dir)
         elif order_by == 'owned' and search_type == 'bulk_multi_sell':
@@ -772,7 +858,7 @@ def assets(
         elif order_by == 'date' and search_type == 'summaries':
             order_clause = 'ORDER BY a.template_id {}'.format(order_dir)
         elif order_by == 'date':
-            order_clause = 'ORDER BY a.timestamp {}'.format(order_dir)
+            order_clause = 'ORDER BY a.seq {}'.format(order_dir)
         elif order_by == 'volume' and search_type == 'summaries':
             order_clause = 'ORDER BY tsv.volume_7_days {} NULLS LAST'.format(order_dir)
         elif order_by == 'mint':
@@ -824,9 +910,9 @@ def assets(
             '{with_clause} '
             'SELECT {columns_clause}, f.user_name IS NOT NULL AS favorited '
             'FROM {source_clause} '
-            'LEFT JOIN asset_mints am USING (asset_id) '
-            'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) ' 
+            'LEFT JOIN backed_assets ba USING (asset_id) ' 
             'LEFT JOIN collections col USING (collection) '
+            'LEFT JOIN pfp_assets p USING(asset_id) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN floor_prices_mv fp ON (fp.template_id = a.template_id) '
@@ -841,10 +927,9 @@ def assets(
             'LEFT JOIN data m ON (a.mutable_data_id = m.data_id) '
             'LEFT JOIN data i ON (a.immutable_data_id = i.data_id) '
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
-            '{favorites_clause} '
+            '{join_clause} '
             'WHERE TRUE {search_clause} '
             '{personal_blacklist_clause} '
-            '{group_clause} '
             '{order_clause} {limit_clause}'.format(
                 with_clause=with_clause.format(
                     search_clause=search_clause,
@@ -859,8 +944,7 @@ def assets(
                 market_clause=market_clause,
                 order_clause=order_clause,
                 limit_clause=limit_clause,
-                favorites_clause=favorites_clause,
-                group_clause=group_clause,
+                join_clause=join_clause,
                 personal_blacklist_clause=personal_blacklist_clause
             ))
 
@@ -870,9 +954,7 @@ def assets(
 
         for row in res:
             try:
-                result = _format_asset(row)
-
-                results.append(result)
+                results.append(_format_asset(row))
             except Exception as e:
                 logging.error(e)
 
@@ -931,7 +1013,7 @@ def listings(
 
         limit_clause = 'LIMIT :limit OFFSET :offset'
 
-        favorites_clause = (
+        join_clause = (
             'LEFT JOIN favorites f ON ((f.asset_id = a.asset_id OR f.template_id = a.template_id) '
             'AND f.user_name = :user) '
         ) if user else (
@@ -1250,9 +1332,7 @@ def listings(
                 )
             market_clause += ' AND a1.seller = :search_owner '
 
-        if order_by in ['asset_id', 'mint'] and search_type == 'bundles':
-            order_by = 'date'
-        elif order_by == 'rarity_score' and search_type == 'pfps':
+        if order_by == 'rarity_score' and search_type == 'pfps':
             order_clause = 'ORDER BY t.author, t.schema, t.rarity_score {}'.format(order_dir)
             search_clause += ' AND t.rarity_score IS NOT NULL '
         elif order_by == 'rarity_score':
@@ -1383,7 +1463,7 @@ def listings(
             '{with_clause} '
             'SELECT {columns_clause}, f.user_name IS NOT NULL AS favorited '
             'FROM {source_clause} '
-            '{favorites_clause} '
+            '{join_clause} '
             'WHERE TRUE {search_clause} '
             '{personal_blacklist_clause}'
             '{group_clause} {order_clause}'.format(
@@ -1402,7 +1482,7 @@ def listings(
                 group_clause=group_clause,
                 order_clause=order_clause,
                 limit_clause=limit_clause,
-                favorites_clause=favorites_clause,
+                join_clause=join_clause,
                 personal_blacklist_clause=personal_blacklist_clause
             ))
 

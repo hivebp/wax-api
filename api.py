@@ -203,7 +203,7 @@ def schemas(collection):
     schema = request.args.get('schema')
     limit = request.args.get('limit', 40)
     offset = request.args.get('offset', 0)
-    verified = request.args.get('verified', 'verified')
+    verified = request.args.get('verified', 'all')
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
     exact_search = request.args.get('exact_search') == 'true'
 
@@ -250,7 +250,6 @@ def assets():
     exact_search = request.args.get('exact_search') == 'true'
     search_type = request.args.get('search_type') if request.args.get('search_type') else ''
     attributes = request.args.get('attributes', None)
-    pfps_only = request.args.get('pfps_only', 'false') == 'true'
 
     if collection:
         collection = _format_collection(collection)
@@ -276,7 +275,7 @@ def assets():
     search_res = logic.assets(
         term, owner, collection, schema, tags, limit, order_by,
         exact_search, search_type, min_average, max_average, min_mint, max_mint, contract, offset, verified,
-        user, favorites, backed, recently_sold, attributes, pfps_only
+        user, favorites, backed, recently_sold, attributes
     )
 
     return flaskify(oto_response.Response(search_res))
