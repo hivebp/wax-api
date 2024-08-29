@@ -93,6 +93,18 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: aam_mints; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.aam_mints (
+    asset_id bigint,
+    template_mint integer
+);
+
+
+ALTER TABLE public.aam_mints OWNER TO postgres;
+
+--
 -- Name: account_value_actions; Type: TABLE; Schema: public; Owner: postgres
 --
 
