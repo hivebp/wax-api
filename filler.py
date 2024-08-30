@@ -1104,6 +1104,24 @@ def parse_action(session, action):
     return end_time - start_time
 
 
+@app.route('/loader/update-estimated-wax-price')
+def update_estimated_wax_price():
+    session = create_session()
+
+    try:
+        session.execute(
+            'WITH current_usd_price AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
+            'UPDATE listings SET estimated_wax_price = price / (SELECT usd FROM current_usd_price) '
+            'WHERE currency = \'USD\''
+        )
+    except SQLAlchemyError as err:
+        log_error('update_estimated_wax_price: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        session.remove()
+
+
 @app.route('/loader/update-floor-prices')
 def update_floor_prices():
     session = create_session()
