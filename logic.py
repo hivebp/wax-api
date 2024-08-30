@@ -89,31 +89,34 @@ def to_lower_camel_case(snake_str):
 
 def _get_assets_object():
     return (
-        'array_agg(json_build_object(\'asset_id\', a.asset_id, \'name\', n.name, \'schema\', a.schema, '
-        '\'mutable_data\', m.data, \'immutable_data\', i.data, \'template_immutable_data\', td.data, '
-        '\'num_burned\', ts.num_burned, \'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', ts.avg_usd_price, '
-        '\'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
+        'array_agg(json_build_object(\'asset_id\', a.asset_id, \'name\', n.name, \'collection\', a.collection, '
+        '\'schema\', a.schema, \'mutable_data\', m.data, \'immutable_data\', i.data, \'template_immutable_data\', '
+        'td.data, \'num_burned\', ts.num_burned, \'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', '
+        'ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
         '\'last_sold_listing_id\', last_sold_listing_id, '
-        '\'last_sold_timestamp\', ts.last_sold_timestamp AT time zone \'UTC\', \'floor_price\', fp.floor_price, '
+        '\'last_sold_timestamp\', ts.last_sold_timestamp, \'floor_price\', fp.floor_price, '
         '\'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, '
         '\'num_minted\', ts.total, \'favorited\', f.user_name IS NOT NULL, '
         '\'template_id\', t.template_id, \'image\', img.image, \'video\', vid.video, '
         '\'universal_preview_image\', CASE WHEN up1.image_id IS NULL THEN img.image ELSE NULL END, '
-        '\'universal_preview_video\', CASE WHEN up2.video_id IS NULL THEN vid.video ELSE NULL END)) AS assets '
+        '\'universal_preview_video\', CASE WHEN up2.video_id IS NULL THEN vid.video ELSE NULL END, '
+        '\'mint\', a.mint, \'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, \'mint_seq\', a.seq, '
+        '\'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, '
+        '\'traits\', {attributes_obj})) AS assets '.format(attributes_obj=_get_attributes_object())
     )
 
 
-def _get_badges_object():
+def _get_badges_object(prefix='a.'):
     return (
         '(SELECT array_agg(json_build_object(\'name\', b.name, \'level\', b.level, \'value\', b.value, '
-        '\'timestamp\', b.timestamp)) FROM badges b WHERE collection = a.collection) AS badges '
+        '\'timestamp\', b.timestamp)) FROM badges b WHERE collection = {}collection) AS badges '.format(prefix)
     )
 
 
-def _get_tags_object():
+def _get_tags_object(prefix='a.'):
     return (
         '(SELECT array_agg(json_build_object(\'tag_id\', tg.tag_id, \'tag_name\', tg.tag_name)) '
-        'FROM tags_mv tg WHERE collection = a.collection) AS tags '
+        'FROM tags_mv tg WHERE collection = {}collection) AS tags '.format(prefix)
     )
 
 
@@ -126,7 +129,7 @@ def _get_attributes_object():
         'FROM assets '
         'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
         'LEFT JOIN attribute_stats USING(attribute_id) '
-        'WHERE asset_id = a.asset_id) AS traits '
+        'WHERE asset_id = a.asset_id) '
     )
 
 
@@ -200,6 +203,11 @@ def construct_category_clause(
     return category_clause
 
 
+def _format_date(date):
+    return datetime.datetime.strptime(date, '%Y-%m-%dT%H:%M:%S' + ('.%f' if '.' in date else '')).strftime(
+        DATE_FORMAT_STRING) if isinstance(date, str) else date.strftime(DATE_FORMAT_STRING)
+
+
 def _format_tags(tags):
     tags_arr = []
     for tag in tags:
@@ -252,58 +260,74 @@ def _format_traits(traits):
 
 
 def _format_asset(asset):
-    asset_obj = {
-        'assetId': asset['asset_id'],
-        'name': asset['name'],
-        'schema': asset['schema'],
-        'mint': asset['mint'],
-        'mutableData': json.loads(asset['mutable_data']) if asset['mutable_data'] else '{}',
-        'immutableData': json.loads(asset['immutable_data']) if asset['immutable_data'] else '{}',
-        'collection': {
-            'collection': asset['collection'],
-            'collectionName': asset['collection_name'],
-            'collectionImage': asset['collection_image'],
-            'tags': _format_tags(asset['tags']) if asset['tags'] else [],
-            'badges': _format_badges(asset['badges']) if asset['badges'] else []
-        },
-        'createdAt': {
-            'date': asset['mint_timestamp'].strftime(DATE_FORMAT_STRING),
-            'block': asset['mint_block_num'],
-            'globalSequence': asset['mint_seq'],
-        },
-        'traits': _format_traits(asset['traits']) if asset['traits'] else [],
-    }
-    if asset['rarity_score']:
-        asset_obj['rarityScore'] = asset['rarity_score']
-        asset_obj['rank'] = asset['rank']
-        asset_obj['numTraits'] = asset['num_traits']
-    if asset['universal_preview_video']:
-        asset_obj['universalPreview'] = _format_collection_thumbnail(
-            asset['universal_preview_video'], asset['collection'], 240)
-    elif asset['universal_preview_image']:
-        asset_obj['universalPreview'] = _format_collection_thumbnail(
-            asset['universal_preview_image'], asset['collection'], 240)
-    if 'template_id' in asset.keys() and asset['template_id']:
-        asset_obj['template'] = {
-            'templateId': asset['template_id'],
-            'immutableData': asset['template_immutable_data'],
-            'stats': {
-                'averageWaxPrice': asset['avg_wax_price'],
-                'averageUsd': asset['avg_usd_price'],
-                'lastSoldWax': asset['last_sold_wax'],
-                'lastSoldUsd': asset['last_sold_usd'],
-                'lastSoldDate': asset['last_sold_timestamp'].strftime(
-                    DATE_FORMAT_STRING) if asset['last_sold_timestamp'] else None,
-                'lastSoldListingId': asset['last_sold_listing_id'],
-                'volumeWax': asset['volume_wax'],
-                'volumeUsd': asset['volume_usd'],
-                'numSales': asset['num_sales'],
-                'numBurned': asset['num_burned'],
-                'numMinted': asset['num_minted'],
-                'floorPrice': asset['floor_price'],
+    try:
+        asset_obj = {
+            'assetId': asset['asset_id'],
+            'name': asset['name'],
+            'schema': asset['schema'],
+            'mint': asset['mint'],
+            'mutableData': json.loads(asset['mutable_data']) if asset['mutable_data'] else '{}',
+            'immutableData': json.loads(asset['immutable_data']) if asset['immutable_data'] else '{}',
+            'createdAt': {
+                'date': _format_date(asset['mint_timestamp']),
+                'block': asset['mint_block_num'],
+                'globalSequence': asset['mint_seq'],
             },
+            'traits': _format_traits(asset['traits']) if asset['traits'] else [],
         }
-    return asset_obj
+        if 'collection_name' in asset.keys():
+            asset_obj['collection'] = {
+                'collection': asset['collection'],
+                'collectionName': asset['collection_name'],
+                'collectionImage': asset['collection_image'],
+                'tags': _format_tags(asset['tags']) if asset['tags'] else [],
+                'badges': _format_badges(asset['badges']) if asset['badges'] else []
+            }
+        if asset['rarity_score']:
+            asset_obj['rarityScore'] = asset['rarity_score']
+            asset_obj['rank'] = asset['rank']
+            asset_obj['numTraits'] = asset['num_traits']
+        if asset['universal_preview_video']:
+            asset_obj['previewImage'] = _format_collection_thumbnail(
+                asset['universal_preview_video'], asset['collection'], 240)
+        elif asset['universal_preview_image']:
+            asset_obj['previewImage'] = _format_collection_thumbnail(
+                asset['universal_preview_image'], asset['collection'], 240)
+        if 'template_id' in asset.keys() and asset['template_id']:
+            stats_obj = {}
+            if asset['avg_wax_price'] and asset['avg_usd_price']:
+                stats_obj['averageWaxPrice'] = asset['avg_wax_price']
+                stats_obj['averageUsd'] = asset['avg_usd_price']
+            if asset['last_sold_wax'] and asset['last_sold_usd']:
+                stats_obj['lastSoldWax'] = asset['last_sold_wax']
+                stats_obj['lastSoldUsd'] = asset['last_sold_usd']
+            if asset['last_sold_timestamp'] and asset['last_sold_listing_id'] and asset['last_sold_wax'] and asset[
+                    'last_sold_usd']:
+                stats_obj['lastSold'] = {
+                    'date': _format_date(asset['last_sold_timestamp']),
+                    'listingId': asset['last_sold_listing_id'],
+                    'priceWax': asset['last_sold_wax'],
+                    'priceUsd': asset['last_sold_usd']
+                }
+            if asset['volume_wax'] and asset['volume_usd']:
+                stats_obj['volumeWax'] = asset['volume_wax']
+                stats_obj['volumeUsd'] = asset['volume_usd']
+            if asset['num_sales']:
+                stats_obj['numSales'] = asset['num_sales']
+            if asset['num_burned']:
+                stats_obj['numBurned'] = asset['num_burned']
+            if asset['num_minted']:
+                stats_obj['numMinted'] = asset['num_minted']
+            if asset['floor_price']:
+                stats_obj['floorPrice'] = asset['floor_price']
+            asset_obj['template'] = {
+                'templateId': asset['template_id'],
+                'immutableData': asset['template_immutable_data'],
+                'stats': stats_obj,
+            }
+        return asset_obj
+    except Exception as e:
+        print(e)
 
 
 def _format_schema(schema):
@@ -385,6 +409,44 @@ def _get_search_term(session, term):
         name = term
 
     return name, asset_id, template_id, collection
+
+
+def _add_mint_filter(min_mint, max_mint, search_clause, format_dict):
+    if min_mint and max_mint:
+        search_clause += (
+            'AND a.mint BETWEEN :min_mint AND :max_mint '
+        )
+        format_dict['min_mint'] = min_mint
+        format_dict['max_mint'] = max_mint
+    elif min_mint:
+        search_clause += (
+            'AND a.mint >= :min_mint '
+        )
+        format_dict['min_mint'] = min_mint
+    elif max_mint:
+        search_clause += (
+            'AND a.mint >= :max_mint '
+        )
+        format_dict['max_mint'] = max_mint
+    return search_clause
+
+
+def _add_recently_sold_filter(recently_sold, search_clause):
+    if recently_sold:
+        table = 'recently_sold_month_mv'
+        if recently_sold == 'hour':
+            table = 'recently_sold_hour_mv'
+        elif recently_sold == 'day':
+            table = 'recently_sold_day_mv'
+        elif recently_sold == 'week':
+            table = 'recently_sold_week_mv'
+
+        search_clause += (
+            ' AND a.template_id IN ('
+            '   SELECT template_id FROM {table} WHERE template_id = a.template_id'
+            ') '.format(table=table)
+        )
+    return search_clause
 
 
 def parallel(requests):
@@ -478,7 +540,6 @@ def schemas(
         limit_clause = 'LIMIT :limit OFFSET :offset'
 
         search_clause = ''
-        market_clause = ''
         order_clause = ''
         personal_blacklist_clause = ''
         search_category_clause = ''
@@ -561,7 +622,6 @@ def schemas(
                 columns_clause=columns_clause,
                 source_clause=source_clause,
                 search_clause=search_clause,
-                market_clause=market_clause,
                 order_clause=order_clause,
                 limit_clause=limit_clause,
                 personal_blacklist_clause=personal_blacklist_clause
@@ -658,7 +718,6 @@ def assets(
         )
 
         search_clause = ''
-        market_clause = ''
         order_clause = ''
         with_clause = ''
         personal_blacklist_clause = ''
@@ -706,13 +765,13 @@ def assets(
             'a.asset_id, a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, '
             'm.data AS mutable_data, i.data AS immutable_data, td.data AS template_immutable_data, ts.num_burned, '
             'a.mint, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, '
-            'ts.last_sold_timestamp AT time zone \'UTC\' AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
+            'ts.last_sold_timestamp AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
             'ts.volume_usd, ts.num_sales, ts.total AS num_minted, t.template_id, img.image, vid.video,'
             'CASE WHEN up1.image_id IS NULL THEN img.image ELSE NULL END AS universal_preview_image, '
             'CASE WHEN up2.video_id IS NULL THEN vid.video ELSE NULL END AS universal_preview_video, '
             'cn.name AS collection_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
             'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
-            '{badges_object}, {tags_obj}, {attributes_obj}'.format(
+            '{badges_object}, {tags_obj}, {attributes_obj} AS traits'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(), attributes_obj=_get_attributes_object()
             )
         )
@@ -722,7 +781,7 @@ def assets(
             )
         if search_type == 'pfps':
             search_clause += (
-                'AND p.rarity_score IS NOT NULL '
+                'AND p.asset_id IS NOT NULL '
             )
 
         if verified == 'verified':
@@ -762,37 +821,8 @@ def assets(
                 )
                 format_dict['tag_ids'] = tag_int_arr
 
-        if min_mint and max_mint:
-            search_clause += (
-                'AND a.mint BETWEEN :min_mint AND :max_mint '
-            )
-            format_dict['min_mint'] = min_mint
-            format_dict['max_mint'] = max_mint
-        elif min_mint:
-            search_clause += (
-                'AND a.mint >= :min_mint '
-            )
-            format_dict['min_mint'] = min_mint
-        elif max_mint:
-            search_clause += (
-                'AND a.mint >= :max_mint '
-            )
-            format_dict['max_mint'] = max_mint
-
-        if recently_sold:
-            table = 'recently_sold_month_mv'
-            if recently_sold == 'hour':
-                table = 'recently_sold_hour_mv'
-            elif recently_sold == 'day':
-                table = 'recently_sold_day_mv'
-            elif recently_sold == 'week':
-                table = 'recently_sold_week_mv'
-
-            search_clause += (
-                ' AND a.template_id IN ('
-                '   SELECT template_id FROM {table} WHERE template_id = a.template_id'
-                ') '.format(table=table)
-            )
+        search_clause += _add_mint_filter(min_mint, max_mint, search_clause, format_dict)
+        search_clause += _add_recently_sold_filter(recently_sold, search_clause)
 
         if contract:
             format_dict['contract'] = contract
@@ -885,24 +915,24 @@ def assets(
                 'ORDER BY ts.usd_average {}'
             ).format(order_dir)
         elif order_by == 'floor':
-            search_clause += ' AND asu.lowest IS NOT NULL '
+            search_clause += ' AND fp.floor_price IS NOT NULL '
             order_clause = (
-                'ORDER BY ts.floor {}'
+                'ORDER BY fp.floor_price {}'
             ).format(order_dir)
         elif order_by == 'asset_id':
             order_clause = 'ORDER BY a.asset_id ' + order_dir
 
         if min_average and max_average:
-            market_clause += (
+            search_clause += (
                 ' AND ts.usd_average BETWEEN :min_average AND :max_average '
             )
             format_dict['min_average'] = min_average
             format_dict['max_average'] = max_average
         elif min_average:
-            market_clause += ' AND ts.usd_average >= :min_average '
+            search_clause += ' AND ts.usd_average >= :min_average '
             format_dict['min_average'] = min_average
         elif max_average:
-            market_clause += ' AND ts.usd_average <= :max_average '
+            search_clause += ' AND ts.usd_average <= :max_average '
             format_dict['max_average'] = max_average
 
         sql = (
@@ -915,7 +945,7 @@ def assets(
             'LEFT JOIN pfp_assets p USING(asset_id) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
-            'LEFT JOIN floor_prices_mv fp ON (fp.template_id = a.template_id) '
+            'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
             'LEFT JOIN names cn ON (col.name_id = cn.name_id) '
@@ -933,7 +963,6 @@ def assets(
             '{order_clause} {limit_clause}'.format(
                 with_clause=with_clause.format(
                     search_clause=search_clause,
-                    market_clause=market_clause,
                     limit_clause=limit_clause,
                     order_clause=order_clause,
                     columns_clause=columns_clause
@@ -941,7 +970,6 @@ def assets(
                 columns_clause=columns_clause,
                 source_clause=source_clause,
                 search_clause=search_clause,
-                market_clause=market_clause,
                 order_clause=order_clause,
                 limit_clause=limit_clause,
                 join_clause=join_clause,
@@ -968,9 +996,9 @@ def assets(
 
 
 def listings(
-    term=None, owner=None, market=None, collection=None, schema=None, category=None, limit=100, order_by='name_asc',
+    term=None, owner=None, market=None, collection=None, schema=None, limit=100, order_by='name_asc',
     exact_search=False, search_type='assets', min_price=None, max_price=None,
-    min_average=None, max_average=None, min_mint=None, max_mint=None, contract=None, offset=0,
+    min_mint=None, max_mint=None, contract=None, offset=0,
     verified='verified', user='', favorites=False, backed=False, recently_sold=None,
     attributes=None, pfps_only=False
 ):
@@ -1021,7 +1049,6 @@ def listings(
         )
 
         search_clause = ''
-        market_clause = ''
         order_clause = ''
         with_clause = ''
         personal_blacklist_clause = ''
@@ -1067,26 +1094,31 @@ def listings(
             'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
             'l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
             'FROM listings l '
-            'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
-            'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) ' 
+            'LEFT JOIN listings_helper_mv h USING (sale_id) '
+            'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
+            'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN backed_assets ba USING (asset_id) ' 
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
-            'LEFT JOIN floor_prices_mv fp ON (fp.template_id = a.template_id) '
+            'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) ' 
-            'WHERE TRUE {search_clause} {market_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price {order_clause} {limit_clause}) '
+            'WHERE TRUE {search_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+            '{group_clause} {order_clause} {limit_clause}) '
         )
 
         source_clause = (
             'filtered_listings l2 '
             'INNER JOIN listings l USING (sale_id) '
-            'LEFT JOIN assets a ON (asset_id = ANY(asset_ids)) '
-            'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) ' 
+            'LEFT JOIN listings_helper_mv h USING (sale_id) '
+            'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
+            'LEFT JOIN pfp_assets p USING (asset_id) '
+            'LEFT JOIN backed_assets ba USING (asset_id) ' 
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
-            'LEFT JOIN floor_prices_mv fp ON (fp.template_id = a.template_id) '
+            'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
             'LEFT JOIN names cn ON (col.name_id = cn.name_id) '
@@ -1100,12 +1132,16 @@ def listings(
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
         )
         columns_clause = (
-            'l.market, l.seller, l.timestamp AT time zone \'UTC\' AS timestamp, l.listing_id, l.currency, '
+            'l.market, l.seller, l.timestamp AS timestamp, l.listing_id, l.currency, '
             'l.sale_id, col.verified, l.maker, l.collection, l.price, ci.image as collection_image, '
             'cn.name AS collection_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
-            '{assets_object} '.format(assets_object=_get_assets_object())
+            '{badges_object}, {tags_obj}, {assets_object} '.format(
+                badges_object=_get_badges_object('l.'),
+                tags_obj=_get_tags_object('l.'),
+                assets_object=_get_assets_object()
+            )
         )
-        group_clause = ' GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, l.timestamp, f.user_name '
+        group_clause = ' '
         if search_type == 'packs':
             search_clause += (
                 ' AND EXISTS (SELECT template_id FROM packs p WHERE template_id = a.template_id) '
@@ -1132,18 +1168,12 @@ def listings(
         elif verified == 'blacklisted':
             search_clause += ' AND ac.blacklisted '
 
-        if recently_sold:
-            table = 'recently_sold_month_mv'
-            if recently_sold == 'hour':
-                table = 'recently_sold_hour_mv'
-            elif recently_sold == 'day':
-                table = 'recently_sold_day_mv'
-            elif recently_sold == 'week':
-                table = 'recently_sold_week_mv'
+        search_clause = _add_mint_filter(min_mint, max_mint, search_clause, format_dict)
+        search_clause = _add_recently_sold_filter(recently_sold, search_clause)
 
+        if pfps_only:
             search_clause += (
-                ' AND a.template_id IN ('
-                'SELECT template_id FROM {table} WHERE template_id = a.template_id) '.format(table=table)
+                'AND p.asset_id IS NOT NULL '
             )
 
         if contract:
@@ -1157,18 +1187,18 @@ def listings(
             search_clause += ' AND ba.amount IS NOT NULL '
 
         if min_price and max_price:
-            market_clause += (
+            search_clause += (
                 ' AND estimated_wax_price BETWEEN :min_price AND :max_price '
             )
             format_dict['min_price'] = min_price
             format_dict['max_price'] = max_price
         elif min_price:
-            market_clause += (
+            search_clause += (
                 ' AND estimated_wax_price >= :min_price '
             )
             format_dict['min_price'] = min_price
         elif max_price:
-            market_clause += (
+            search_clause += (
                 ' AND estimated_wax_price <= :max_price '
             )
             format_dict['max_price'] = max_price
@@ -1197,14 +1227,16 @@ def listings(
                     'FROM listings l '
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
+                    'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
                     'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
-                    'LEFT JOIN floor_prices_mv fp ON (fp.template_id = a.template_id) '
+                    'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
                     'LEFT JOIN names n ON (a.name_id = n.name_id) '
-                    'WHERE a.template_id > 0 AND ma.template_id IS NULL {search_clause} {market_clause} '
-                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price {order_clause} {limit_clause}) '
+                    'WHERE a.template_id > 0 AND ma.template_id IS NULL '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+                    '{group_clause} {order_clause} {limit_clause}) '
                 )
 
                 source_clause += (
@@ -1241,14 +1273,16 @@ def listings(
                     'FROM listings l '
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
+                    'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
                     'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
-                    'LEFT JOIN floor_prices_mv fp ON (fp.template_id = a.template_id) '
+                    'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
                     'LEFT JOIN names n ON (a.name_id = n.name_id) '
-                    'WHERE a.mint < ma.mint {search_clause} {market_clause} '
-                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price {order_clause} {limit_clause}) '
+                    'WHERE a.mint < ma.mint {search_clause} '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+                    '{group_clause} {order_clause} {limit_clause}) '
                 )
         if market:
             format_dict['market'] = '{}'.format(market.lower().strip())
@@ -1266,197 +1300,48 @@ def listings(
                     '     asset_id = a1.asset_id AND (bidder = :owner OR seller = :owner) '
                     ' ) '
                 )
-            elif search_type == 'duplicates' or search_type == 'highest_duplicates':
-                source_clause = ' my_assets a1 LEFT JOIN backed_assets_mv ba USING (asset_id) '
-                with_clause += (
-                    ', my_assets AS (SELECT a1.*, COUNT(*) OVER ('
-                    'PARTITION BY a1.author, a1.summary_id) cnt, MIN(a1.mint) OVER ('
-                    'PARTITION BY a1.author, a1.summary_id) AS min_mint, MAX(a1.mint) OVER ('
-                    'PARTITION BY a1.author, a1.summary_id) AS max_mint '
-                    'FROM assets a1 '
-                    'INNER JOIN author_categories ac USING(category_id) '
-                    'LEFT JOIN packs p USING (template_id) '
-                    '{personal_blacklist_clause} '
-                    'LEFT JOIN asset_summaries asu USING (summary_id) '
-                    'LEFT JOIN cheapest_new_mv ch USING (summary_id) '
-                    'LEFT JOIN sales s USING (asset_id) '
-                    'WHERE owner = :search_owner AND seller IS NULL '
-                    '{search_clause}) '.format(
-                        search_clause=search_clause.replace('AND a1.mint >= :min_mint', '').replace(
-                            'AND a1.mint <= :max_mint', ''),
-                        personal_blacklist_clause=personal_blacklist_clause
-                    )
-                )
-                if search_type == 'duplicates':
-                    search_clause += ' AND cnt > 1 AND a1.mint > min_mint'
-                else:
-                    search_clause += ' AND cnt > 1 AND a1.mint = max_mint'
-            elif search_type == 'lowest_mints' or search_type == 'highest_mints':
-                source_clause = ' my_assets a1 LEFT JOIN backed_assets_mv ba USING (asset_id) '
-                with_clause += (
-                    ', my_assets AS (SELECT a1.*, '
-                    'MIN(a1.mint) OVER (PARTITION BY a1.summary_id) AS min_mint, '
-                    'MAX(a1.mint) OVER (PARTITION BY a1.summary_id) AS max_mint '
-                    'FROM assets a1 '
-                    'INNER JOIN author_categories ac USING(category_id) '
-                    'LEFT JOIN packs p USING (template_id) '
-                    'LEFT JOIN asset_summaries asu USING (summary_id) '
-                    'LEFT JOIN cheapest_new_mv ch USING (summary_id) '
-                    '{personal_blacklist_clause} '
-                    'LEFT JOIN sales s USING (asset_id) '
-                    'WHERE owner = :search_owner AND seller IS NULL AND (a1.mint IS NOT NULL AND a1.mint > 0) '
-                    '{search_clause}) '.format(
-                        search_clause=search_clause,
-                        personal_blacklist_clause=personal_blacklist_clause
-                    )
-                )
-                if search_type == 'lowest_mints':
-                    search_clause += ' AND a1.mint = min_mint'
-                else:
-                    search_clause += ' AND a1.mint = max_mint'
-            elif search_type == 'my_packs':
-                source_clause = ' my_assets a1 LEFT JOIN backed_assets_mv ba USING (asset_id) '
-                with_clause += (
-                    ', my_assets AS (SELECT a1.*  '
-                    'FROM assets a1 '
-                    'INNER JOIN author_categories ac USING (category_id) '
-                    'INNER JOIN asset_summaries asu USING (summary_id) '
-                    'INNER JOIN packs p USING (template_id) '
-                    '{personal_blacklist_clause} '
-                    'LEFT JOIN cheapest_new_mv ch USING (summary_id) '
-                    'LEFT JOIN sales s USING (asset_id) '
-                    'WHERE owner = :search_owner AND seller IS NULL '
-                    '{search_clause}) '.format(
-                        search_clause=search_clause,
-                        personal_blacklist_clause=personal_blacklist_clause)
-                )
-            market_clause += ' AND a1.seller = :search_owner '
+                search_clause += ' AND a1.mint = max_mint'
+            else:
+                search_clause += ' AND a1.seller = :search_owner '
 
-        if order_by == 'rarity_score' and search_type == 'pfps':
-            order_clause = 'ORDER BY t.author, t.schema, t.rarity_score {}'.format(order_dir)
-            search_clause += ' AND t.rarity_score IS NOT NULL '
-        elif order_by == 'rarity_score':
-            source_clause += ' INNER JOIN attribute_assets ata USING(asset_id) '
-            order_clause = 'ORDER BY ata.author, ata.schema, ata.rarity_score {}'.format(order_dir)
-            search_clause += ' AND ata.rarity_score IS NOT NULL '
-        elif order_by == 'date' and search_type == 'bulk_multi_sell':
-            order_clause = 'ORDER BY MAX(a1.transferred) {}'.format(order_dir)
-        elif order_by == 'owned' and search_type == 'bulk_multi_sell':
-            order_clause = 'ORDER BY num_owned {}'.format(order_dir)
-        elif order_by == 'date' and search_type == 'tubed':
-            order_clause = 'ORDER BY a1.seq {}'.format(order_dir)
-        elif order_by == 'date' and search_type == 'staked':
-            order_clause = 'ORDER BY a1.seq {}'.format(order_dir)
-        elif order_by == 'date' and search_type == 'summaries':
-            order_clause = 'ORDER BY a1.template_id {}'.format(order_dir)
-        elif order_by == 'date' and search_type == 'auctions':
-            order_clause = 'ORDER BY a.timestamp {}'.format(order_dir)
+        if order_by == 'rarity_score':
+            order_clause = 'ORDER BY l.collection, h.schema, h.rarity_score {}'.format(order_dir)
+            group_clause += ', l.collection, h.schema, h.rarity_score '
+            search_clause += ' AND h.rarity_score IS NOT NULL '
         elif order_by == 'date':
-            order_clause = 'ORDER BY l.timestamp {}'.format(order_dir)
-        elif order_by == 'end' and search_type == 'auctions':
-            order_clause = 'ORDER BY a1.offer_time {}'.format(order_dir)
-        elif order_by == 'volume' and search_type == 'summaries':
-            group_clause += ', tsv.volume_7_days'
-            order_clause = 'ORDER BY tsv.volume_7_days {} NULLS LAST'.format(order_dir)
+            order_clause = 'ORDER BY l.seq {}'.format(order_dir)
         elif order_by == 'price':
-            order_clause = (
-                'ORDER BY estimated_wax_price {}'.format(order_dir)
-            )
-            group_clause += ', estimated_wax_price'
+            order_clause = 'ORDER BY estimated_wax_price {}'.format(order_dir)
+            group_clause += ', estimated_wax_price '
         elif order_by == 'mint':
-            search_clause += ' AND (a1.mint IS NOT NULL AND a1.mint > 0)'
-            if search_type != 'bundles':
-                order_clause = 'ORDER BY a1.mint {}'.format(order_dir)
-        elif order_by == 'diff':
-            search_clause += ' AND lp.price_diff IS NOT NULL '
-            if search_type != 'bundles':
-                order_clause = 'ORDER BY lp.price_diff {}'.format(order_dir)
+            group_clause += ', h.mint '
+            search_clause += ' AND h.mint > 0 '
+            order_clause = 'ORDER BY h.mint {}'.format(order_dir)
         elif order_by == 'template_id':
-            search_clause += ' AND a1.template_id IS NOT NULL '
+            search_clause += ' AND h.template_id IS NOT NULL '
             order_clause = (
-                'ORDER BY template_id {}'
+                'ORDER BY h.template_id {}'
             ).format(order_dir)
-        elif order_by == 'author':
-            search_clause += ' AND a1.author IS NOT NULL '
+            search_clause += ' AND h.template_id IS NOT NULL '
+            group_clause += ', h.template_id '
+        elif order_by == 'collection':
             order_clause = (
-                'ORDER BY a1.author {}'
-            ).format(order_dir)
-        elif order_by == 'rarity':
-            search_clause += ' AND ac.category_3 IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.category_3 {}'
-            ).format(order_dir)
-        elif order_by == 'attr7':
-            search_clause += ' AND ac.attr7 IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.attr7 {}'
-            ).format(order_dir)
-        elif order_by == 'attr8':
-            search_clause += ' AND ac.attr9 IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.attr8 {}'
-            ).format(order_dir)
-        elif order_by == 'attr9':
-            search_clause += ' AND ac.attr9 IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.attr9 {}'
-            ).format(order_dir)
-        elif order_by == 'attr10':
-            search_clause += ' AND ac.attr10 IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.attr10 {}'
-            ).format(order_dir)
-        elif order_by == 'color':
-            search_clause += ' AND ac.color IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.color {}'
-            ).format(order_dir)
-        elif order_by == 'border':
-            search_clause += ' AND ac.border IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.border {}'
-            ).format(order_dir)
-        elif order_by == 'type':
-            search_clause += ' AND ac.type IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.type {}'
-            ).format(order_dir)
-        elif order_by == 'variant':
-            search_clause += ' AND ac.variant IS NOT NULL '
-            order_clause = (
-                'ORDER BY ac.variant {}'
-            ).format(order_dir)
-        elif order_by == 'average':
-            search_clause += ' AND asu.usd_average IS NOT NULL '
-            order_clause = (
-                'ORDER BY asu.usd_average {}'
+                'ORDER BY l.collection {}'
             ).format(order_dir)
         elif order_by == 'floor':
-            search_clause += ' AND asu.lowest IS NOT NULL '
+            search_clause += ' AND h.floor_price IS NOT NULL '
             order_clause = (
-                'ORDER BY asu.lowest {}'
+                'ORDER BY h.floor_price {}'
             ).format(order_dir)
-        elif order_by == 'crafting_cost':
-            search_clause += ' AND wax_cost IS NOT NULL '
-            order_clause = 'ORDER BY wax_cost ' + order_dir
-        elif order_by == 'asset_id':
-            order_clause = 'ORDER BY a.asset_id ' + order_dir
+            group_clause += ', h.floor_price '
 
-        if min_average and max_average:
-            market_clause += (
-                ' AND asu.usd_average BETWEEN :min_average AND :max_average '
-            )
-            format_dict['min_average'] = min_average
-            format_dict['max_average'] = max_average
-        elif min_average:
-            market_clause += ' AND asu.usd_average >= :min_average '
-            format_dict['min_average'] = min_average
-        elif max_average:
-            market_clause += ' AND asu.usd_average <= :max_average '
-            format_dict['max_average'] = max_average
-
-        if category:
-            format_dict['category_type'] = category
+        with_clause = with_clause.format(
+            search_clause=search_clause,
+            limit_clause=limit_clause,
+            order_clause=order_clause,
+            columns_clause=columns_clause,
+            group_clause=group_clause
+        )
 
         sql = (
             'WITH usd_rate AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
@@ -1464,27 +1349,20 @@ def listings(
             'SELECT {columns_clause}, f.user_name IS NOT NULL AS favorited '
             'FROM {source_clause} '
             '{join_clause} '
-            'WHERE TRUE {search_clause} '
-            '{personal_blacklist_clause}'
-            '{group_clause} {order_clause}'.format(
-                with_clause=with_clause.format(
-                    search_clause=search_clause,
-                    market_clause=market_clause,
-                    limit_clause=limit_clause,
-                    order_clause=order_clause,
-                    columns_clause=columns_clause,
-                    group_clause=group_clause
-                ),
+            '{personal_blacklist_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, l.timestamp, f.user_name {group_clause}'
+            '{order_clause}'.format(
+                with_clause=with_clause,
                 columns_clause=columns_clause,
                 source_clause=source_clause,
-                search_clause=search_clause,
-                market_clause=market_clause,
                 group_clause=group_clause,
                 order_clause=order_clause,
                 limit_clause=limit_clause,
                 join_clause=join_clause,
                 personal_blacklist_clause=personal_blacklist_clause
             ))
+
+        print(sql)
 
         res = session.execute(sql, format_dict)
 

@@ -1,5 +1,6 @@
 import os
 from functools import wraps
+from random import random, randint
 
 from flask import Flask, request, Response
 from oto.adaptors.flask import flaskify
@@ -289,15 +290,12 @@ def listings():
     market = request.args.get('market')
     collection = request.args.get('collection')
     schema = request.args.get('schema')
-    category = request.args.get('category')
     limit = request.args.get('limit', 40)
     offset = request.args.get('offset', 0)
     min_mint = request.args.get('min_mint')
     max_mint = request.args.get('max_mint')
     min_price = request.args.get('min_price')
     max_price = request.args.get('max_price')
-    min_average = request.args.get('min_average')
-    max_average = request.args.get('max_average')
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
     favorites = request.args.get('favorites', 'false') == 'true'
@@ -342,9 +340,8 @@ def listings():
         limit = 100
 
     search_res = logic.listings(
-        term, owner, market, collection, schema, category, limit, order_by,
-        exact_search, search_type, min_price, max_price, min_average,
-        max_average, min_mint, max_mint, contract, offset, verified,
+        term, owner, market, collection, schema, limit, order_by,
+        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
         user, favorites, backed, recently_sold, attributes, pfps_only
     )
 

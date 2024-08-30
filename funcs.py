@@ -18,8 +18,6 @@ def log_error(e):
 
 
 def setup_logger(name, log_file, level=logging.INFO):
-    """To setup as many loggers as you want"""
-
     handler = logging.FileHandler(log_file)
 
     logger = logging.getLogger(name)
@@ -27,10 +25,6 @@ def setup_logger(name, log_file, level=logging.INFO):
     logger.addHandler(handler)
 
     return logger
-
-
-# first file logger
-db_logger = setup_logger('db_logger', 'loader_db.log')
 
 
 measure_god = {}

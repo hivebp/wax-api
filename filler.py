@@ -450,7 +450,6 @@ def load_pfp_attributes():
     session = create_session()
 
     try:
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY attribute_floors_mv')
         session.commit()
 
         session.execute(
@@ -1105,6 +1104,27 @@ def parse_action(session, action):
     return end_time - start_time
 
 
+@app.route('/loader/update-floor-prices')
+def update_floor_prices():
+    session = create_session()
+
+    try:
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY listings_floor_breakdown_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_floor_prices_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY attribute_floors_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
+        session.commit()
+    except SQLAlchemyError as err:
+        log_error('update_floor_prices: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        session.remove()
+
+
 @app.route('/loader/update-volume-views')
 def update_volumes():
     session = create_session()
@@ -1127,7 +1147,7 @@ def update_volumes():
 
         return flaskify(oto_response.Response('Volumes Updated'))
     except SQLAlchemyError as err:
-        log_error('move_categories: {}'.format(err))
+        log_error('update_volumes: {}'.format(err))
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
@@ -1152,7 +1172,7 @@ def do_update_sales_summary():
 
         return flaskify(oto_response.Response('Sales Summary Updated'))
     except SQLAlchemyError as err:
-        log_error('move_categories: {}'.format(err))
+        log_error('do_update_sales_summary: {}'.format(err))
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
