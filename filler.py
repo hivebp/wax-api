@@ -1114,6 +1114,10 @@ def update_estimated_wax_price():
             'UPDATE listings SET estimated_wax_price = price / (SELECT usd FROM current_usd_price) '
             'WHERE currency = \'USD\''
         )
+
+        session.commit()
+
+        return flaskify(oto_response.Response('Estimated WAX Prices Updated'))
     except SQLAlchemyError as err:
         log_error('update_estimated_wax_price: {}'.format(err))
         session.rollback()
@@ -1135,6 +1139,8 @@ def update_floor_prices():
         session.commit()
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
         session.commit()
+
+        return flaskify(oto_response.Response('Floor Prices Updated'))
     except SQLAlchemyError as err:
         log_error('update_floor_prices: {}'.format(err))
         session.rollback()
