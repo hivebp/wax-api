@@ -286,7 +286,7 @@ def assets():
 @catch_and_respond()
 def filter_attributes(collection):
     schema = request.args.get('schema')
-    templates = request.args.get('templates', '').split(',')
+    templates = request.args.get('templates')
 
     collection = _format_collection(collection)
 

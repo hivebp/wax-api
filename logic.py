@@ -688,28 +688,30 @@ def filter_attributes(collection, schema=None, templates=None):
         search_dict['schema'] = schema
 
     if templates:
-        search_dict['templates'] = tuple(templates)
+        search_dict['templates'] = tuple(templates.split(','))
         res = session.execute(
-            'SELECT attribute_name, string_value, int_value, float_value, bool_value '
+            'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
+            'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
             'FROM assets a '
             'INNER JOIN attributes att ON attribute_id = ANY(attribute_ids) '
             'WHERE a.collection = :collection '
             '{schema_clause} '
             'AND template_id IN :templates '
-            'GROUP BY 1, 2, 3, 4, 5 '
-            'ORDER BY attribute_name ASC, string_value ASC, int_value ASC, float_value ASC'.format(
+            'GROUP BY 1, 2, 7 '
+            'ORDER BY attribute_name ASC, string_value ASC'.format(
                 schema_clause=schema_clause
             ),
             search_dict
         )
     else:
         res = session.execute(
-            'SELECT attribute_name, string_value, int_value, float_value, bool_value '
+            'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
+            'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
             'FROM attributes a '
             'WHERE collection = :collection '
             '{schema_clause} '
-            'GROUP BY 1, 2, 3, 4, 5 '
-            'ORDER BY attribute_name ASC, string_value ASC, int_value ASC, float_value ASC'.format(
+            'GROUP BY 1, 2, 7 '
+            'ORDER BY attribute_name ASC, string_value ASC'.format(
                 schema_clause=schema_clause
             ),
             search_dict
@@ -719,21 +721,38 @@ def filter_attributes(collection, schema=None, templates=None):
 
     for attribute in res:
         value = attribute['string_value']
-        attribute_type = 'string'
-        if not value:
-            value = attribute['int_value']
-            attribute_type = 'integer'
-        if not value and value != 0:
-            value = attribute['float_value']
-            attribute_type = 'float'
-        if not value and value != 0.0:
+
+        attribute_type = None
+
+        if value:
+            attribute_type = 'string'
+        else:
+            min_value = attribute['min_int_value']
+            max_value = attribute['max_int_value']
+            if min_value or max_value or max_value == 0:
+                attribute_type = 'integer'
+            else:
+                min_value = attribute['min_float_value']
+                max_value = attribute['max_float_value']
+                if min_value or max_value or max_value == 0.0:
+                    value = attribute['float_value']
+                    attribute_type = 'float'
+        if not attribute_type:
             value = attribute['bool_value']
             attribute_type = 'boolean'
-        if attribute['attribute_name'] in attributes.keys():
-            attributes[attribute['attribute_name']]['values'].append(value)
-        else:
+
+        if value and attribute_type in ['string', 'boolean']:
+            if attribute['attribute_name'] in attributes.keys():
+                attributes[attribute['attribute_name']]['values'].append(value)
+            else:
+                attributes[attribute['attribute_name']] = {
+                    'values': [value],
+                    'type': attribute_type
+                }
+        elif attribute_type in ['float', 'integer']:
             attributes[attribute['attribute_name']] = {
-                'values': [value],
+                'minValue': min_value,
+                'maxValue': max_value,
                 'type': attribute_type
             }
 
