@@ -282,6 +282,20 @@ def assets():
     return flaskify(oto_response.Response(search_res))
 
 
+@app.route('/api/filter-attributes/<collection>')
+@catch_and_respond()
+def filter_attributes(collection):
+    schema = request.args.get('schema')
+
+    collection = _format_collection(collection)
+
+    search_res = logic.filter_attributes(
+        collection, schema
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/listings')
 @catch_and_respond()
 def listings():

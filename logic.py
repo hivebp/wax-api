@@ -675,6 +675,55 @@ def get_health():
         session.remove()
 
 
+def filter_attributes(collection, schema=None):
+    session = create_session()
+
+    search_dict = {
+        'collection': collection
+    }
+
+    schema_clause = ''
+    if schema:
+        schema_clause += ' AND schema = :schema'
+        search_dict['schema'] = schema
+
+    res = session.execute(
+        'SELECT attribute_name, string_value, int_value, float_value, bool_value '
+        'FROM attributes '
+        'WHERE collection = :collection '
+        '{schema_clause} '
+        'GROUP BY 1, 2, 3, 4, 5 '
+        'ORDER BY attribute_name ASC, string_value ASC, int_value ASC, float_value ASC'.format(
+            schema_clause=schema_clause
+        ),
+        search_dict
+    )
+
+    attributes = {}
+
+    for attribute in res:
+        value = attribute['string_value']
+        attribute_type = 'string'
+        if not value:
+            value = attribute['int_value']
+            attribute_type = 'integer'
+        if not value and value != 0:
+            value = attribute['float_value']
+            attribute_type = 'float'
+        if not value and value != 0.0:
+            value = attribute['bool_value']
+            attribute_type = 'boolean'
+        if attribute['attribute_name'] in attributes.keys():
+            attributes[attribute['attribute_name']]['values'].append(value)
+        else:
+            attributes[attribute['attribute_name']] = {
+                'values': [value],
+                'type': attribute_type
+            }
+
+    return attributes
+
+
 def assets(
     term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
