@@ -675,7 +675,7 @@ def get_health():
         session.remove()
 
 
-def filter_attributes(collection, schema=None):
+def filter_attributes(collection, schema=None, templates=None):
     session = create_session()
 
     search_dict = {
@@ -684,20 +684,36 @@ def filter_attributes(collection, schema=None):
 
     schema_clause = ''
     if schema:
-        schema_clause += ' AND schema = :schema'
+        schema_clause += ' AND a.schema = :schema'
         search_dict['schema'] = schema
 
-    res = session.execute(
-        'SELECT attribute_name, string_value, int_value, float_value, bool_value '
-        'FROM attributes '
-        'WHERE collection = :collection '
-        '{schema_clause} '
-        'GROUP BY 1, 2, 3, 4, 5 '
-        'ORDER BY attribute_name ASC, string_value ASC, int_value ASC, float_value ASC'.format(
-            schema_clause=schema_clause
-        ),
-        search_dict
-    )
+    if templates:
+        search_dict['templates'] = tuple(templates)
+        res = session.execute(
+            'SELECT attribute_name, string_value, int_value, float_value, bool_value '
+            'FROM assets a '
+            'INNER JOIN attributes att ON attribute_id = ANY(attribute_ids) '
+            'WHERE a.collection = :collection '
+            '{schema_clause} '
+            'AND template_id IN :templates '
+            'GROUP BY 1, 2, 3, 4, 5 '
+            'ORDER BY attribute_name ASC, string_value ASC, int_value ASC, float_value ASC'.format(
+                schema_clause=schema_clause
+            ),
+            search_dict
+        )
+    else:
+        res = session.execute(
+            'SELECT attribute_name, string_value, int_value, float_value, bool_value '
+            'FROM attributes a '
+            'WHERE collection = :collection '
+            '{schema_clause} '
+            'GROUP BY 1, 2, 3, 4, 5 '
+            'ORDER BY attribute_name ASC, string_value ASC, int_value ASC, float_value ASC'.format(
+                schema_clause=schema_clause
+            ),
+            search_dict
+        )
 
     attributes = {}
 

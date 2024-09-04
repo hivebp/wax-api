@@ -286,11 +286,12 @@ def assets():
 @catch_and_respond()
 def filter_attributes(collection):
     schema = request.args.get('schema')
+    templates = request.args.get('templates', '').split(',')
 
     collection = _format_collection(collection)
 
     search_res = logic.filter_attributes(
-        collection, schema
+        collection, schema, templates
     )
 
     return flaskify(oto_response.Response(search_res))
