@@ -235,12 +235,12 @@ def assets():
     collection = request.args.get('collection')
     schema = request.args.get('schema')
     tags = request.args.get('tags')
-    limit = request.args.get('limit', 40)
-    offset = request.args.get('offset', 0)
-    min_mint = request.args.get('min_mint')
-    max_mint = request.args.get('max_mint')
-    min_average = request.args.get('min_average')
-    max_average = request.args.get('max_average')
+    limit = int(request.args.get('limit', 40))
+    offset = int(request.args.get('offset', 0))
+    min_mint = int(request.args.get('min_mint', 0))
+    max_mint = int(request.args.get('max_mint', 0))
+    min_average = int(request.args.get('min_average', 0))
+    max_average = int(request.args.get('max_average', 0))
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
     favorites = request.args.get('favorites', 'false') == 'true'
@@ -305,12 +305,12 @@ def listings():
     market = request.args.get('market')
     collection = request.args.get('collection')
     schema = request.args.get('schema')
-    limit = request.args.get('limit', 40)
-    offset = request.args.get('offset', 0)
-    min_mint = request.args.get('min_mint')
-    max_mint = request.args.get('max_mint')
-    min_price = request.args.get('min_price')
-    max_price = request.args.get('max_price')
+    limit = int(request.args.get('limit', 40))
+    offset = int(request.args.get('offset', 0))
+    min_mint = int(request.args.get('min_mint', 0))
+    max_mint = int(request.args.get('max_mint', 0))
+    min_price = int(request.args.get('min_price', 0))
+    max_price = int(request.args.get('max_price', 0))
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
     favorites = request.args.get('favorites', 'false') == 'true'
@@ -321,7 +321,7 @@ def listings():
     exact_search = request.args.get('exact_search') == 'true'
     search_type = request.args.get('search_type') if request.args.get('search_type') else ''
     attributes = request.args.get('attributes', None)
-    pfps_only = request.args.get('pfps_only', 'false') == 'true'
+    only = request.args.get('only', None)
 
     if collection:
         collection = _format_collection(collection)
@@ -357,7 +357,7 @@ def listings():
     search_res = logic.listings(
         term, owner, market, collection, schema, limit, order_by,
         exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
-        user, favorites, backed, recently_sold, attributes, pfps_only
+        user, favorites, backed, recently_sold, attributes, only
     )
 
     return flaskify(oto_response.Response(search_res))

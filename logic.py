@@ -93,13 +93,14 @@ def _get_assets_object():
         '\'schema\', a.schema, \'mutable_data\', m.data, \'immutable_data\', i.data, \'template_immutable_data\', '
         'td.data, \'num_burned\', ts.num_burned, \'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', '
         'ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
-        '\'last_sold_listing_id\', last_sold_listing_id, '
-        '\'last_sold_timestamp\', ts.last_sold_timestamp, \'floor_price\', fp.floor_price, '
-        '\'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, '
-        '\'num_minted\', ts.total, \'favorited\', f.user_name IS NOT NULL, '
+        '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
+        '\'owner\', a.owner, \'burned\', burned, \'floor_price\', fp.floor_price, \'rwax_symbol\', r.symbol, '
+        '\'rwax_contract\', r.contract, \'template_token_supply\', r.template_token_supply, '
+        '\'rwax_max_assets\', r.max_assets, \'trait_factors\', rt.trait_factors, \'rwax_supply\', rt.maximum_supply, '
+        '\'rwax_decimals\', rt.decimals, \'rwax_token_name\', rt.token_name, \'rwax_token_logo\', rt.token_logo, '
+        '\'rwax_token_logo_lg\', rt.token_logo_lg, \'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, '
+        '\'num_sales\', ts.num_sales, \'num_minted\', ts.total, \'favorited\', f.user_name IS NOT NULL, '
         '\'template_id\', t.template_id, \'image\', img.image, \'video\', vid.video, '
-        '\'universal_preview_image\', CASE WHEN up1.image_id IS NULL THEN img.image ELSE NULL END, '
-        '\'universal_preview_video\', CASE WHEN up2.video_id IS NULL THEN vid.video ELSE NULL END, '
         '\'mint\', a.mint, \'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, \'mint_seq\', a.seq, '
         '\'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, '
         '\'traits\', {attributes_obj})) AS assets '.format(attributes_obj=_get_attributes_object())
@@ -265,7 +266,10 @@ def _format_asset(asset):
             'assetId': asset['asset_id'],
             'name': asset['name'],
             'schema': asset['schema'],
+            'owner': asset['owner'],
+            'burned': asset['burned'],
             'mint': asset['mint'],
+            'collection': asset['collection'],
             'mutableData': json.loads(asset['mutable_data']) if asset['mutable_data'] else '{}',
             'immutableData': json.loads(asset['immutable_data']) if asset['immutable_data'] else '{}',
             'createdAt': {
@@ -287,12 +291,22 @@ def _format_asset(asset):
             asset_obj['rarityScore'] = asset['rarity_score']
             asset_obj['rank'] = asset['rank']
             asset_obj['numTraits'] = asset['num_traits']
-        if asset['universal_preview_video']:
-            asset_obj['previewImage'] = _format_collection_thumbnail(
-                asset['universal_preview_video'], asset['collection'], 240)
-        elif asset['universal_preview_image']:
-            asset_obj['previewImage'] = _format_collection_thumbnail(
-                asset['universal_preview_image'], asset['collection'], 240)
+        if 'rwax_symbol' in asset.keys() and asset['rwax_symbol']:
+            asset_obj['rwax'] = {
+                'symbol': asset['rwax_symbol'],
+                'contract': asset['rwax_contract'],
+                'decimals': asset['rwax_decimals'],
+                'tokenName': asset['rwax_token_name'],
+                'tokenLogo': asset['rwax_token_logo'],
+                'tokenLogoLarge': asset['rwax_token_logo_lg'],
+                'templateMaxAssets': asset['rwax_max_assets'],
+                'templateSupply': asset['template_token_supply'],
+                'totalSupply': asset['rwax_supply']
+            }
+        if asset['video']:
+            asset_obj['video'] = asset['video']
+        if asset['image']:
+            asset_obj['image'] = asset['image']
         if 'template_id' in asset.keys() and asset['template_id']:
             stats_obj = {}
             if asset['avg_wax_price'] and asset['avg_usd_price']:
@@ -846,16 +860,17 @@ def assets(
             'assets a '
         )
         columns_clause = (
-            'a.asset_id, a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, '
+            'a.asset_id, a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, a.owner, a.burned, '
             'm.data AS mutable_data, i.data AS immutable_data, td.data AS template_immutable_data, ts.num_burned, '
             'a.mint, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, '
             'ts.last_sold_timestamp AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
-            'ts.volume_usd, ts.num_sales, ts.total AS num_minted, t.template_id, img.image, vid.video,'
-            'CASE WHEN up1.image_id IS NULL THEN img.image ELSE NULL END AS universal_preview_image, '
-            'CASE WHEN up2.video_id IS NULL THEN vid.video ELSE NULL END AS universal_preview_video, '
+            'ts.volume_usd, ts.num_sales, ts.total AS num_minted, t.template_id, img.image, vid.video, '
             'cn.name AS collection_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
             'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
-            '{badges_object}, {tags_obj}, {attributes_obj} AS traits'.format(
+            'r.symbol AS rwax_symbol, r.contract AS rwax_contract, r.template_token_supply, '
+            'r.max_assets AS rwax_max_assets, rt.trait_factors, rt.maximum_supply AS rwax_supply, '
+            'rt.decimals AS rwax_decimals, rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, '
+            'rt.token_logo_lg AS rwax_token_logo_lg, {badges_object}, {tags_obj}, {attributes_obj} AS traits'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(), attributes_obj=_get_attributes_object()
             )
         )
@@ -865,19 +880,24 @@ def assets(
             )
         if search_type == 'pfps':
             search_clause += (
-                'AND p.asset_id IS NOT NULL '
+                ' AND p.asset_id IS NOT NULL '
+            )
+        if search_type == 'rwax':
+            search_clause += (
+                ' AND ra.asset_id IS NOT NULL '
             )
 
         if verified == 'verified':
             search_clause += ' AND col.verified '
         elif verified == 'unverified':
             search_clause += (
-                ' AND ((ac.verified IS NULL AND ac.blacklisted IS NULL) OR (NOT ac.verified AND NOT ac.blacklisted))'
+                ' AND ((col.verified IS NULL AND col.blacklisted IS NULL) '
+                '  OR (NOT col.verified AND NOT col.blacklisted))'
             )
         elif verified == 'all':
-            search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
+            search_clause += ' AND (NOT col.blacklisted OR col.blacklisted IS NULL) '
         elif verified == 'blacklisted':
-            search_clause += ' AND ac.blacklisted '
+            search_clause += ' AND col.blacklisted '
 
         if tags:
             tag_ids = tags.split(',')
@@ -1025,8 +1045,11 @@ def assets(
             'SELECT {columns_clause}, f.user_name IS NOT NULL AS favorited '
             'FROM {source_clause} '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
-            'LEFT JOIN collections col USING (collection) '
+            'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN rwax_assets ra USING(asset_id) '
+            'LEFT JOIN rwax_templates r ON (a.template_id = r.template_id) '
+            'LEFT JOIN rwax_tokens rt ON (r.contract = rt.contract AND r.symbol = rt.symbol) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
@@ -1036,8 +1059,6 @@ def assets(
             'LEFT JOIN images img ON (a.image_id = img.image_id) '
             'LEFT JOIN images ci ON (col.image_id = ci.image_id) '
             'LEFT JOIN videos vid ON (a.video_id = vid.video_id) '
-            'LEFT JOIN universal_previews up1 ON (a.image_id = up1.image_id) '
-            'LEFT JOIN universal_previews up2 ON (a.video_id = up2.video_id) '
             'LEFT JOIN data m ON (a.mutable_data_id = m.data_id) '
             'LEFT JOIN data i ON (a.immutable_data_id = i.data_id) '
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
@@ -1059,6 +1080,8 @@ def assets(
                 join_clause=join_clause,
                 personal_blacklist_clause=personal_blacklist_clause
             ))
+
+        print(sql)
 
         res = session.execute(sql, format_dict)
 
@@ -1084,7 +1107,7 @@ def listings(
     exact_search=False, search_type='assets', min_price=None, max_price=None,
     min_mint=None, max_mint=None, contract=None, offset=0,
     verified='verified', user='', favorites=False, backed=False, recently_sold=None,
-    attributes=None, pfps_only=False
+    attributes=None, only=False
 ):
     session = create_session()
 
@@ -1181,6 +1204,7 @@ def listings(
             'LEFT JOIN listings_helper_mv h USING (sale_id) '
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1198,7 +1222,10 @@ def listings(
             'LEFT JOIN listings_helper_mv h USING (sale_id) '
             'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
+            'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
+            'LEFT JOIN rwax_templates r ON (a.template_id = r.template_id) '
+            'LEFT JOIN rwax_tokens rt ON (r.contract = rt.contract AND r.symbol = rt.symbol) '
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats ts ON (a.template_id = ts.template_id) '
@@ -1209,8 +1236,6 @@ def listings(
             'LEFT JOIN images img ON (a.image_id = img.image_id) '
             'LEFT JOIN images ci ON (col.image_id = ci.image_id) '
             'LEFT JOIN videos vid ON (a.video_id = vid.video_id) '
-            'LEFT JOIN universal_previews up1 ON (a.image_id = up1.image_id) '
-            'LEFT JOIN universal_previews up2 ON (a.video_id = up2.video_id) '
             'LEFT JOIN data m ON (a.mutable_data_id = m.data_id) '
             'LEFT JOIN data i ON (a.immutable_data_id = i.data_id) '
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
@@ -1245,19 +1270,24 @@ def listings(
             search_clause += ' AND col.verified '
         elif verified == 'unverified':
             search_clause += (
-                ' AND ((ac.verified IS NULL AND ac.blacklisted IS NULL) OR (NOT ac.verified AND NOT ac.blacklisted))'
+                ' AND ((col.verified IS NULL AND col.blacklisted IS NULL)'
+                '  OR (NOT col.verified AND NOT col.blacklisted))'
             )
         elif verified == 'all':
-            search_clause += ' AND (NOT ac.blacklisted OR ac.blacklisted IS NULL) '
+            search_clause += ' AND (NOT col.blacklisted OR col.blacklisted IS NULL) '
         elif verified == 'blacklisted':
-            search_clause += ' AND ac.blacklisted '
+            search_clause += ' AND col.blacklisted '
 
         search_clause = _add_mint_filter(min_mint, max_mint, search_clause, format_dict)
         search_clause = _add_recently_sold_filter(recently_sold, search_clause)
 
-        if pfps_only:
+        if only == 'pfps':
             search_clause += (
                 'AND p.asset_id IS NOT NULL '
+            )
+        elif only == 'rwax':
+            search_clause += (
+                'AND ra.asset_id IS NOT NULL '
             )
 
         if contract:
@@ -1312,6 +1342,7 @@ def listings(
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1358,6 +1389,7 @@ def listings(
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1394,6 +1426,7 @@ def listings(
             search_clause += ' AND h.rarity_score IS NOT NULL '
         elif order_by == 'date':
             order_clause = 'ORDER BY l.seq {}'.format(order_dir)
+            group_clause += ', l.seq '
         elif order_by == 'price':
             order_clause = 'ORDER BY estimated_wax_price {}'.format(order_dir)
             group_clause += ', estimated_wax_price '
@@ -1447,7 +1480,6 @@ def listings(
             ))
 
         print(sql)
-
         res = session.execute(sql, format_dict)
 
         results = []

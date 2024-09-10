@@ -4673,14 +4673,16 @@ def load_create_token(session, token):
     new_token['contract'] = data['contract']
     templates = []
     new_token['template_ids'] = []
+    max_assets_accumulated = 0
     for template in data['templates']:
         new_token['template_ids'].append(template['template_id'])
+        max_assets = template['max_assets_to_tokonize'] if 'max_assets_to_tokonize' in template else template[
+            'max_assets_to_tokenize']
+        max_assets_accumulated += max_assets
         templates.append(
             {
                 'template_id': template['template_id'],
-                'max_assets': template[
-                    'max_assets_to_tokonize'] if 'max_assets_to_tokonize' in template else template[
-                    'max_assets_to_tokenize']
+                'max_assets': max_assets
             }
         )
     new_token['templates'] = json.dumps(templates)
@@ -4700,6 +4702,35 @@ def load_create_token(session, token):
         'WHERE NOT EXISTS (SELECT seq FROM rwax_tokens WHERE seq = :seq)',
         new_token
     )
+
+    for template in templates:
+        new_token['max_assets'] = template['max_assets']
+        new_token['template_token_supply'] = (
+            new_token['maximum_supply'] / max_assets_accumulated
+        ) * template['max_assets']
+
+        session_execute_logged(
+            session,
+            'INSERT INTO rwax_templates ('
+            '   template_id, collection, symbol, contract, max_assets, template_token_supply, seq, block_num, timestamp'
+            ') '
+            'SELECT :template_id, :collection, :symbol, :contract, :max_assets, :template_token_supply, :seq, '
+            ':block_num, :timestamp '
+            'WHERE NOT EXISTS (SELECT seq FROM rwax_templates WHERE seq = :seq)',
+            new_token
+        )
+
+        session_execute_logged(
+            session,
+            'INSERT INTO rwax_assets ('
+            '   asset_id, collection, schema, template_id, max_assets, template_token_supply, seq, block_num, timestamp'
+            ') '
+            'SELECT :template_id, :collection, :symbol, :contract, :max_assets, :template_token_supply, :seq, '
+            ':block_num, :timestamp '
+            'WHERE NOT EXISTS (SELECT seq FROM rwax_templates WHERE seq = :seq)',
+            new_token
+        )
+
 
 
 @catch_and_log()

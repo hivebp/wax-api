@@ -37,6 +37,7 @@ isLoadingUSD = False
 isVacuuming = False
 isUpdatingAtomicAssets = False
 isLoadingPFPAttributes = False
+isUpdatingRWAXAssets = False
 
 
 action_measure_god = {
@@ -439,6 +440,44 @@ def add_sets():
     return flaskify(oto_response.Response('Added {} Sets'.format(cnt)))
 
 
+@app.route('/loader/update-rwax-assets')
+def update_rwax_assets():
+    global isUpdatingRWAXAssets
+
+    if isUpdatingRWAXAssets:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+    isUpdatingRWAXAssets = True
+
+    session = create_session()
+
+    try:
+        session.execute(
+            'INSERT INTO rwax_assets '
+            'SELECT asset_id, collection, schema, template_id '
+            'FROM rwax_templates '
+            'LEFT JOIN assets a USING (collection, template_id) '
+            'WHERE NOT EXISTS ('
+            '   SELECT asset_id FROM rwax_assets WHERE asset_id = a.asset_id'
+            ')'
+        )
+
+        session.execute(
+            'DELETE FROM rwax_assets '
+            'WHERE asset_id IN (SELECT asset_id FROM rwax_assets ra LEFT JOIN assets a USING (asset_id) '
+            'WHERE a.template_id NOT IN (SELECT template_id FROM rwax_templates WHERE template_id = a.template_id))'
+        )
+    except SQLAlchemyError as err:
+        log_error('update_rwax_assets: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    except Exception as err:
+        log_error('update_rwax_assets: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        session.remove()
+        isUpdatingRWAXAssets = False
+
+
 @app.route('/loader/load-pfp-attributes')
 def load_pfp_attributes():
     global isLoadingPFPAttributes
@@ -507,6 +546,18 @@ def load_pfp_attributes():
                 ') '
                 'WHERE num_traits IS NULL AND attribute_ids IS NOT NULL AND a.collection = :collection ',
                 {'collection': collection['collection']}
+            )
+
+            session.execute(
+                'DELETE FROM pfp_assets WHERE asset_id IN ('
+                '   SELECT asset_id '
+                '   FROM pfp_assets p '
+                '   INNER JOIN assets a USING(asset_id) '
+                '   WHERE p.collection = :collection '
+                '   AND (a.collection, a.schema) NOT IN ('
+                '       SELECT collection, schema FROM pfp_schemas'
+                '   )'
+                ')', {'collection': collection['collection']}
             )
 
         session.commit()
