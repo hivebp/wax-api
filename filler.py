@@ -466,6 +466,8 @@ def update_rwax_assets():
             'WHERE asset_id IN (SELECT asset_id FROM rwax_assets ra LEFT JOIN assets a USING (asset_id) '
             'WHERE a.template_id NOT IN (SELECT template_id FROM rwax_templates WHERE template_id = a.template_id))'
         )
+
+        session.commit()
     except SQLAlchemyError as err:
         log_error('update_rwax_assets: {}'.format(err))
         session.rollback()
