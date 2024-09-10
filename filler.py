@@ -479,9 +479,11 @@ def update_rwax_assets():
         session.remove()
         isUpdatingRWAXAssets = False
 
+    return flaskify(oto_response.Response('Updated RWAX Assets'))
 
-@app.route('/loader/load-pfp-attributes')
-def load_pfp_attributes():
+
+@app.route('/loader/update-pfp-attributes')
+def update_pfp_attributes():
     global isLoadingPFPAttributes
 
     if isLoadingPFPAttributes:
@@ -671,6 +673,8 @@ def load_pfp_attributes():
     finally:
         session.remove()
         isLoadingPFPAttributes = False
+
+    return flaskify(oto_response.Response('Updated PFP Attributes'))
 
 
 @app.route('/loader/sync-new-collection-verifications')
