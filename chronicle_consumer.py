@@ -512,6 +512,9 @@ def handle_transaction(action, block_num, timestamp, session):
         return
     try:
         traces = action['trace']
+        status = traces['status']
+        if status != 'executed':
+            return
         trx_id = traces['id']
         for trace in traces['action_traces']:
             try:

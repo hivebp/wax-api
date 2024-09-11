@@ -297,6 +297,16 @@ def filter_attributes(collection):
     return flaskify(oto_response.Response(search_res))
 
 
+@app.route('/api/collection-filters/<collection>')
+@catch_and_respond()
+def collection_filters(collection):
+    collection = _format_collection(collection)
+
+    search_res = logic.collection_filters(collection)
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/listings')
 @catch_and_respond()
 def listings():

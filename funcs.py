@@ -3908,7 +3908,7 @@ def load_suggesttag(session, action):
 
     new_suggestion['suggester'] = action['act']['authorization'][0]['actor']
     new_suggestion['tag_id'] = data['tag_id']
-    new_suggestion['author'] = data['collection_name']
+    new_suggestion['collection'] = data['collection_name']
 
     session_execute_logged(
         session,

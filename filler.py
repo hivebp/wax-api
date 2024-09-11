@@ -468,6 +468,8 @@ def update_rwax_assets():
         )
 
         session.commit()
+
+        return flaskify(oto_response.Response('Updated RWAX Assets'))
     except SQLAlchemyError as err:
         log_error('update_rwax_assets: {}'.format(err))
         session.rollback()
@@ -478,8 +480,6 @@ def update_rwax_assets():
     finally:
         session.remove()
         isUpdatingRWAXAssets = False
-
-    return flaskify(oto_response.Response('Updated RWAX Assets'))
 
 
 @app.route('/loader/update-pfp-attributes')
@@ -661,8 +661,8 @@ def update_pfp_attributes():
                 {'collection': collection['collection']}
             )
             session.commit()
-            
-        return flaskify(oto_response.Response('Attribute Assets Updated'))
+
+        return flaskify(oto_response.Response('Updated PFP Attributes'))
     except SQLAlchemyError as err:
         log_error('load_pfp_attributes: {}'.format(err))
         session.rollback()
@@ -673,8 +673,6 @@ def update_pfp_attributes():
     finally:
         session.remove()
         isLoadingPFPAttributes = False
-
-    return flaskify(oto_response.Response('Updated PFP Attributes'))
 
 
 @app.route('/loader/sync-new-collection-verifications')
@@ -1200,6 +1198,72 @@ def update_floor_prices():
         return flaskify(oto_response.Response('Floor Prices Updated'))
     except SQLAlchemyError as err:
         log_error('update_floor_prices: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        session.remove()
+
+
+@app.route('/loader/clean-up')
+def clean_up():
+    session = create_session()
+    try:
+        res = session.execute(
+            'SELECT transaction_id, listing_id, seq, seller '
+            'FROM duplicate_atomic_listings '
+            'LEFT JOIN chronicle_transactions USING (seq) '
+            'ORDER BY listing_id DESC'
+        )
+
+        for trx in res:
+            trx_id = trx['transaction_id']
+
+            url = 'https://wax.hivebp.io/v2/history/get_transaction?id=' + trx_id
+
+            response = requests.request("GET", url)
+
+            content = json.loads(response.content)
+            if not content['executed']:
+                session.execute(
+                    'INSERT INTO deleted_chronicle_transactions '
+                    'SELECT * FROM chronicle_transactions WHERE seq = :seq AND transaction_id = :transaction_id',
+                    {'seq': trx['seq'], 'transaction_id': trx_id}
+                )
+                session.commit()
+    except SQLAlchemyError as err:
+        log_error('clean_up: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    except Exception as err:
+        print(err)
+    finally:
+        session.remove()
+
+
+@app.route('/loader/update-template-stats')
+def update_template_stats():
+    session = create_session()
+    try:
+        session.execute(
+            'INSERT INTO template_sales '
+            'SELECT template_id, wax_price, usd_price, s.seq, s.block_num, s.timestamp '
+            'FROM sales s '
+            'INNER JOIN assets a ON a.asset_id = s.asset_ids[1] '
+            'WHERE s.seq > (SELECT MAX(seq) FROM template_sales) '
+            'AND template_id > 0 AND ARRAY_LENGTH(asset_ids, 1) = 1'
+        )
+        session.commit()
+
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_stats_mv')
+        session.commit()
+
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY schema_stats_mv')
+        session.commit()
+
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY templates_minted_mv')
+        session.commit()
+    except SQLAlchemyError as err:
+        log_error('update_template_stats: {}'.format(err))
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
