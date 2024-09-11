@@ -108,5 +108,5 @@ Run ```curl -L 0.0.0.0:5002/filler/start``` to start the filler and ```curl -L 0
 */15 * * * * curl -L 0.0.0.0:5002/filler/update-template-stats
 0 */1 * * * curl -L 0.0.0.0:5002/filler/update-volumes
 */10 * * * * curl -L 0.0.0.0:5002/filler/sync-new-collection-verifications
-*/30 * * * * curl -L 0.0.0.0:5002/filler/load-pfp-attributes
+*/30 * * * * curl -L 0.0.0.0:5002/filler/update-pfp-attributes
 ```

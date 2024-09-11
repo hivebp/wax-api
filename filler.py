@@ -1246,7 +1246,7 @@ def update_template_stats():
     try:
         session.execute(
             'INSERT INTO template_sales '
-            'SELECT template_id, wax_price, usd_price, s.seq, s.block_num, s.timestamp '
+            'SELECT template_id, a.schema, a.collection, wax_price, usd_price, s.seq, s.block_num, s.timestamp '
             'FROM sales s '
             'INNER JOIN assets a ON a.asset_id = s.asset_ids[1] '
             'WHERE s.seq > (SELECT MAX(seq) FROM template_sales) '
