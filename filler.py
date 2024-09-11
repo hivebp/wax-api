@@ -38,6 +38,12 @@ isVacuuming = False
 isUpdatingAtomicAssets = False
 isLoadingPFPAttributes = False
 isUpdatingRWAXAssets = False
+isUpdatingRecentlySold = False
+isUpdatingFloorPrices = False
+isUpdatingTemplateStats = False
+isUpdatingVolumes = False
+isUpdatingSales = False
+isUpdatingDrops = False
 
 
 action_measure_god = {
@@ -1183,6 +1189,13 @@ def update_estimated_wax_price():
 
 @app.route('/loader/update-floor-prices')
 def update_floor_prices():
+    global isUpdatingFloorPrices
+
+    if isUpdatingFloorPrices:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingFloorPrices = True
+
     session = create_session()
 
     try:
@@ -1201,6 +1214,7 @@ def update_floor_prices():
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
+        isUpdatingFloorPrices = False
         session.remove()
 
 
@@ -1242,6 +1256,13 @@ def clean_up():
 
 @app.route('/loader/update-template-stats')
 def update_template_stats():
+    global isUpdatingTemplateStats
+
+    if isUpdatingTemplateStats:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingTemplateStats = True
+
     session = create_session()
     try:
         session.execute(
@@ -1267,11 +1288,19 @@ def update_template_stats():
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
+        isUpdatingTemplateStats = False
         session.remove()
 
 
 @app.route('/loader/update-volume-views')
 def update_volumes():
+    global isUpdatingVolumes
+
+    if isUpdatingVolumes:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingVolumes = True
+
     session = create_session()
 
     try:
@@ -1296,11 +1325,19 @@ def update_volumes():
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
+        isUpdatingVolumes = False
         session.remove()
 
 
-@app.route('/loader/update-sales-views')
-def do_update_sales_summary():
+@app.route('/loader/update-sales-summary')
+def update_sales_summary():
+    global isUpdatingSales
+
+    if isUpdatingSales:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingSales = True
+
     session = create_session()
 
     try:
@@ -1321,6 +1358,7 @@ def do_update_sales_summary():
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
+        isUpdatingSales = False
         session.remove()
 
 
@@ -1357,6 +1395,13 @@ def get_delphi_oracle_actions():
 
 @app.route('/loader/refresh-drops-views')
 def refresh_drops_views():
+    global isUpdatingDrops
+
+    if isUpdatingDrops:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingDrops = True
+
     start_time = time.time()
     session = create_session()
     try:
@@ -1368,6 +1413,7 @@ def refresh_drops_views():
     except Exception as err:
         log_error('refresh_drops_views: {}'.format(err))
     finally:
+        isUpdatingDrops = False
         session.remove()
     end_time = time.time()
 
@@ -1376,6 +1422,12 @@ def refresh_drops_views():
 
 @app.route('/loader/refresh-recently-sold')
 def refresh_recently_sold():
+    global isUpdatingRecentlySold
+
+    if isUpdatingRecentlySold:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingRecentlySold = True
     start_time = time.time()
     session = create_session()
     try:
@@ -1390,6 +1442,7 @@ def refresh_recently_sold():
     except Exception as err:
         log_error('refresh_recently_sold: {}'.format(err))
     finally:
+        isUpdatingRecentlySold = False
         session.remove()
     end_time = time.time()
 
