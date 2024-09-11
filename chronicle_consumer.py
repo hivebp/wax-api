@@ -419,7 +419,7 @@ def handle_transfers_reversed(session, block_num):
 
     for trx in reverse_trxs:
         session.execute(
-            'UPDATE assets SET owner = :sender '
+            'UPDATE assets SET owner = sender '
             'FROM transfers_reversed s WHERE asset_id = ANY(asset_ids) AND s.seq = :seq', {'seq': trx['seq']}
         )
 
