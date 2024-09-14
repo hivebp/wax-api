@@ -1069,17 +1069,13 @@ def load_mint_pfp(session, mint):
 
     transaction = load_transaction_basics(mint)
     transaction['result_id'] = result_id
+    transaction['drop_id'] = data['drop_id']
+    transaction['owner'] = data['owner']
 
     session_execute_logged(
         session,
         'INSERT INTO pfp_mints SELECT :result_id, :seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM pfp_mints WHERE seq = :seq)',
-        transaction
-    )
-
-    session_execute_logged(
-        session,
-        'UPDATE pfp_results SET minted = TRUE WHERE result_id = :result_id',
         transaction
     )
 
@@ -1107,17 +1103,16 @@ def load_remint_pfp(session, mint):
     data = _get_data(mint)
     transaction = load_transaction_basics(mint)
     transaction['result_id'] = data['result_id']
+    transaction['drop_id'] = data['drop_id']
+    transaction['asset_id'] = data['asset_id']
+    transaction['owner'] = data['owner']
+    transaction['hash'] = data['hash']
 
     session_execute_logged(
         session,
-        'INSERT INTO pfp_swap_mints SELECT :result_id, :seq, :block_num, :timestamp '
+        'INSERT INTO pfp_swap_mints SELECT :result_id, :drop_id, :asset_id, :owner, :hash, '
+        ':seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM pfp_swap_mints WHERE seq = :seq)',
-        transaction
-    )
-
-    session_execute_logged(
-        session,
-        'UPDATE pfp_swap_results SET minted = TRUE WHERE result_id = :result_id',
         transaction
     )
 
@@ -2040,6 +2035,7 @@ def update_sales_summary(session):
         '   WHERE dc.seq > (SELECT MAX(seq) FROM sales_summary WHERE type = \'drops\')'
         ') dt'
     )
+
     session.commit()
 
 
@@ -3194,7 +3190,7 @@ def load_market_myth_buy(session, action):
     buy['referral'] = data['referral'] if 'referral' in data and data['referral'] == 'waxplorerref' else None
 
     session.execute(
-        'INSERT INTO secondary_market_sales '
+        'INSERT INTO market_myth_sales '
         'SELECT :asset_ids, :seller, :buyer, :price, :currency, :asset_id, :market, NULL, :referral, '
         ':seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM secondary_market_sales WHERE seq = :seq) ',

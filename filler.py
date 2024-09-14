@@ -44,6 +44,8 @@ isUpdatingTemplateStats = False
 isUpdatingVolumes = False
 isUpdatingSales = False
 isUpdatingDrops = False
+isUpdatingCollectionUserStats = False
+isUpdatingSmallViews = False
 
 
 action_measure_god = {
@@ -1187,6 +1189,33 @@ def update_estimated_wax_price():
         session.remove()
 
 
+@app.route('/loader/update-small-views')
+def update_small_views():
+    global isUpdatingSmallViews
+
+    if isUpdatingSmallViews:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingSmallViews = True
+
+    session = create_session()
+
+    try:
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY tags_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY user_pictures_mv')
+        session.commit()
+
+        return flaskify(oto_response.Response('Floor Prices Updated'))
+    except SQLAlchemyError as err:
+        log_error('update_floor_prices: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        isUpdatingSmallViews = False
+        session.remove()
+
+
 @app.route('/loader/update-floor-prices')
 def update_floor_prices():
     global isUpdatingFloorPrices
@@ -1283,6 +1312,8 @@ def update_template_stats():
 
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY templates_minted_mv')
         session.commit()
+
+        return flaskify(oto_response.Response('Template Stats Updated'))
     except SQLAlchemyError as err:
         log_error('update_template_stats: {}'.format(err))
         session.rollback()
@@ -1310,10 +1341,7 @@ def update_volumes():
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY seller_volumes_mv')
         session.commit()
 
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY user_collection_volumes_mv')
-        session.commit()
-
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY user_volumes_mv')
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY market_collection_volumes_mv')
         session.commit()
 
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_volumes_mv')
@@ -1326,6 +1354,37 @@ def update_volumes():
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
         isUpdatingVolumes = False
+        session.remove()
+
+
+@app.route('/loader/update-collection-user-stats')
+def update_collection_user_stats():
+    global isUpdatingCollectionUserStats
+
+    if isUpdatingCollectionUserStats:
+        return flaskify(oto_response.Response('Already processing request', status=102))
+
+    isUpdatingCollectionUserStats = True
+
+    session = create_session()
+
+    try:
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_users_mv')
+        session.commit()
+
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_user_count_mv')
+        session.commit()
+
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY users_mv')
+        session.commit()
+
+        return flaskify(oto_response.Response('Collection User Stats Updated'))
+    except SQLAlchemyError as err:
+        log_error('update_volumes: {}'.format(err))
+        session.rollback()
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        isUpdatingCollectionUserStats = False
         session.remove()
 
 
