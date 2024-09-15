@@ -1074,7 +1074,7 @@ def load_mint_pfp(session, mint):
 
     session_execute_logged(
         session,
-        'INSERT INTO pfp_mints SELECT :result_id, :seq, :block_num, :timestamp '
+        'INSERT INTO pfp_mints SELECT :result_id, :drop_id, :owner, :seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM pfp_mints WHERE seq = :seq)',
         transaction
     )
