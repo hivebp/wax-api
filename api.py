@@ -48,6 +48,11 @@ CORS(app, resources={
         "origins": [
             "*",
         ]
+    },
+    r"/v3/*": {
+        "origins": [
+            "*",
+        ]
     }
 })
 
@@ -403,7 +408,7 @@ def get_collections_overview_by_type():
 
 
 @app.route('/v3/collection-stats/<collection>')
-def collection_stats_v2(collection):
+def collection_stats2(collection):
     try:
         return flaskify(oto_response.Response(stats_v3.collection_stats(collection)))
     except Exception as err:
@@ -412,7 +417,7 @@ def collection_stats_v2(collection):
 
 
 @app.route('/v3/user-stats/<user>')
-def user_stats_v2(user):
+def user_stats(user):
     try:
         return flaskify(oto_response.Response(stats_v3.user_stats(user)))
     except Exception as err:
@@ -429,41 +434,6 @@ def market_table_v2(days=1):
     except Exception as err:
         logging.error(err)
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-
-
-@app.route('/v3/top-tokens/<days>')
-def top_token_table(days):
-    term = request.args.get('term', default=None)
-    limit = request.args.get('limit', default=0, type=int)
-    offset = request.args.get('offset', default=0, type=int)
-
-    start = time.time()
-    try:
-        tokens = stats_v3.get_token_table(days, term)
-        if limit:
-            return flaskify(oto_response.Response(
-                tokens[min(offset, len(tokens)):min(offset + limit, len(tokens))])
-            )
-        return flaskify(oto_response.Response(tokens))
-    except Exception as err:
-        logging.error(err)
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        end = time.time()
-        print('top_token_table: {}'.format(end - start))
-
-
-@app.route('/v3/collection-tokens/<collection>')
-def get_collection_tokens(collection):
-    start = time.time()
-    try:
-        return flaskify(oto_response.Response(stats_v3.get_collection_tokens(collection)))
-    except Exception as err:
-        logging.error(err)
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        end = time.time()
-        print('get_collection_tokens: {}'.format(end - start))
 
 
 @app.route('/v3/top-collections/<days>')
@@ -676,13 +646,13 @@ def get_user_info(user):
 @app.route('/v3/collection-volume-graph')
 @app.route('/v3/collection-volume-graph/<days>')
 @app.route('/v3/collection-volume-graph/<days>/<topx>')
-def get_collection_volume_graph_v2(days=60, topx=10):
+def get_collection_volume_graph(days=60, topx=10):
     start = time.time()
     type = request.args.get('type', default=None)
-    author = request.args.get('author')
-    author = _format_author(author)
+    collection = request.args.get('collection')
+    collection = _format_collection(collection)
     try:
-        return flaskify(oto_response.Response(stats_v3.get_collection_volume_graph(days, topx, type, author)))
+        return flaskify(oto_response.Response(stats_v3.get_collection_volume_graph(days, topx, type, collection)))
     except Exception as err:
         logging.error(err)
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
@@ -732,6 +702,52 @@ def get_floor(template_id):
     finally:
         end = time.time()
         print('get_floor: {}'.format(end - start))
+
+
+@app.route('/v3/volume/<days>')
+@app.route('/v3/volume/<days>/<collection>')
+def get_volume(days, collection=None):
+    start = time.time()
+    collection = _format_collection(collection)
+    try:
+        type = request.args.get('type', default=None)
+        return flaskify(oto_response.Response(stats_v3.get_volume(collection, days, type)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        end = time.time()
+        print('get_volume: {}'.format(end - start))
+
+
+@app.route('/v3/change')
+@app.route('/v3/change/<collection>')
+def get_change(collection=None):
+    start = time.time()
+    try:
+        type = request.args.get('type', default=None)
+        collection = _format_collection(collection)
+        return flaskify(oto_response.Response(stats_v3.get_change(collection, type)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        end = time.time()
+        print('get_change: {}'.format(end - start))
+
+
+@app.route('/v3/marketcap')
+@app.route('/v3/marketcap/<collection>')
+def get_marketcap(collection=None):
+    start = time.time()
+    try:
+        return flaskify(oto_response.Response(stats_v3.get_market_cap(collection)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        end = time.time()
+        print('get_marketcap: {}'.format(end - start))
 
 
 @app.route('/v3/initial-sales-feed')

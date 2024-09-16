@@ -1328,25 +1328,18 @@ def create_volume_day_views():
     session = create_session()
 
     for table in [
-        'collection_market_user', 'collection_market', 'collection', 'market',
-        'collection_seller', 'collection_buyer', 'seller', 'buyer'
+        'collection_seller', 'seller'
     ]:
         columns = ''
         table_columns = table.split('_')
         if 'collection' in table_columns:
             columns += 'collection, '
-        if 'market' in table_columns:
-            columns += 'market, maker, taker, '
-        if 'user' in table_columns:
-            columns += 'buyer, seller, '
-        if 'buyer' in table_columns:
-            columns += 'buyer, '
         if 'seller' in table_columns:
-            columns += 'buyer, '
+            columns += 'seller, '
 
         for day in [
             '365_days', '180_days', '90_days', '60_days', '30_days', '15_days', '14_days', '7_days', '3_days', '2_days',
-            '1_day'
+            '1_days'
         ]:
             print(
                 'volume_{table}_{day}_mv'.format(
@@ -1365,14 +1358,8 @@ def create_volume_day_views():
             aggregates = 'SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales'
 
             sources = {
-                'collection_market_user': 'sales_summary',
-                'collection_market': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'collection': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'market': 'volume_collection_market_user_{day}_mv'.format(day=day),
                 'collection_seller': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'collection_buyer': 'volume_collection_market_user_{day}_mv'.format(day=day),
                 'seller': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'buyer': 'volume_collection_market_user_{day}_mv'.format(day=day),
             }
 
             source = sources[table]
@@ -1393,7 +1380,8 @@ def create_volume_day_views():
                 'FROM {source} t '
                 '{where_clause} '
                 'GROUP BY {columns}type '.format(
-                    day=day, table=table, source=source, columns=columns, aggregates=aggregates, where_clause=where_clause
+                    day=day, table=table, source=source, columns=columns, aggregates=aggregates,
+                    where_clause=where_clause
                 )
             )
 
@@ -1800,6 +1788,14 @@ def update_small_volumes():
 
     session = create_session()
 
+    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_15_days_mv')
+    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_14_days_mv')
+    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_7_days_mv')
+    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_3_days_mv')
+    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_2_days_mv')
+    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_1_days_mv')
+    session.commit()
+
     try:
         funcs.update_sales_summary(session)
 
@@ -1808,7 +1804,7 @@ def update_small_volumes():
         )
         session.commit()
 
-        for days in ['15_days', '14_days', '7_days', '3_days', '2_days', '1_day']:
+        for days in ['15_days', '14_days', '7_days', '3_days', '2_days', '1_days']:
             session.execute(
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_market_{days}_mv'.format(days=days)
             )
