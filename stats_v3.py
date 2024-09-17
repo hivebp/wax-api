@@ -571,26 +571,10 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
 def get_drops_table(days, limit, offset):
     session = create_session()
     try:
-        usd_volume_column = 'usd_volume_all_time'
-        volume_column = 'volume_all_time'
-        buyers_column = 'claimers_all_time'
-        amount_column = 'amount_all_time'
+        table = 'volume_drop_all_time_mv'
 
-        table = 'drop_volumes_mv'
-
-        if days and int(days) == 1:
-            volume_column = 'volume_1_day'
-            usd_volume_column = 'usd_volume_1_day'
-            buyers_column = 'claimers_1_day'
-            amount_column = 'amount_1_day'
-        elif days and int(days) > 0:
-            volume_column = 'volume_{}_days'.format(days)
-            usd_volume_column = 'usd_volume_{}_days'.format(days)
-            buyers_column = 'claimers_{}_days'.format(days)
-            amount_column = 'amount_{}_days'.format(days)
-
-        if days and 0 < int(days) < 15:
-            table = 'drop_volumes_s_mv'
+        if days and days != '0':
+            table = 'volume_drop_{days}_days_mv'.format(days=days)
 
         total_result = session.execute(
             'SELECT COUNT(1) AS total_results '
@@ -600,19 +584,20 @@ def get_drops_table(days, limit, offset):
         ).first()
 
         drops_result = session.execute(
-            'SELECT dv.drop_id, dv.market, d.display_data, d.author, c.name AS display_name, '
-            'c.image AS collection_image, {volume_column} AS volume, {usd_volume_column} AS usd_volume, '
-            '{buyers_column} AS buyers, {amount_column} AS claims, '
-            'json_agg(json_build_object(\'template_id\', t.template_id, \'data\', t.idata)) AS template_data, '
-            'COUNT(1) AS total_amount, ROW_NUMBER() OVER (ORDER BY {volume_column} DESC) AS rank '
+            'SELECT dv.drop_id, dv.market, d.display_data, d.collection, cn.name AS display_name, '
+            'ci.image AS collection_image, wax_volume, usd_volume, buyers, sales AS claims, '
+            'json_agg(json_build_object(\'template_id\', t.template_id, \'data\', td.data)) AS template_data, '
+            'COUNT(1) AS total_amount, ROW_NUMBER() OVER (ORDER BY wax_volume DESC) AS rank '
             'FROM {table} dv '
             'LEFT JOIN drops d ON d.drop_id = dv.drop_id AND d.contract = dv.market '
             'LEFT JOIN templates t ON t.template_id = ANY(templates_to_mint) '
-            'LEFT JOIN collections c ON c.collection_name = d.author '
-            'GROUP BY 1,2,3,4,5,6,7,8,9,10 ORDER BY {volume_column} DESC '
+            'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
+            'LEFT JOIN collections c ON c.collection = d.collection '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'GROUP BY 1,2,3,4,5,6,7,8,9,10 ORDER BY wax_volume DESC '
             'LIMIT :limit OFFSET :offset'.format(
-                table=table, volume_column=volume_column, usd_volume_column=usd_volume_column,
-                buyers_column=buyers_column, amount_column=amount_column
+                table=table
             ), {'limit': limit, 'offset': offset}
         )
 
@@ -642,13 +627,13 @@ def get_drops_table(days, limit, offset):
                     'drop': drop_data,
                     'total': total_result['total_results'],
                     'collection': {
-                        'name': drop.author,
+                        'name': drop.collection,
                         'displayName': drop.display_name,
                         'image': drop.collection_image,
                     },
                     'stats': {
                         'days': days,
-                        'volume': float(drop.volume if drop.volume else 0),
+                        'volume': float(drop.wax_volume if drop.wax_volume else 0),
                         'usdVolume': float(drop.usd_volume if drop.usd_volume else 0),
                         'buyers': int(drop.buyers),
                         'claims': int(drop.claims),
@@ -1537,7 +1522,7 @@ def get_market_table(days, collection, type):
                 table=table, one_day_table=one_day_table, two_days_table=two_days_table,
                 volume_column=volume_column, usd_volume_column=usd_volume_column,
                 buyers_column=buyers_column, sellers_column=sellers_column, sales_column=sales_column,
-                type_clause=' AND type = :type ' if type and type != 'all' else '',
+                type_clause=' AND u.type = :type ' if type and type != 'all' else '',
                 collection_clause=' AND collection = :collection ' if collection else '',
             )
         )
@@ -1831,32 +1816,35 @@ def get_collection_table(days, type, term, verified):
         collections = []
 
         for collection in collection_results:
-            collections.append(
-                {
-                    'rank': collection.rank,
-                    'total': collection_results.rowcount,
-                    'collection': {
-                        'name': collection.collection,
-                        'image': collection.collection_image,
-                        'displayName': collection.display_name,
-                    },
-                    'stats': {
-                        'days': days,
-                        'waxVolume': float(collection.wax_volume if collection.wax_volume else 0),
-                        'usdVolume': float(collection.usd_volume if collection.usd_volume else 0),
-                        'change': float(
-                            ((collection.wax_volume_1_day - (
-                                    collection.wax_volume_2_days - collection.wax_volume_1_day)
-                              ) / (collection.wax_volume_2_days - collection.wax_volume_1_day))
-                            if collection.wax_volume_1_day and (
-                                    collection.wax_volume_2_days - collection.wax_volume_1_day) else 0),
-                        'buyers': int(collection.buyers),
-                        'sellers': int(collection.sellers),
-                        'sales': int(collection.sales),
-                        'trend': add_trend(collection)
+            try:
+                collections.append(
+                    {
+                        'rank': collection.rank,
+                        'total': collection_results.rowcount,
+                        'collection': {
+                            'name': collection.collection,
+                            'image': collection.collection_image,
+                            'displayName': collection.display_name,
+                        },
+                        'stats': {
+                            'days': days,
+                            'waxVolume': float(collection.wax_volume if collection.wax_volume else 0),
+                            'usdVolume': float(collection.usd_volume if collection.usd_volume else 0),
+                            'change': float(
+                                ((collection.wax_volume_1_day - (
+                                        collection.wax_volume_2_days - collection.wax_volume_1_day)
+                                  ) / (collection.wax_volume_2_days - collection.wax_volume_1_day))
+                                if collection.wax_volume_1_day and collection.wax_volume_2_days and (
+                                        collection.wax_volume_2_days - collection.wax_volume_1_day) else 0),
+                            'buyers': int(collection.buyers),
+                            'sellers': int(collection.sellers),
+                            'sales': int(collection.sales),
+                            'trend': add_trend(collection)
+                        }
                     }
-                }
-            )
+                )
+            except Exception as e:
+                logging.error(e)
 
         return collections
     except SQLAlchemyError as e:

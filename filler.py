@@ -1735,6 +1735,12 @@ def update_big_volumes():
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_60_days_mv')
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_30_days_mv')
     session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW volume_template_user_from_2024_mv')
+    session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
+    session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
+    session.commit()
 
     try:
         for days in ['all_time', '365_days', '180_days', '90_days', '60_days', '30_days']:
@@ -1764,6 +1770,14 @@ def update_big_volumes():
             session.commit()
             session.execute(
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_buyer_{days}_mv'.format(days=days)
+            )
+            session.commit()
+            session.execute(
+                'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_drop_{days}_mv'.format(days=days)
+            )
+            session.commit()
+            session.execute(
+                'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_template_{days}_mv'.format(days=days)
             )
             session.commit()
 
@@ -1831,6 +1845,14 @@ def update_small_volumes():
             session.commit()
             session.execute(
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_buyer_{days}_mv'.format(days=days)
+            )
+            session.commit()
+            session.execute(
+                'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_drop_{days}_mv'.format(days=days)
+            )
+            session.commit()
+            session.execute(
+                'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_template_{days}_mv'.format(days=days)
             )
             session.commit()
 
