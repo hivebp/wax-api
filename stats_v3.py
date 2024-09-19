@@ -1070,7 +1070,7 @@ def get_volume(collection=None, days=1, type=None):
         ).first()
 
         return {
-            'waxVolume': float(result.usd_volume if result.usd_volume else 0),
+            'waxVolume': float(result.wax_volume if result.wax_volume else 0),
             'usdVolume': float(result.usd_volume if result.usd_volume else 0),
         }
     except SQLAlchemyError as e:
