@@ -1358,8 +1358,8 @@ def create_volume_day_views():
             aggregates = 'SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales'
 
             sources = {
-                'collection_seller': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'seller': 'volume_collection_market_user_{day}_mv'.format(day=day),
+                'collection_seller': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'seller': 'volume_collection_market_user_{day}_mv t'.format(day=day),
             }
 
             source = sources[table]
@@ -1377,7 +1377,7 @@ def create_volume_day_views():
                 'CREATE MATERIALIZED VIEW IF NOT EXISTS volume_{table}_{day}_mv AS '
                 'SELECT {columns}type, '
                 '{aggregates} '
-                'FROM {source} t '
+                'FROM {source} '
                 '{where_clause} '
                 'GROUP BY {columns}type '.format(
                     day=day, table=table, source=source, columns=columns, aggregates=aggregates,
@@ -1407,25 +1407,16 @@ def create_volume_day_views():
 def create_volumes_views():
     session = create_session()
 
-    matviews = session.execute(
-        'select matviewname as view_name ' 
-        'from pg_matviews WHERE matviewname LIKE \'volume%\''
-        'order by view_name'
-    )
-
-    for matview in matviews:
-        session.execute('DROP MATERIALIZED VIEW IF EXISTS {matview} CASCADE'.format(matview=matview['view_name']))
-
-    session.commit()
-
     for table in [
-        'collection_market_user', 'collection_seller', 'collection_buyer'
+        #'collection_market_user', 'collection_seller', 'collection_buyer',
+        #'template_user'
     ]:
-        for year in [2019, 2020, 2021, 2022, 2023, 'from_2024']:
+        for year in ['before_2024', 'from_2024']:
             sources = {
-                'collection_market_user': 'sales_summary',
-                'collection_seller': 'volume_collection_market_user_{year}_mv'.format(year=year),
-                'collection_buyer': 'volume_collection_market_user_{year}_mv'.format(year=year),
+                'collection_market_user': 'sales_summary t ',
+                'collection_seller': 'volume_collection_market_user_{year}_mv t'.format(year=year),
+                'collection_buyer': 'volume_collection_market_user_{year}_mv t'.format(year=year),
+                'template_user': 'template_sales t LEFT JOIN sales_summary s USING (seq) '
             }
 
             columns = ''
@@ -1433,6 +1424,8 @@ def create_volumes_views():
             table_columns = table.split('_')
             if 'collection' in table_columns:
                 columns += 'collection, '
+            if 'template' in table_columns:
+                columns += 'template_id, schema, t.collection, '
             if 'market' in table_columns:
                 columns += 'market, maker, taker, '
             if 'user' in table_columns:
@@ -1440,7 +1433,7 @@ def create_volumes_views():
             if 'buyer' in table_columns:
                 columns += 'buyer, '
             if 'seller' in table_columns:
-                columns += 'buyer, '
+                columns += 'seller, '
 
             source = sources[table]
 
@@ -1448,14 +1441,12 @@ def create_volumes_views():
 
             where_clause = ''
 
-            if source == 'sales_summary':
+            if 'sales_summary' in source:
                 if year == 'from_2024':
-                    where_clause = 'WHERE timestamp > \'2024-01-01\''
+                    where_clause = 'WHERE s.timestamp >= \'2024-01-01\''
                 else:
-                    where_clause = 'WHERE timestamp BETWEEN \'{year}-01-01\' AND \'{next_year}-01-01\''.format(
-                        year=year, next_year=year + 1
-                    )
-                aggregates = 'sum(wax_price) AS wax_volume, sum(usd_price) AS usd_volume, COUNT(1) AS sales'
+                    where_clause = 'WHERE s.timestamp < \'2024-01-01\''
+                aggregates = 'sum(s.wax_price) AS wax_volume, sum(s.usd_price) AS usd_volume, COUNT(1) AS sales'
 
             if 'user' not in table_columns and 'buyer' not in table_columns and 'seller' not in table_columns:
                 aggregates += ',COUNT(DISTINCT seller) AS sellers, COUNT(DISTINCT buyer) AS buyers'
@@ -1485,15 +1476,15 @@ def create_volumes_views():
 
             session.execute(
                 'CREATE UNIQUE INDEX ON volume_{table}_{year}_mv ({columns}type) '.format(
-                    table=table, columns=columns, year=year
+                    table=table, columns=columns.replace('t.', ''), year=year
                 )
             )
 
             session.commit()
-
     for table in [
-        'collection_market_user', 'collection_market', 'collection', 'market',
-        'collection_seller', 'collection_buyer', 'seller', 'buyer'
+        #'collection_market_user', 'collection_market', 'collection', 'market',
+        #'collection_seller', 'collection_buyer', 'seller', 'buyer',
+        #'template_user', 'template'
     ]:
         columns = ''
         table_columns = table.split('_')
@@ -1501,17 +1492,19 @@ def create_volumes_views():
             columns += 'collection, '
         if 'market' in table_columns:
             columns += 'market, maker, taker, '
+        if 'template' in table_columns:
+            columns += 'template_id, schema, collection, '
         if 'user' in table_columns:
             columns += 'buyer, seller, '
         if 'buyer' in table_columns:
             columns += 'buyer, '
         if 'seller' in table_columns:
-            columns += 'buyer, '
+            columns += 'seller, '
 
         aggregates = 'SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales'
 
         if 'user' not in table_columns and 'buyer' not in table_columns and 'seller' not in table_columns:
-            aggregates += ',COUNT(DISTINCT seller) AS sellers, COUNT(DISTINCT buyer) AS buyers'
+            aggregates += ', COUNT(DISTINCT seller) AS sellers, COUNT(DISTINCT buyer) AS buyers'
 
         print(
             'volume_{table}_all_time_mv'.format(
@@ -1529,71 +1522,45 @@ def create_volumes_views():
             'collection_market_user': (
                 '('
                 '   SELECT * FROM '
-                '   volume_collection_market_user_2019_mv '
-                '   UNION ALL '
+                '   volume_collection_market_user_from_2024_mv '
+                '   UNION ALL'
                 '   SELECT * FROM '
-                '   volume_collection_market_user_2020_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_market_user_2021_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_market_user_2022_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_market_user_2023_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_market_user_from_2024_mv'
-                ')'
+                '   volume_collection_market_user_before_2024_mv '
+                ') t'
             ),
-            'collection_market': 'volume_collection_market_user_all_time_mv',
-            'collection': 'volume_collection_market_user_all_time_mv',
-            'market': 'volume_collection_market_user_all_time_mv',
+            'collection_market': 'volume_collection_market_user_all_time_mv t',
+            'collection': 'volume_collection_market_user_all_time_mv t',
+            'market': 'volume_collection_market_user_all_time_mv t',
             'collection_seller': (
                 '('
                 '   SELECT * FROM '
-                '   volume_collection_seller_2019_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_seller_2020_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_seller_2021_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_seller_2022_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_seller_2023_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
                 '   volume_collection_seller_from_2024_mv'
-                ')'
+                '   UNION ALL'
+                '   SELECT * FROM '
+                '   volume_collection_seller_before_2024_mv'
+                ') t'
             ),
             'collection_buyer': (
                 '('
                 '   SELECT * FROM '
-                '   volume_collection_buyer_2019_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_buyer_2020_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_buyer_2021_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_buyer_2022_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
-                '   volume_collection_buyer_2023_mv '
-                '   UNION ALL '
-                '   SELECT * FROM '
                 '   volume_collection_buyer_from_2024_mv'
-                ')'
+                '   UNION ALL'
+                '   SELECT * FROM '
+                '   volume_collection_buyer_before_2024_mv'
+                ') t'
             ),
-            'seller': 'volume_collection_seller_all_time_mv',
-            'buyer': 'volume_collection_buyer_all_time_mv'
+            'seller': 'volume_collection_seller_all_time_mv t',
+            'buyer': 'volume_collection_buyer_all_time_mv t',
+            'template_user': (
+                '('
+                '   SELECT * FROM '
+                '   volume_template_user_from_2024_mv'
+                '   UNION ALL'
+                '   SELECT * FROM '
+                '   volume_template_user_before_2024_mv'
+                ') t'
+            ),
+            'template': 'volume_template_user_all_time_mv t'
         }
 
         source = sources[table]
@@ -1602,7 +1569,7 @@ def create_volumes_views():
             'CREATE MATERIALIZED VIEW IF NOT EXISTS volume_{table}_all_time_mv AS '
             'SELECT {columns}type, '
             '{aggregates} '
-            'FROM {source} t '
+            'FROM {source} '
             'GROUP BY {columns}type '.format(
                 table=table, source=source, columns=columns, aggregates=aggregates
             )
@@ -1626,7 +1593,8 @@ def create_volumes_views():
 
     for table in [
         'collection_market_user', 'collection_market', 'collection', 'market',
-        'collection_seller', 'collection_buyer', 'seller', 'buyer'
+        'collection_seller', 'collection_buyer', 'seller', 'buyer',
+        'template_user', 'template'
     ]:
         columns = ''
         table_columns = table.split('_')
@@ -1634,16 +1602,27 @@ def create_volumes_views():
             columns += 'collection, '
         if 'market' in table_columns:
             columns += 'market, maker, taker, '
+        if 'template' in table_columns:
+            columns += 'template_id, schema, t.collection, '
         if 'user' in table_columns:
             columns += 'buyer, seller, '
         if 'buyer' in table_columns:
             columns += 'buyer, '
         if 'seller' in table_columns:
-            columns += 'buyer, '
+            columns += 'seller, '
+
+        for day in [
+            '1_day'
+        ]:
+            session.execute(
+                'DROP MATERIALIZED VIEW IF EXISTS volume_{table}_{day}_mv CASCADE'.format(
+                    table=table, day=day
+                )
+            )
 
         for day in [
             '365_days', '180_days', '90_days', '60_days', '30_days', '15_days', '14_days', '7_days', '3_days', '2_days',
-            '1_day'
+            '1_days'
         ]:
             print(
                 'volume_{table}_{day}_mv'.format(
@@ -1662,23 +1641,25 @@ def create_volumes_views():
             aggregates = 'SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales'
 
             sources = {
-                'collection_market_user': 'sales_summary',
-                'collection_market': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'collection': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'market': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'collection_seller': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'collection_buyer': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'seller': 'volume_collection_market_user_{day}_mv'.format(day=day),
-                'buyer': 'volume_collection_market_user_{day}_mv'.format(day=day),
+                'collection_market_user': 'sales_summary t ',
+                'collection_market': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'collection': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'market': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'collection_seller': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'collection_buyer': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'seller': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'buyer': 'volume_collection_market_user_{day}_mv t'.format(day=day),
+                'template_user': 'template_sales t INNER JOIN sales_summary s USING(seq) ',
+                'template': 'volume_template_user_{day}_mv t'.format(day=day),
             }
 
             source = sources[table]
 
-            if source == 'sales_summary':
-                where_clause = 'WHERE timestamp > NOW() AT TIME ZONE \'UTC\' - INTERVAL \'{interval}\''.format(
+            if 'sales_summary' in source:
+                where_clause = 'WHERE t.timestamp > NOW() AT TIME ZONE \'UTC\' - INTERVAL \'{interval}\''.format(
                     interval=day.replace('_', ' ')
                 )
-                aggregates = 'sum(wax_price) AS wax_volume, sum(usd_price) AS usd_volume, COUNT(1) AS sales'
+                aggregates = 'sum(t.wax_price) AS wax_volume, sum(t.usd_price) AS usd_volume, COUNT(1) AS sales'
 
             if 'user' not in table_columns and 'buyer' not in table_columns and 'seller' not in table_columns:
                 aggregates += ', COUNT(DISTINCT seller) AS sellers, COUNT(DISTINCT buyer) AS buyers'
@@ -1687,10 +1668,11 @@ def create_volumes_views():
                 'CREATE MATERIALIZED VIEW IF NOT EXISTS volume_{table}_{day}_mv AS '
                 'SELECT {columns}type, '
                 '{aggregates} '
-                'FROM {source} t '
+                'FROM {source} '
                 '{where_clause} '
                 'GROUP BY {columns}type '.format(
-                    day=day, table=table, source=source, columns=columns, aggregates=aggregates, where_clause=where_clause
+                    day=day, table=table, source=source, columns=columns, aggregates=aggregates,
+                    where_clause=where_clause
                 )
             )
 
@@ -1704,7 +1686,7 @@ def create_volumes_views():
 
             session.execute(
                 'CREATE UNIQUE INDEX ON volume_{table}_{day}_mv ({columns}type) '.format(
-                    table=table, columns=columns, day=day
+                    table=table, columns=columns.replace('t.', ''), day=day
                 )
             )
 
@@ -1739,7 +1721,9 @@ def update_big_volumes():
     session.commit()
     session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
     session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
+    session.execute('REFRESH MATERIALIZED VIEW monthly_collection_volume_mv')
+    session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_mv')
     session.commit()
 
     try:
@@ -1774,6 +1758,10 @@ def update_big_volumes():
             session.commit()
             session.execute(
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_drop_{days}_mv'.format(days=days)
+            )
+            session.commit()
+            session.execute(
+                'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_template_user_{days}_mv'.format(days=days)
             )
             session.commit()
             session.execute(

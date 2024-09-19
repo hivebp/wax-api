@@ -1,4 +1,5 @@
 import json
+import time
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -236,7 +237,7 @@ def get_user_info(user):
     session = create_session()
     try:
         res = session.execute(
-            'SELECT owner as user_name, value, usd_value, num_assets, image '
+            'SELECT owner as user_name, wax_value, usd_value, num_assets, image '
             'FROM users_mv '
             'LEFT JOIN user_pictures_mv up ON owner = user_name '
             'WHERE owner = :owner ',
@@ -255,7 +256,7 @@ def get_user_info(user):
         return {
             'name': res.user_name,
             'image': res.image,
-            'value': float(res.value if res.value else 0),
+            'waxValue': float(res.wax_value if res.wax_value else 0),
             'usdValue': float(res.usd_value if res.usd_value else 0),
             'numAssets': int(res.num_assets if res.num_assets else 0)
         }
@@ -273,12 +274,13 @@ def get_monthly_volume(collection, days, type):
 
     try:
         res = session.execute(
-            'SELECT date, SUM(volume) AS volume, SUM(usd_volume) AS usd_volume '
-            'FROM monthly_volume_mv WHERE TRUE {type_clause} {date_clause} {collection_clause} '
+            'SELECT to_date, SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
+            'FROM monthly_collection_volume_mv WHERE TRUE {type_clause} {date_clause} {collection_clause} '
             'GROUP BY 1 ORDER BY 1 ASC'.format(
                 collection_clause=' AND collection = :collection ' if collection and collection != '*' else '',
                 type_clause=' AND type = :type ' if type and type != 'all' else '',
-                date_clause=' AND date >= NOW() AT TIME ZONE \'utc\' - INTERVAL :interval' if days and int(days) > 0 else '',
+                date_clause=' AND to_date >= NOW() AT TIME ZONE \'utc\' - INTERVAL :interval' if days and int(
+                    days) > 0 else '',
             ), {'type': type, 'collection': collection, 'interval': '{} days'.format(days)},
         )
 
@@ -286,8 +288,8 @@ def get_monthly_volume(collection, days, type):
 
         for item in res:
             volumes.append({
-                'date': item['date'].strftime("%Y-%m-%d"),
-                'volume': item['volume'],
+                'date': item['to_date'].strftime("%Y-%m-%d"),
+                'waxVolume': item['wax_volume'],
                 'usdVolume': item['usd_volume']
             })
 
@@ -535,7 +537,7 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
                 template='template_' if template_id else '',
                 date_clause=' AND to_date >= NOW() AT TIME ZONE \'utc\' - INTERVAL :interval ' if days and int(
                     days) > 0 else '',
-                type_clause=' AND type = :type ' if type and type != 'all' else '',
+                type_clause=' AND t.type = :type ' if type and type != 'all' else '',
                 template_clause=' AND template_id = :template_id ' if template_id else '',
                 collection_clause=' AND collection = :collection ' if collection else ''
             ), {
@@ -650,7 +652,7 @@ def get_drops_table(days, limit, offset):
         session.remove()
 
 
-def _parse_immutable_data(data):
+def _parse_data_object(data):
     result = {}
 
     for item in data:
@@ -709,7 +711,7 @@ def get_template_table(days, collection, limit, offset):
         collections = []
 
         for template in template_results:
-            template_data = _parse_immutable_data(json.loads(template['idata']))
+            template_data = _parse_data_object(json.loads(template['idata']))
             template_data['template_id'] = template['template_id']
             template_data['schema'] = template['schema']
             collections.append(
@@ -995,68 +997,38 @@ def get_floor(template_id):
     session = create_session()
     try:
         total_res = session.execute(
-            'SELECT COUNT(1) AS total, a.mdata, aa.attribute_ids '
-            'FROM attribute_assets aa INNER JOIN templates t USING(template_id) '
-            'INNER JOIN assets a USING(asset_id) '
-            'LEFT JOIN asset_summaries asu ON (asu.summary_id =  a.summary_id) '
-            'WHERE aa.template_id = :template_id GROUP BY 2, 3',
+            'SELECT COUNT(1) AS total, td.data, t.attribute_ids '
+            'FROM templates t '
+            'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
+            'WHERE t.template_id = :template_id GROUP BY 2, 3',
             {'template_id': template_id}
         ).first()
 
-        hasRarity = False
+        template_data = _parse_data_object(json.loads(total_res['data']))
 
-        template_data = json.loads(total_res['mdata'])
-
-        if total_res and total_res['total'] == 1 and total_res['attribute_ids'] and len(total_res['attribute_ids']) > 0:
-            is1of1 = True
-            if 'rarity' in template_data.keys() or 'Rarity' in template_data.keys():
-                hasRarity = True
-                template = session.execute(
-                    'SELECT idata, template_id, category, category_3 AS rarity, tb.author, c.name, c.image, floor, '
-                    'usd_floor FROM rarity_floors_mv tb '
-                    'INNER JOIN templates t USING(author, category) '
-                    'INNER JOIN collections c ON (tb.author = collection_name) '
-                    'WHERE template_id = :template_id AND tb.author = t.author AND tb.category = t.category '
-                    'AND category_3 = :rarity',
-                    {'template_id': template_id,
-                     'rarity': template_data['rarity'] if 'rarity' in template_data.keys() else template_data['Rarity']}
-                ).first()
-            else:
-                hasRarity = False
-                template = session.execute(
-                    'SELECT idata, template_id, category, tb.author, c.name, c.image, floor, usd_floor '
-                    'FROM schema_floors_mv tb '
-                    'INNER JOIN templates t USING(author, category) '
-                    'INNER JOIN collections c ON (tb.author = collection_name) '
-                    'WHERE template_id = :template_id',
-                    {'template_id': template_id}
-                ).first()
-        else:
-            is1of1 = False
-            template = session.execute(
-                'SELECT idata, template_id, category, tb.author, c.name, c.image, min_price AS floor, '
-                'min_price_usd AS usd_floor '
-                'FROM floor_template_mv tb '
-                'INNER JOIN collections c ON (tb.author = collection_name) '
-                'INNER JOIN templates t USING(template_id) '
-                'WHERE template_id = :template_id',
-                {'template_id': template_id}
-            ).first()
+        template = session.execute(
+            'SELECT td.data, template_id, t.schema, tb.collection, cn.name, ci.image, floor_price '
+            'FROM template_floor_prices_mv tb '
+            'INNER JOIN collections c USING (collection) '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'INNER JOIN templates t USING(template_id) '
+            'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
+            'WHERE template_id = :template_id',
+            {'template_id': template_id}
+        ).first()
 
         if template is None:
             return []
 
         template_data['template_id'] = template['template_id']
-        template_data['schema'] = template['category']
+        template_data['schema'] = template['schema']
 
         return {
             'template': template_data,
-            'waxFloor': template.floor,
-            'usdFloor': template.usd_floor,
-            'is1of1': is1of1,
-            'has1of1Rarity': hasRarity,
+            'waxFloor': template.floor_price,
             'collection': {
-                'name': template.author,
+                'name': template.collection,
                 'displayName': template.name,
                 'image': template.image,
             }
@@ -1073,13 +1045,11 @@ def get_floor(template_id):
 def get_volume(collection=None, days=1, type=None):
     session = create_session()
 
-    table = 'volume_collection_1_days_mv'
+    table = 'volume_collection_all_time_mv'
     volume_column = 'wax_volume'
 
     if days and days != '0':
         table = 'volume_collection_{}_days_mv'.format(days)
-    else:
-        volume_column = 'volume_collection_all_time_mv'
 
     try:
         result = session.execute(
@@ -1095,6 +1065,86 @@ def get_volume(collection=None, days=1, type=None):
                 type_clause=' AND type = :type ' if type and type != 'all' else '',
             ), {
                 'collection': collection,
+                'type': type,
+            }
+        ).first()
+
+        return {
+            'waxVolume': float(result.usd_volume if result.usd_volume else 0),
+            'usdVolume': float(result.usd_volume if result.usd_volume else 0),
+        }
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_buy_volume(user, days=1, type=None):
+    session = create_session()
+
+    table = 'volume_buyer_all_time_mv'
+    volume_column = 'wax_volume'
+
+    if days and days != '0':
+        table = 'volume_buyer_{}_days_mv'.format(days)
+
+    try:
+        result = session.execute(
+            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
+            'FROM ('
+            '   SELECT wax_volume, usd_volume '
+            '   FROM {table} '
+            '   WHERE TRUE {type_clause}{collection_clause} '
+            ') t '.format(
+                table=table,
+                volume_column=volume_column,
+                collection_clause=' AND buyer = :user ' if user and user != '*' else '',
+                type_clause=' AND type = :type ' if type and type != 'all' else '',
+            ), {
+                'user': user,
+                'type': type,
+            }
+        ).first()
+
+        return {
+            'waxVolume': float(result.usd_volume if result.usd_volume else 0),
+            'usdVolume': float(result.usd_volume if result.usd_volume else 0),
+        }
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_sell_volume(user, days=1, type=None):
+    session = create_session()
+
+    table = 'volume_seller_all_time_mv'
+    volume_column = 'wax_volume'
+
+    if days and days != '0':
+        table = 'volume_seller_{}_days_mv'.format(days)
+
+    try:
+        result = session.execute(
+            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
+            'FROM ('
+            '   SELECT wax_volume, usd_volume '
+            '   FROM {table} '
+            '   WHERE TRUE {type_clause}{collection_clause} '
+            ') t '.format(
+                table=table,
+                volume_column=volume_column,
+                collection_clause=' AND seller = :user ' if user and user != '*' else '',
+                type_clause=' AND type = :type ' if type and type != 'all' else '',
+            ), {
+                'user': user,
                 'type': type,
             }
         ).first()
@@ -1194,61 +1244,48 @@ def get_top_template_sales(days, template_id, limit, offset):
         attribute_value = ''
         attribute_id = None
 
-        if template_id:
-            template_clause = ' AND template_id = :template_id '
-            total_res = session.execute(
-                'SELECT SUM(total) AS total, attribute_ids '
-                'FROM templates '
-                'LEFT JOIN template_asset_summary_mapping tm USING (template_id) '
-                'LEFT JOIN asset_summaries asu ON (asu.summary_id =  tm.summary_id) '
-                'WHERE template_id = :template_id GROUP BY 2',
-                {'template_id': template_id}
-            ).first()
+        total_sql = (
+            'SELECT num_minted AS total, attribute_ids '
+            'FROM templates '
+            'LEFT JOIN templates_minted_mv USING(template_id)'
+            'WHERE template_id = :template_id LIMIT 1'
+        )
 
-            if total_res and total_res['total'] == 1 and total_res['attribute_ids'] and len(
-                    total_res['attribute_ids']) > 0:
-                join_clause = 'INNER JOIN similar_templates USING (template_id) '
-                attribute = session.execute(
-                    'SELECT attribute_id, attribute_name, string_value, int_value, bool_value, float_value '
-                    'FROM templates f '
-                    'LEFT JOIN attribute_summaries af ON af.attribute_id = ANY(attribute_ids) '
-                    'LEFT JOIN attributes a USING (attribute_id) '
-                    'WHERE template_id = :template_id ORDER BY total ASC NULLS LAST ', {
-                        'template_id': template_id
-                    }
-                ).first()
+        total_res = session.execute(
+            total_sql,
+            {'template_id': template_id}
+        )
 
-                if attribute:
-                    template_clause = ' AND :attribute_id = ANY(attribute_ids) '
-                    attribute_id = attribute['attribute_id']
-                    attribute_name = attribute['attribute_name']
-                    if attribute['string_value']:
-                        attribute_value = attribute['string_value']
-                    elif attribute['int_value'] or attribute['int_value'] == 0:
-                        attribute_value = int(attribute['string_value'])
-                    elif attribute['float_value'] or attribute['float_value'] == 0.0:
-                        attribute_value = float(attribute['float_value'])
-                    is1of1 = True
-
-        res = session.execute(
-            'SELECT price, usd_price, buyer, seller, buy_transaction_id, t.author, c.name AS display_name, '
-            'c.image AS collection_image, CASE WHEN taker IS NULL THEN market ELSE taker END AS market, '
-            'collection_name, asset_id, t.name, mint, t.image, template_id '
-            'FROM trades t '
-            'LEFT JOIN templates USING(template_id) '
-            'LEFT JOIN collections c ON (t.author = collection_name) '
-            'WHERE TRUE {time_clause} {template_clause} AND NOT bundle '
-            'ORDER BY usd_price DESC '.format(
+        sql = (
+            'SELECT ts.wax_price, ts.usd_price, buyer, seller, ct.transaction_id AS buy_transaction_id, t.collection, '
+            'cn.name AS display_name, ci.image AS collection_image, '
+            'CASE WHEN taker IS NULL THEN market ELSE taker END AS market, asset_ids[1] AS asset_id, tn.name, a.mint, '
+            'ti.image, t.template_id '
+            'FROM template_sales ts '
+            'LEFT JOIN sales s USING(seq) '
+            'LEFT JOIN chronicle_transactions ct USING (seq) '
+            'LEFT JOIN templates t USING(template_id) '
+            'LEFT JOIN assets a ON asset_id = s.asset_ids[1] '
+            'LEFT JOIN collections c ON (s.collection = c.collection) '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'LEFT JOIN names tn ON t.name_id = tn.name_id '
+            'LEFT JOIN images ti ON t.image_id = ti.image_id '
+            'WHERE ts.template_id = :template_id {time_clause} {template_clause}'
+            'ORDER BY usd_price DESC '
+            'LIMIT :limit OFFSET :offset'.format(
                 time_clause=' AND t.timestamp > (NOW() - INTERVAL :interval) at time zone \'utc\''
                 if days and int(days) > 0 else '',
                 template_clause=template_clause,
                 with_clause=with_clause,
                 join_clause=join_clause
-            ), {
-                'interval': '{} days'.format(days), 'limit': limit, 'offset': offset,
-                'template_id': template_id, 'attribute_id': attribute_id
-            }
+            )
         )
+
+        res = session.execute(sql, {
+            'interval': '{} days'.format(days), 'limit': limit, 'offset': offset,
+            'template_id': template_id, 'attribute_id': attribute_id
+        })
 
         sales = []
 
@@ -1258,7 +1295,7 @@ def get_top_template_sales(days, template_id, limit, offset):
             sale = {
                 'rank': rank,
                 'collection': {
-                    'name': row.author,
+                    'name': row.collection,
                     'displayName': row.display_name,
                     'image': row.collection_image,
                 },
@@ -1270,7 +1307,7 @@ def get_top_template_sales(days, template_id, limit, offset):
                     'templateId': row['template_id']
                 },
                 'days': days,
-                'price': row.price,
+                'waxPrice': row.wax_price,
                 'usdPrice': row.usd_price,
                 'buyer': row.buyer,
                 'seller': row.seller,
@@ -1566,91 +1603,6 @@ def get_market_table(days, collection, type):
 
 
 @cache.memoize(timeout=300)
-def get_market_volume_graph(days, topx, type):
-    session = create_session()
-    try:
-        markets = {}
-
-        top_markets = session.execute(
-            'SELECT market '
-            'FROM market_collection_sales_by_date '
-            'WHERE TRUE {date_clause} '
-            ' {type_clause} '
-            'GROUP BY 1 '
-            'ORDER BY SUM(usd_price) DESC NULLS LAST '
-            'LIMIT :topx'.format(
-                type_clause=' AND type = :type ' if type and type != 'all' else '',
-                date_clause=' AND date >= NOW() AT TIME ZONE \'utc\' - INTERVAL :interval' if days and int(days) > 0 else '',
-            ), {
-                'interval': '{} days'.format(days),
-                'topx': topx,
-                'type': type
-            }
-        )
-
-        for top_market in top_markets:
-            markets[top_market['market']] = {'name': top_market['market']}
-
-        top_x_markets = tuple(markets.keys())
-
-        volumes = {
-            'combined': {'name': 'Combined', 'graph': _create_empty_chart('volume', int(days), 'usdVolume')},
-            'others': {'name': 'Other', 'graph': _create_empty_chart('volume', int(days), 'usdVolume')}
-        }
-
-        res = session.execute(
-            'SELECT SUM(price) AS volume, SUM(usd_price) AS usd_volume, date, '
-            'CASE WHEN t.market NOT IN :top THEN \'others\' ELSE t.market END AS market '
-            'FROM market_collection_sales_by_date t '
-            'WHERE TRUE {date_clause} '
-            '{type_clause} '
-            'GROUP BY 3, 4 ORDER BY 3, 4'.format(
-                type_clause=' AND type = :type ' if type and type != 'all' else '',
-                date_clause=' AND date >= NOW() AT TIME ZONE \'utc\' - INTERVAL :interval' if days and int(days) > 0 else '',
-            ), {
-                'interval': '{} days'.format(days),
-                'top': top_x_markets,
-                'type': type
-            }
-        )
-
-        for market in top_x_markets:
-            volumes[market] = {
-                'name': markets[market]['name'],
-                'graph': _create_empty_chart('volume', int(days), 'usdVolume')
-            }
-
-        date_list = _create_date_list(int(days))
-
-        for item in res:
-            market = item['market']
-
-            date = item['date'].strftime("%Y-%m-%d")
-            try:
-                index = date_list.index(date)
-
-                if market in top_x_markets:
-                    volumes[market]['graph'][index]['volume'] = item['volume'] if item['volume'] else 0
-                    volumes[market]['graph'][index]['usdVolume'] = item['usd_volume'] if item['usd_volume'] else 0
-                elif market not in top_x_markets:
-                    volumes['others']['graph'][index]['volume'] = item['volume'] if item['volume'] else 0
-                    volumes['others']['graph'][index]['usdVolume'] = item['usd_volume'] if item['usd_volume'] else 0
-
-                volumes['combined']['graph'][index]['volume'] += item['volume'] if item['volume'] else 0
-                volumes['combined']['graph'][index]['usdVolume'] += item['usd_volume'] if item['usd_volume'] else 0
-            except:
-                continue
-
-        return volumes
-    except SQLAlchemyError as e:
-        logging.error(e)
-        session.rollback()
-        raise e
-    finally:
-        session.remove()
-
-
-@cache.memoize(timeout=300)
 def get_collection_volume_graph(days, topx, type, collection):
     session = create_session()
     try:
@@ -1658,7 +1610,7 @@ def get_collection_volume_graph(days, topx, type, collection):
 
         top_collections = session.execute(
             'SELECT a.collection, n.name AS collection_name '
-            'FROM collection_sales_by_date_from_2024_mv a '
+            'FROM collection_sales_by_date_mv a '
             'LEFT JOIN collections c USING (collection) '
             'LEFT JOIN names n USING (name_id) '
             'WHERE TRUE {date_clause} {type_clause} {collection_clause} '
@@ -1691,9 +1643,9 @@ def get_collection_volume_graph(days, topx, type, collection):
             return volumes
 
         res = session.execute(
-            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, date, '
+            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, to_date AS date, '
             'CASE WHEN t.collection NOT IN :top THEN \'others\' ELSE t.collection END as collection '
-            'FROM collection_sales_by_date_from_2024_mv t '
+            'FROM collection_sales_by_date_mv t '
             'WHERE TRUE {date_clause} '
             '{type_clause} {collection_clause} '
             'GROUP BY 3, 4 ORDER BY 3, 4'.format(
@@ -1718,20 +1670,20 @@ def get_collection_volume_graph(days, topx, type, collection):
         date_list = _create_date_list(int(days))
 
         for item in res:
-            collection = item['author']
+            collection = item['collection']
 
             date = item['date'].strftime("%Y-%m-%d")
             try:
                 index = date_list.index(date)
 
                 if collection in top_x_collections:
-                    volumes[collection]['graph'][index]['volume'] = item['volume'] if item['volume'] else 0
+                    volumes[collection]['graph'][index]['waxVolume'] = item['wax_volume'] if item['wax_volume'] else 0
                     volumes[collection]['graph'][index]['usdVolume'] = item['usd_volume'] if item['usd_volume'] else 0
                 elif collection not in top_x_collections:
-                    volumes['others']['graph'][index]['volume'] = item['volume'] if item['volume'] else 0
+                    volumes['others']['graph'][index]['waxVolume'] = item['wax_volume'] if item['wax_volume'] else 0
                     volumes['others']['graph'][index]['usdVolume'] = item['usd_volume'] if item['usd_volume'] else 0
 
-                volumes['combined']['graph'][index]['volume'] += item['volume'] if item['volume'] else 0
+                volumes['combined']['graph'][index]['waxVolume'] += item['wax_volume'] if item['wax_volume'] else 0
                 volumes['combined']['graph'][index]['usdVolume'] += item['usd_volume'] if item['usd_volume'] else 0
             except:
                 continue
@@ -1895,7 +1847,7 @@ def get_newest_sales():
             'LEFT JOIN names cn ON c.name_id = cn.name_id '
             'LEFT JOIN images ai ON ai.image_id = a.image_id '
             'LEFT JOIN images ci ON ci.image_id = c.image_id '
-            'WHERE verified AND NOT ARRAY_LENGTH(asset_ids, 1) = 1 AND ai.image IS NOT NULL '
+            'WHERE verified AND ARRAY_LENGTH(asset_ids, 1) = 1 AND ai.image IS NOT NULL '
             'ORDER BY t.seq DESC limit 10'
         )
 
@@ -1909,6 +1861,8 @@ def get_newest_sales():
 
         has_new_element = False
         for sale in sales_results:
+            if 'Testa' in sale.name:
+                print(sale)
             dict = {
                 'asset': {
                     'assetId': sale.asset_id,
@@ -1920,11 +1874,11 @@ def get_newest_sales():
                     'globalSequence': sale.buy_seq
                 },
                 'collection': {
-                    'name': sale.collection_name if sale.collection_name else sale.author,
+                    'name': sale.collection_name if sale.collection_name else sale.collection,
                 }
             }
             if sale.name:
-                dict['asset']['name'] = sale.name.replace('\'', '\\\'')
+                dict['asset']['name'] = sale.name.replace('\"', '\'')
             if sale.image and 'video:' in sale.image:
                 dict['asset']['video'] = sale.image.replace('video:', '')
             elif sale.image:

@@ -661,22 +661,6 @@ def get_collection_volume_graph(days=60, topx=10):
         print('get_collection_volume_graph: {}'.format(end - start))
 
 
-@app.route('/v3/market-volume-graph')
-@app.route('/v3/market-volume-graph/<days>')
-@app.route('/v3/market-volume-graph/<days>/<topx>')
-def get_market_volume_graph(days=60, topx=10):
-    start = time.time()
-    type = request.args.get('type', default=None)
-    try:
-        return flaskify(oto_response.Response(stats_v3.get_market_volume_graph(days, topx, type)))
-    except Exception as err:
-        logging.error(err)
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        end = time.time()
-        print('get_collection_volume_graph: {}'.format(end - start))
-
-
 @app.route('/v3/attribute-analytics/<collection>/<schema>')
 def get_attribute_asset_analyics_schema(collection, schema):
     start = time.time()
@@ -718,6 +702,26 @@ def get_volume(days, collection=None):
     finally:
         end = time.time()
         print('get_volume: {}'.format(end - start))
+
+
+@app.route('/v3/buy-volume/<user>/<days>')
+def get_buy_volume(user, days):
+    try:
+        type = request.args.get('type', default=None)
+        return flaskify(oto_response.Response(stats_v3.get_buy_volume(user, days, type)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/v3/sell-volume/<user>/<days>')
+def get_sell_volume(user, days):
+    try:
+        type = request.args.get('type', default=None)
+        return flaskify(oto_response.Response(stats_v3.get_sell_volume(user, days, type)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
 @app.route('/v3/change')
