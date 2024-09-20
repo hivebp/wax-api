@@ -529,7 +529,7 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
 def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all'):
     session = create_session()
     try:
-        sales_volume = session.execute(
+        sql = (
             'SELECT to_date, SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales '
             'FROM {template}collection_sales_by_date_mv t '
             'WHERE TRUE {date_clause}{collection_clause}{type_clause}{template_clause}'
@@ -539,8 +539,12 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
                     days) > 0 else '',
                 type_clause=' AND t.type = :type ' if type and type != 'all' else '',
                 template_clause=' AND template_id = :template_id ' if template_id else '',
-                collection_clause=' AND collection = :collection ' if collection else ''
-            ), {
+                collection_clause=' AND collection = :collection ' if collection and collection != '*' else ''
+            )
+        )
+
+        sales_volume = session.execute(
+            sql, {
                 'interval': '{} days'.format(days),
                 'collection': collection,
                 'template_id': template_id,
@@ -548,7 +552,7 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
             }
         )
 
-        dates = _create_empty_chart('volume', int(days), 'sales', 'usdVolume')
+        dates = _create_empty_chart('waxVolume', int(days), 'sales', 'usdVolume')
         for item in sales_volume:
             date = item['to_date'].strftime("%Y-%m-%d")
             for date_item in dates:
@@ -873,23 +877,29 @@ def get_attribute_asset_analytics_schema(asset_id, collection, schema):
 
 
 @cache.memoize(timeout=60)
-def get_attribute_asset_analytics(asset_id, template_id):
+def get_pfp_asset_analytics(asset_id, template_id):
     session = create_session()
     if not asset_id and not template_id:
         return None
     try:
         res = session.execute(
-            'SELECT asu.total, asu.total_schema, af.*, att.*, t.idata, c.name AS display_name, a.rank, a.rarity_score, '
-            'c.image AS collection_image, t.template_id, t.category '
-            'FROM attribute_assets a '
+            'SELECT ast.total, ast.total_schema, af.*, att.*, td.data, cn.name AS display_name, a.rank, a.rarity_score,'
+            'ci.image AS collection_image, t.template_id, t.schema '
+            'FROM pfp_assets a '
             'LEFT JOIN templates t USING (template_id) '
-            'LEFT JOIN collections c ON t.author = c.collection_name '
-            'INNER JOIN attribute_summaries asu ON attribute_id = ANY(a.attribute_ids) '
+            'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
+            'LEFT JOIN collections c ON a.collection = c.collection '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'INNER JOIN attribute_stats ast ON attribute_id = ANY(a.attribute_ids) '
             'LEFT JOIN attribute_floors_mv af USING(attribute_id) '
             'LEFT JOIN attributes att USING(attribute_id) '
             'WHERE TRUE {template_clause} {asset_clause}'.format(
                 template_clause=' AND template_id = :template_id ' if template_id else '',
-                asset_clause=' AND a.asset_id = :asset_id' if asset_id else ' AND a.asset_id = (SELECT asset_id FROM attribute_assets WHERE template_id = :template_id AND rank = 1 LIMIT 1) '
+                asset_clause=' AND a.asset_id = :asset_id' if asset_id else (
+                    ' AND a.asset_id = (SELECT asset_id FROM pfp_assets '
+                    'WHERE template_id = :template_id AND rank = 1 LIMIT 1) '
+                )
             ), {'template_id': template_id, 'asset_id': asset_id}
         )
 
@@ -899,13 +909,13 @@ def get_attribute_asset_analytics(asset_id, template_id):
         if res and res.rowcount > 0:
             for attribute in res:
                 if not template:
-                    template = json.loads(attribute['idata']) if attribute['idata'] else {}
+                    template = _parse_data_object(json.loads(attribute['data'])) if attribute['data'] else {}
                     template['template_id'] = attribute['template_id']
-                    template['schema'] = attribute['category']
+                    template['schema'] = attribute['schema']
                     template['rarityScore'] = attribute['rarity_score']
                     template['rank'] = attribute['rank']
                     collection = {
-                        'name': attribute.author,
+                        'name': attribute.collection,
                         'displayName': attribute.display_name,
                         'image': attribute.collection_image,
                     }
@@ -917,8 +927,8 @@ def get_attribute_asset_analytics(asset_id, template_id):
                     else attribute['bool_value'],
                     'total': attribute['total'],
                     'percentage': attribute['total'] / attribute['total_schema'] if attribute['total_schema'] else 0,
-                    'waxFloor': attribute['floor'],
-                    'usdFloor': attribute['usd_floor'],
+                    'waxFloor': attribute['floor_wax'],
+                    'usdFloor': attribute['floor_usd'],
                 })
 
             return {
@@ -928,6 +938,56 @@ def get_attribute_asset_analytics(asset_id, template_id):
             }
         else:
             return None
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_similar_collections(collection):
+    session = create_session()
+    try:
+        sql = (
+            'SELECT d.collection, ci.image, cn.name, rank_val '
+            'FROM (SELECT collection, SUM(1 - (rank/10)) AS rank_val '                                                                                                                                                   
+            'FROM ('
+            '       SELECT owner, collection, num_assets, wax_value, rank() OVER ('
+            '           PARTITION BY owner ORDER BY wax_value DESC NULLS LAST'
+            '       )'
+            '       FROM collection_users_mv '
+            '       WHERE owner IN ('
+            '              SELECT owner FROM collection_users_mv '
+            '              WHERE collection = :collection '
+            '              AND wax_value > (SELECT AVG(wax_value) '
+            '               FROM collection_users_mv WHERE collection = :collection)'
+            '       ORDER BY wax_value DESC NULLS LAST LIMIT 1000) '
+            '       AND collection != :collection AND wax_value > 50) b '
+            'WHERE rank < 10 GROUP BY 1 ORDER BY 2 DESC NULLS LAST) d '
+            'LEFT JOIN collections c USING (collection) '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'ORDER BY 4 DESC LIMIT 9'
+        )
+
+        res = session.execute(
+            sql, {
+                'collection': collection
+            }
+        )
+
+        collections = []
+
+        for collection in res:
+            collections.append({
+                'collection': collection['collection'],
+                'name': collection['name'],
+                'image': collection['image']
+            })
+
+        return collections
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()
@@ -1818,6 +1878,27 @@ def get_number_of_assets(collection):
 
         return {
             'numberOfAssets': int(result['num_assets']) if result['num_assets'] else 0,
+        }
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_number_of_users(collection):
+    session = create_session()
+    try:
+        result = session.execute(
+            'SELECT COUNT(1) AS num_users FROM collection_users_mv '
+            'WHERE collection = :collection',
+            {'collection': collection}
+        ).first()
+
+        return {
+            'numberOfUsers': int(result['num_users']) if result['num_users'] else 0,
         }
     except SQLAlchemyError as e:
         logging.error(e)

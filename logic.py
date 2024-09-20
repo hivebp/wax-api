@@ -1818,26 +1818,26 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
     try:
         result = session.execute(
             'SELECT c.collection, c.authorized, ci.image, name, verified, blacklisted, '
-            'SUM(COALESCE(cv1.wax_volume, 0)) as wax_volume_1_day, '
-            'SUM(COALESCE(cv1.usd_volume, 0)) as usd_volume_1_day, '
-            'SUM(COALESCE(cv2.wax_volume, 0)) as wax_volume_2_days, '
-            'SUM(COALESCE(cv2.usd_volume, 0)) as usd_volume_2_days, '
-            'SUM(COALESCE(cv7.wax_volume, 0)) as wax_volume_7_days, '
-            'SUM(COALESCE(cv7.usd_volume, 0)) as usd_volume_7_days, '
-            'SUM(COALESCE(cv14.wax_volume, 0)) as wax_volume_14_days, '
-            'SUM(COALESCE(cv14.usd_volume, 0)) as usd_volume_14_days, '
-            'SUM(COALESCE(cvat.wax_volume, 0)) as wax_volume_all_time, '
-            'SUM(COALESCE(cvat.usd_volume, 0)) as usd_volume_all_time, '
+            'SUM(COALESCE(cv1.wax_volume, 0)) AS wax_volume_1_day, '
+            'SUM(COALESCE(cv1.usd_volume, 0)) AS usd_volume_1_day, '
+            'SUM(COALESCE(cv2.wax_volume, 0)) AS wax_volume_2_days, '
+            'SUM(COALESCE(cv2.usd_volume, 0)) AS usd_volume_2_days, '
+            'SUM(COALESCE(cv7.wax_volume, 0)) AS wax_volume_7_days, '
+            'SUM(COALESCE(cv7.usd_volume, 0)) AS usd_volume_7_days, '
+            'SUM(COALESCE(cv14.wax_volume, 0)) AS wax_volume_14_days, '
+            'SUM(COALESCE(cv14.usd_volume, 0)) AS usd_volume_14_days, '
+            'SUM(COALESCE(cvat.wax_volume, 0)) AS wax_volume_all_time, '
+            'SUM(COALESCE(cvat.usd_volume, 0)) AS usd_volume_all_time, '
             'wax_market_cap, usd_market_cap '
             'FROM collections c '
             'LEFT JOIN images ci USING (image_id) '
             'LEFT JOIN names cn USING (name_id) '
             'LEFT JOIN collection_market_cap_mv cmc ON (c.collection = cmc.collection) '
-            'LEFT JOIN collection_volumes_1_mv cv1 ON (c.collection = cv1.collection {cv1_type_join}) '
-            'LEFT JOIN collection_volumes_2_mv cv2 ON (c.collection = cv2.collection {cv2_type_join}) '
-            'LEFT JOIN collection_volumes_7_mv cv7 ON (c.collection = cv7.collection {cv7_type_join}) '
-            'LEFT JOIN collection_volumes_15_mv cv14 ON (c.collection = cv14.collection {cv14_type_join}) '
-            'LEFT JOIN collection_volumes_all_time_mv cvat ON (c.collection = cvat.collection {cvat_type_join}) '
+            'LEFT JOIN volume_collection_1_days_mv cv1 ON (c.collection = cv1.collection {cv1_type_join}) '
+            'LEFT JOIN volume_collection_2_days_mv cv2 ON (c.collection = cv2.collection {cv2_type_join}) '
+            'LEFT JOIN volume_collection_7_days_mv cv7 ON (c.collection = cv7.collection {cv7_type_join}) '
+            'LEFT JOIN volume_collection_14_days_mv cv14 ON (c.collection = cv14.collection {cv14_type_join}) '
+            'LEFT JOIN volume_collection_all_time_mv cvat ON (c.collection = cvat.collection {cvat_type_join}) '
             'WHERE TRUE {author_clause} {tag_clause} {verified_clause} {search_clause} '
             'GROUP BY 1, 2, 3, 4, 5, 6, 17, 18 '
             'ORDER BY {sort_clause} NULLS LAST, c.collection ASC LIMIT :limit offset 0'.format(
@@ -1851,7 +1851,7 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
                 cv1_type_join=' AND cv1.type = \'sales\'' if type_join else '',
                 cv2_type_join=' AND cv2.type = \'sales\'' if type_join else '',
                 cv7_type_join=' AND cv7.type = \'sales\'' if type_join else '',
-                cv15_type_join=' AND cv15.type = \'sales\'' if type_join else '',
+                cv14_type_join=' AND cv14.type = \'sales\'' if type_join else '',
                 cvat_type_join=' AND cvat.type = \'sales\'' if type_join else ''
             ), {
                 'term': '%{}%'.format(collection), 'type': type, 'tag_id': tag_id, 'limit': limit,
@@ -1869,5 +1869,81 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
         logging.error(e)
         session.rollback()
         raise e
+    finally:
+        session.remove()
+
+
+def get_tags(collection):
+    session = create_session()
+    try:
+        res = session.execute(
+            'SELECT * FROM tags_mv t INNER JOIN tags USING(tag_id) '
+            'WHERE collection = :collection ', {'collection': collection})
+        tags = []
+        for tag in res:
+            tags.append({'tagId': tag['tag_id'], 'tagName': tag['tag_name']})
+
+        return tags
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_collection_schemas(collection):
+    session = create_session()
+    try:
+        res = session.execute(
+            'SELECT schema, collection, timestamp, json_agg(json_build_object('
+            '\'rarity\', CASE WHEN string_value IS NULL THEN \'\' ELSE string_value END, \'num_assets\', num_assets, '
+            '\'num_templates\', num_templates '
+            ')) AS rarities, SUM(num_templates) AS num_templates, SUM(num_assets) AS num_assets, '
+            'SUM(volume_wax) AS volume_wax, SUM(volume_usd) AS volume_usd '
+            'FROM ('
+            '   SELECT t.schema, t.collection, s.timestamp, a.string_value, COUNT(1) AS num_templates, '
+            '   SUM(total - COALESCE(num_burned, 0)) AS num_assets, SUM(volume_wax) AS volume_wax, '
+            '   SUM(volume_usd) AS volume_usd '
+            '   FROM schemas s '
+            '   LEFT JOIN templates t USING(collection, schema) '
+            '   LEFT JOIN template_stats_mv USING(template_id) '
+            '   LEFT JOIN attributes a ON s.schema = a.schema AND s.collection = a.collection '
+            '   AND a.attribute_id = ANY(attribute_ids) AND LOWER(attribute_name) = \'rarity\' '
+            '   WHERE s.collection = :collection '
+            '   GROUP BY 1, 2, 3, 4'
+            ') b GROUP BY 1, 2, 3 HAVING SUM(num_assets) > 0 ORDER BY 6 DESC ', {
+                'collection': collection
+            }
+        )
+
+        schemas = []
+
+        for schema in res:
+            item = {
+                'collection': schema['collection'],
+                'schema': schema['schema'],
+                'timestamp': datetime.datetime.timestamp(schema['timestamp']),
+                'volumeWax': schema['volume_wax'],
+                'volumeUsd': schema['volume_usd'],
+                'numTemplates': int(schema['num_templates']) if schema['num_templates'] else 0,
+                'numAssets': int(schema['num_assets']) if schema['num_assets'] else 0,
+            }
+            rarities = schema['rarities']
+            item['rarities'] = []
+            for rarity in sorted(filter(lambda x: x['num_assets'], rarities), key=lambda x: x['num_assets']):
+                if rarity['rarity']:
+                    item['rarities'].append({
+                        'rarity': rarity['rarity'],
+                        'numAssets': rarity['num_assets'],
+                        'numTemplates': rarity['num_templates']
+                    })
+            schemas.append(item)
+
+        return schemas
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        return []
     finally:
         session.remove()

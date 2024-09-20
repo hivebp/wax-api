@@ -559,33 +559,43 @@ CREATE TABLE public.listings (
 ALTER TABLE public.listings OWNER TO postgres;
 
 --
--- Name: listings_floor_breakdown_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+-- Name: usd_prices; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW public.listings_floor_breakdown_mv AS
- SELECT a.collection,
-    a.schema,
-    a.template_id,
-    att.attribute_id,
-    min(l.estimated_wax_price) AS floor_price
-   FROM ((public.listings l
-     LEFT JOIN public.assets a ON ((a.asset_id = ANY (l.asset_ids))))
-     LEFT JOIN public.attributes att ON ((att.attribute_id = ANY (a.attribute_ids))))
-  GROUP BY a.collection, a.schema, a.template_id, att.attribute_id
-  WITH NO DATA;
+CREATE TABLE public.usd_prices (
+    "timestamp" timestamp without time zone,
+    usd double precision
+);
 
 
-ALTER TABLE public.listings_floor_breakdown_mv OWNER TO postgres;
+ALTER TABLE public.usd_prices OWNER TO postgres;
 
 --
 -- Name: attribute_floors_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.attribute_floors_mv AS
- SELECT listings_floor_breakdown_mv.attribute_id,
-    min(listings_floor_breakdown_mv.floor_price) AS min
-   FROM public.listings_floor_breakdown_mv
-  GROUP BY listings_floor_breakdown_mv.attribute_id
+ SELECT att.attribute_id,
+    min(
+        CASE
+            WHEN ((s.currency)::text = 'WAX'::text) THEN s.price
+            ELSE (s.price / ( SELECT usd_prices.usd
+               FROM public.usd_prices
+              ORDER BY usd_prices."timestamp" DESC
+             LIMIT 1))
+        END) AS floor_wax,
+    min(
+        CASE
+            WHEN ((s.currency)::text = 'USD'::text) THEN s.price
+            ELSE (s.price * ( SELECT usd_prices.usd
+               FROM public.usd_prices
+              ORDER BY usd_prices."timestamp" DESC
+             LIMIT 1))
+        END) AS floor_usd
+   FROM ((public.listings s
+     JOIN public.assets a ON ((a.asset_id = ANY (s.asset_ids))))
+     JOIN public.attributes att ON ((att.attribute_id = ANY (a.attribute_ids))))
+  GROUP BY att.attribute_id
   WITH NO DATA;
 
 
@@ -1166,6 +1176,115 @@ CREATE TABLE public.collection_account_updates (
 ALTER TABLE public.collection_account_updates OWNER TO postgres;
 
 --
+-- Name: sales; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.sales (
+    asset_ids bigint[],
+    collection character varying(13),
+    seller character varying(13),
+    buyer character varying(13),
+    wax_price double precision,
+    usd_price double precision,
+    currency character varying(12),
+    listing_id bigint,
+    market character varying(13),
+    maker character varying(13),
+    taker character varying(13),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.sales OWNER TO postgres;
+
+--
+-- Name: template_sales; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.template_sales (
+    template_id integer,
+    schema character varying(16),
+    collection character varying(13),
+    wax_price double precision,
+    usd_price double precision,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.template_sales OWNER TO postgres;
+
+--
+-- Name: template_stats_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.template_stats_mv AS
+ SELECT t1.template_id,
+    t1.avg_wax_price,
+    t1.avg_usd_price,
+    t1.num_sales,
+    t1.volume_wax,
+    t1.volume_usd,
+    t2.wax_price AS last_sold_wax,
+    t2.usd_price AS last_sold_usd,
+    t2.seq AS last_sold_seq,
+    t2.block_num AS last_sold_block_num,
+    t2."timestamp" AS last_sold_timestamp,
+    s.listing_id AS last_sold_listing_id
+   FROM ((( SELECT t1_1.template_id,
+            avg(t1_1.wax_price) AS avg_wax_price,
+            avg(t1_1.usd_price) AS avg_usd_price,
+            count(1) AS num_sales,
+            sum(t1_1.wax_price) AS volume_wax,
+            sum(t1_1.usd_price) AS volume_usd
+           FROM public.template_sales t1_1
+          GROUP BY t1_1.template_id) t1
+     LEFT JOIN public.template_sales t2 ON ((t2.seq = ( SELECT max(template_sales.seq) AS max
+           FROM public.template_sales
+          WHERE (template_sales.template_id = t1.template_id)))))
+     LEFT JOIN public.sales s ON ((s.seq = t2.seq)))
+  WITH NO DATA;
+
+
+ALTER TABLE public.template_stats_mv OWNER TO postgres;
+
+--
+-- Name: collection_users_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_users_mv AS
+ SELECT a.collection,
+    a.owner,
+    count(1) AS num_assets,
+    sum(template_stats_mv.avg_wax_price) AS wax_value,
+    sum(template_stats_mv.avg_usd_price) AS usd_value
+   FROM (public.assets a
+     LEFT JOIN public.template_stats_mv USING (template_id))
+  WHERE ((NOT a.burned) AND (a.owner IS NOT NULL))
+  GROUP BY a.collection, a.owner
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_users_mv OWNER TO postgres;
+
+--
+-- Name: collection_assets_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_assets_mv AS
+ SELECT collection_users_mv.collection,
+    sum(collection_users_mv.num_assets) AS num_assets
+   FROM public.collection_users_mv
+  GROUP BY collection_users_mv.collection
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_assets_mv OWNER TO postgres;
+
+--
 -- Name: collection_badges_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -1195,6 +1314,139 @@ CREATE TABLE public.collection_fee_updates (
 
 
 ALTER TABLE public.collection_fee_updates OWNER TO postgres;
+
+--
+-- Name: templates; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.templates (
+    template_id integer NOT NULL,
+    collection character varying(13),
+    schema character varying(16),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    name_id integer,
+    image_id integer,
+    video_id integer,
+    max_supply bigint,
+    burnable boolean,
+    transferable boolean,
+    num_assets integer,
+    attribute_ids integer[],
+    immutable_data_id integer
+);
+
+
+ALTER TABLE public.templates OWNER TO postgres;
+
+--
+-- Name: templates_minted_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.templates_minted_mv AS
+ SELECT assets.template_id,
+    count(1) AS num_minted,
+    sum(
+        CASE
+            WHEN assets.burned THEN 1
+            ELSE 0
+        END) AS num_burned
+   FROM public.assets
+  WHERE (assets.template_id > 0)
+  GROUP BY assets.template_id
+  WITH NO DATA;
+
+
+ALTER TABLE public.templates_minted_mv OWNER TO postgres;
+
+--
+-- Name: collection_market_cap_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_market_cap_mv AS
+ SELECT t.collection,
+    sum((template_stats_mv.avg_wax_price * ((COALESCE(templates_minted_mv.num_minted, (0)::bigint) - COALESCE(templates_minted_mv.num_burned, (0)::bigint)))::double precision)) AS wax_market_cap,
+    sum((template_stats_mv.avg_usd_price * ((COALESCE(templates_minted_mv.num_minted, (0)::bigint) - COALESCE(templates_minted_mv.num_burned, (0)::bigint)))::double precision)) AS usd_market_cap
+   FROM ((public.templates t
+     LEFT JOIN public.template_stats_mv USING (template_id))
+     LEFT JOIN public.templates_minted_mv USING (template_id))
+  GROUP BY t.collection
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_market_cap_mv OWNER TO postgres;
+
+--
+-- Name: collection_sales_by_date_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_sales_by_date_before_2024_mv AS
+ SELECT sales_summary.collection,
+    to_date(to_char(sales_summary."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text) AS to_date,
+    sales_summary.type,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    count(DISTINCT sales_summary.buyer) AS buyers,
+    count(DISTINCT sales_summary.seller) AS sellers,
+    count(1) AS sales
+   FROM public.sales_summary
+  WHERE (sales_summary."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY sales_summary.collection, (to_date(to_char(sales_summary."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text)), sales_summary.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_sales_by_date_before_2024_mv OWNER TO postgres;
+
+--
+-- Name: collection_sales_by_date_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_sales_by_date_from_2024_mv AS
+ SELECT sales_summary.collection,
+    to_date(to_char(sales_summary."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text) AS to_date,
+    sales_summary.type,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    count(DISTINCT sales_summary.buyer) AS buyers,
+    count(DISTINCT sales_summary.seller) AS sellers,
+    count(1) AS sales
+   FROM public.sales_summary
+  WHERE (sales_summary."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY sales_summary.collection, (to_date(to_char(sales_summary."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text)), sales_summary.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_sales_by_date_from_2024_mv OWNER TO postgres;
+
+--
+-- Name: collection_sales_by_date_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_sales_by_date_mv AS
+ SELECT collection_sales_by_date_from_2024_mv.collection,
+    collection_sales_by_date_from_2024_mv.to_date,
+    collection_sales_by_date_from_2024_mv.type,
+    collection_sales_by_date_from_2024_mv.wax_volume,
+    collection_sales_by_date_from_2024_mv.usd_volume,
+    collection_sales_by_date_from_2024_mv.buyers,
+    collection_sales_by_date_from_2024_mv.sellers,
+    collection_sales_by_date_from_2024_mv.sales
+   FROM public.collection_sales_by_date_from_2024_mv
+UNION ALL
+ SELECT collection_sales_by_date_before_2024_mv.collection,
+    collection_sales_by_date_before_2024_mv.to_date,
+    collection_sales_by_date_before_2024_mv.type,
+    collection_sales_by_date_before_2024_mv.wax_volume,
+    collection_sales_by_date_before_2024_mv.usd_volume,
+    collection_sales_by_date_before_2024_mv.buyers,
+    collection_sales_by_date_before_2024_mv.sellers,
+    collection_sales_by_date_before_2024_mv.sales
+   FROM public.collection_sales_by_date_before_2024_mv
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_sales_by_date_mv OWNER TO postgres;
 
 --
 -- Name: tag_updates; Type: TABLE; Schema: public; Owner: postgres
@@ -1288,178 +1540,468 @@ CREATE TABLE public.collection_updates (
 ALTER TABLE public.collection_updates OWNER TO postgres;
 
 --
--- Name: collection_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+-- Name: collection_user_count_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW public.collection_volumes_mv AS
- SELECT sum(t.wax_volume_1_day) AS wax_volume_1_day,
-    sum(t.usd_volume_1_day) AS usd_volume_1_day,
-    sum(t.wax_volume_2_days) AS wax_volume_2_days,
-    sum(t.usd_volume_2_days) AS usd_volume_2_days,
-    sum(t.wax_volume_3_days) AS wax_volume_3_days,
-    sum(t.usd_volume_3_days) AS usd_volume_3_days,
-    sum(t.wax_volume_7_days) AS wax_volume_7_days,
-    sum(t.usd_volume_7_days) AS usd_volume_7_days,
-    sum(t.wax_volume_14_days) AS wax_volume_14_days,
-    sum(t.usd_volume_14_days) AS usd_volume_14_days,
-    sum(t.wax_volume_28_days) AS wax_volume_28_days,
-    sum(t.usd_volume_28_days) AS usd_volume_28_days,
-    sum(t.wax_volume_60_days) AS wax_volume_60_days,
-    sum(t.usd_volume_60_days) AS usd_volume_60_days,
-    sum(t.wax_volume_90_days) AS wax_volume_90_days,
-    sum(t.usd_volume_90_days) AS usd_volume_90_days,
-    sum(t.wax_volume_150_days) AS wax_volume_150_days,
-    sum(t.usd_volume_150_days) AS usd_volume_150_days,
-    sum(t.wax_volume_365_days) AS wax_volume_365_days,
-    sum(t.usd_volume_365_days) AS usd_volume_365_days,
-    sum(t.wax_volume_all_time) AS wax_volume_all_time,
-    sum(t.usd_volume_all_time) AS usd_volume_all_time,
-    count(t.purchases_1_day) AS purchases_1_day,
-    sum(t.purchases_2_days) AS purchases_2_days,
-    sum(t.purchases_3_days) AS purchases_3_days,
-    sum(t.purchases_7_days) AS purchases_7_days,
-    sum(t.purchases_14_days) AS purchases_15_days,
-    sum(t.purchases_28_days) AS purchases_30_days,
-    sum(t.purchases_60_days) AS purchases_60_days,
-    sum(t.purchases_90_days) AS purchases_90_days,
-    sum(t.purchases_150_days) AS purchases_150_days,
-    sum(t.purchases_365_days) AS purchases_365_days,
-    sum(t.purchases_all_time) AS purchases_all_time,
-    t.type,
-    t.collection
-   FROM ( SELECT
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_1_day,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_1_day,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_2_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_2_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_3_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_3_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_7_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_7_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '14 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_14_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '14 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_14_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '28 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_28_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '28 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_28_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '60 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_60_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '60 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_60_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '90 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_90_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '90 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_90_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '150 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_150_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '150 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_150_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '365 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-                    ELSE (0)::double precision
-                END AS wax_volume_365_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '365 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-                    ELSE (0)::double precision
-                END AS usd_volume_365_days,
-            sales_summary.wax_price AS wax_volume_all_time,
-            sales_summary.usd_price AS usd_volume_all_time,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_1_day,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_2_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_3_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_7_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '14 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_14_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '28 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_28_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '60 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_60_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '90 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_90_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '150 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_150_days,
-                CASE
-                    WHEN (sales_summary."timestamp" > ((now() - '365 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-                    ELSE 0
-                END AS purchases_365_days,
-            sales_summary.num_items AS purchases_all_time,
-            sales_summary.type,
-            sales_summary.collection
-           FROM public.sales_summary) t
-  GROUP BY t.type, t.collection
-  ORDER BY (sum(t.wax_volume_1_day)) DESC
+CREATE MATERIALIZED VIEW public.collection_user_count_mv AS
+ SELECT collection_users_mv.collection,
+    count(1) AS num_users,
+    sum(collection_users_mv.wax_value) AS wax_value,
+    sum(collection_users_mv.usd_value) AS usd_value,
+    sum(collection_users_mv.num_assets) AS num_assets
+   FROM public.collection_users_mv
+  GROUP BY collection_users_mv.collection
   WITH NO DATA;
 
 
-ALTER TABLE public.collection_volumes_mv OWNER TO postgres;
+ALTER TABLE public.collection_user_count_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_14_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_14_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_14_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_14_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_14_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_15_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_15_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_15_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_15_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_15_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_180_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_180_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_180_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_180_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_180_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_1_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_1_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_1_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_1_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_1_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_2_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_2_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_2_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_2_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_2_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_30_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_30_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_30_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_30_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_30_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_365_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_365_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_365_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_365_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_365_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_3_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_3_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_3_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_3_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_3_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_60_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_60_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_60_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_60_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_60_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_7_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_7_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_7_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_7_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_7_mv OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_90_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval))
+  GROUP BY t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_90_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_90_mv AS
+ SELECT sum(t.wax_volume) AS wax_volume,
+    sum(t.wax_volume) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    sum(t.sales) AS sales,
+    t.collection,
+    t.type
+   FROM public.user_collection_volumes_90_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_90_mv OWNER TO postgres;
+
+--
+-- Name: collection_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.collection_volumes_from_2023_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.collection_volumes_from_2023_mv OWNER TO postgres;
 
 --
 -- Name: collection_volumes_s_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -2286,6 +2828,30 @@ CREATE TABLE public.drops (
 ALTER TABLE public.drops OWNER TO postgres;
 
 --
+-- Name: drops_summary; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.drops_summary (
+    collection character varying(13),
+    type text,
+    price double precision,
+    usd_price double precision,
+    num_items integer,
+    buyer character varying(13),
+    seller character varying(13),
+    market character varying(13),
+    maker text,
+    taker text,
+    drop_id bigint,
+    "timestamp" timestamp without time zone,
+    seq bigint,
+    block_num bigint
+);
+
+
+ALTER TABLE public.drops_summary OWNER TO postgres;
+
+--
 -- Name: duplicate_atomic_listings; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2391,31 +2957,6 @@ CREATE MATERIALIZED VIEW public.floor_prices_mv AS
 
 
 ALTER TABLE public.floor_prices_mv OWNER TO postgres;
-
---
--- Name: templates; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.templates (
-    template_id integer NOT NULL,
-    collection character varying(13),
-    schema character varying(16),
-    seq bigint,
-    block_num bigint,
-    "timestamp" timestamp without time zone,
-    name_id integer,
-    image_id integer,
-    video_id integer,
-    max_supply bigint,
-    burnable boolean,
-    transferable boolean,
-    num_assets integer,
-    attribute_ids integer[],
-    immutable_data_id integer
-);
-
-
-ALTER TABLE public.templates OWNER TO postgres;
 
 --
 -- Name: floor_template_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -2533,18 +3074,6 @@ ALTER SEQUENCE public.images_image_id_seq OWNED BY public.images.image_id;
 
 
 --
--- Name: usd_prices; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.usd_prices (
-    "timestamp" timestamp without time zone,
-    usd double precision
-);
-
-
-ALTER TABLE public.usd_prices OWNER TO postgres;
-
---
 -- Name: listing_prices_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -2562,6 +3091,25 @@ CREATE MATERIALIZED VIEW public.listing_prices_mv AS
 
 
 ALTER TABLE public.listing_prices_mv OWNER TO postgres;
+
+--
+-- Name: listings_floor_breakdown_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.listings_floor_breakdown_mv AS
+ SELECT a.collection,
+    a.schema,
+    a.template_id,
+    att.attribute_id,
+    min(l.estimated_wax_price) AS floor_price
+   FROM ((public.listings l
+     LEFT JOIN public.assets a ON ((a.asset_id = ANY (l.asset_ids))))
+     LEFT JOIN public.attributes att ON ((att.attribute_id = ANY (a.attribute_ids))))
+  GROUP BY a.collection, a.schema, a.template_id, att.attribute_id
+  WITH NO DATA;
+
+
+ALTER TABLE public.listings_floor_breakdown_mv OWNER TO postgres;
 
 --
 -- Name: pfp_assets; Type: TABLE; Schema: public; Owner: postgres
@@ -2658,6 +3206,303 @@ CREATE TABLE public.market_actions (
 ALTER TABLE public.market_actions OWNER TO postgres;
 
 --
+-- Name: market_collection_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_14_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_14_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_15_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_15_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_180_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_180_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_1_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_1_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_2_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_2_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_30_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_30_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_365_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_365_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_3_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_3_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_60_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_60_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_7_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_7_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_90_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_90_mv OWNER TO postgres;
+
+--
+-- Name: market_collection_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_collection_volumes_from_2023_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_collection_volumes_from_2023_mv OWNER TO postgres;
+
+--
+-- Name: market_myth_sales; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.market_myth_sales (
+    asset_ids bigint[],
+    seller character varying(13),
+    buyer character varying(13),
+    price double precision,
+    currency character varying(12),
+    listing_id bigint,
+    market character varying(13),
+    maker character varying(13),
+    taker character varying(13),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    wax_price double precision
+);
+
+
+ALTER TABLE public.market_myth_sales OWNER TO postgres;
+
+--
 -- Name: market_statuses; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2672,6 +3517,290 @@ CREATE TABLE public.market_statuses (
 
 
 ALTER TABLE public.market_statuses OWNER TO postgres;
+
+--
+-- Name: market_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_14_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_14_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_15_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_15_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_180_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_180_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_1_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_1_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_2_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_2_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_30_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_30_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_365_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_365_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_3_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_3_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_4_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_4_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '4 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_4_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_60_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_60_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_7_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_7_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_90_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT t.buyer) AS buyers,
+    count(DISTINCT t.seller) AS sellers,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval))
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_90_mv OWNER TO postgres;
+
+--
+-- Name: market_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.market_volumes_from_2023_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.market_volumes_from_2023_mv OWNER TO postgres;
 
 --
 -- Name: memos; Type: TABLE; Schema: public; Owner: postgres
@@ -2777,6 +3906,23 @@ CREATE TABLE public.mirror_swap_results (
 
 
 ALTER TABLE public.mirror_swap_results OWNER TO postgres;
+
+--
+-- Name: monthly_collection_volume_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.monthly_collection_volume_mv AS
+ SELECT to_date(to_char((collection_sales_by_date_mv.to_date)::timestamp with time zone, 'YYYY-MM'::text), 'YYYY-MM'::text) AS to_date,
+    collection_sales_by_date_mv.collection,
+    collection_sales_by_date_mv.type,
+    sum(collection_sales_by_date_mv.wax_volume) AS wax_volume,
+    sum(collection_sales_by_date_mv.usd_volume) AS usd_volume
+   FROM public.collection_sales_by_date_mv
+  GROUP BY (to_date(to_char((collection_sales_by_date_mv.to_date)::timestamp with time zone, 'YYYY-MM'::text), 'YYYY-MM'::text)), collection_sales_by_date_mv.collection, collection_sales_by_date_mv.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.monthly_collection_volume_mv OWNER TO postgres;
 
 --
 -- Name: names; Type: TABLE; Schema: public; Owner: postgres
@@ -3019,6 +4165,8 @@ ALTER TABLE public.pfp_drop_data OWNER TO postgres;
 
 CREATE TABLE public.pfp_mints (
     result_id character varying(48),
+    drop_id bigint,
+    owner character varying(13),
     seq bigint,
     block_num bigint,
     "timestamp" timestamp without time zone
@@ -3067,6 +4215,10 @@ ALTER TABLE public.pfp_schemas OWNER TO postgres;
 
 CREATE TABLE public.pfp_swap_mints (
     result_id character varying(48),
+    drop_id bigint,
+    asset_id bigint,
+    owner character varying(13),
+    hash character varying(46),
     seq bigint,
     block_num bigint,
     "timestamp" timestamp without time zone
@@ -3179,24 +4331,6 @@ CREATE TABLE public.purchased_atomic_listings (
 
 
 ALTER TABLE public.purchased_atomic_listings OWNER TO postgres;
-
---
--- Name: template_sales; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.template_sales (
-    template_id integer,
-    schema character varying(16),
-    collection character varying(13),
-    wax_price double precision,
-    usd_price double precision,
-    seq bigint,
-    block_num bigint,
-    "timestamp" timestamp without time zone
-);
-
-
-ALTER TABLE public.template_sales OWNER TO postgres;
 
 --
 -- Name: recently_sold_day_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -3712,82 +4846,54 @@ CREATE TABLE public.rwax_tokens (
 ALTER TABLE public.rwax_tokens OWNER TO postgres;
 
 --
--- Name: sales; Type: TABLE; Schema: public; Owner: postgres
+-- Name: sales_seven_day_chart_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.sales (
-    asset_ids bigint[],
-    collection character varying(13),
-    seller character varying(13),
-    buyer character varying(13),
-    wax_price double precision,
-    usd_price double precision,
-    currency character varying(12),
-    listing_id bigint,
-    market character varying(13),
-    maker character varying(13),
-    taker character varying(13),
-    seq bigint,
-    block_num bigint,
-    "timestamp" timestamp without time zone
-);
-
-
-ALTER TABLE public.sales OWNER TO postgres;
-
---
--- Name: template_stats_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.template_stats_mv AS
- SELECT t1.template_id,
-    t1.avg_wax_price,
-    t1.avg_usd_price,
-    t1.num_sales,
-    t1.volume_wax,
-    t1.volume_usd,
-    t2.wax_price AS last_sold_wax,
-    t2.usd_price AS last_sold_usd,
-    t2.seq AS last_sold_seq,
-    t2.block_num AS last_sold_block_num,
-    t2."timestamp" AS last_sold_timestamp,
-    s.listing_id AS last_sold_listing_id
-   FROM ((( SELECT t1_1.template_id,
-            avg(t1_1.wax_price) AS avg_wax_price,
-            avg(t1_1.usd_price) AS avg_usd_price,
-            count(1) AS num_sales,
-            sum(t1_1.wax_price) AS volume_wax,
-            sum(t1_1.usd_price) AS volume_usd
-           FROM public.template_sales t1_1
-          GROUP BY t1_1.template_id) t1
-     LEFT JOIN public.template_sales t2 ON ((t2.seq = ( SELECT max(template_sales.seq) AS max
-           FROM public.template_sales
-          WHERE (template_sales.template_id = t1.template_id)))))
-     LEFT JOIN public.sales s ON ((s.seq = t2.seq)))
-  WITH NO DATA;
-
-
-ALTER TABLE public.template_stats_mv OWNER TO postgres;
-
---
--- Name: templates_minted_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.templates_minted_mv AS
- SELECT assets.template_id,
-    count(1) AS num_minted,
+CREATE MATERIALIZED VIEW public.sales_seven_day_chart_mv AS
+ SELECT sum(
+        CASE
+            WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_7,
     sum(
         CASE
-            WHEN assets.burned THEN 1
-            ELSE 0
-        END) AS num_burned
-   FROM public.assets
-  WHERE (assets.template_id > 0)
-  GROUP BY assets.template_id
+            WHEN ((sales_summary."timestamp" >= ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) AND (sales_summary."timestamp" <= ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text))) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_6,
+    sum(
+        CASE
+            WHEN ((sales_summary."timestamp" >= ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) AND (sales_summary."timestamp" <= ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text))) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_5,
+    sum(
+        CASE
+            WHEN ((sales_summary."timestamp" >= ((now() - '4 days'::interval) AT TIME ZONE 'utc'::text)) AND (sales_summary."timestamp" <= ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text))) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_4,
+    sum(
+        CASE
+            WHEN ((sales_summary."timestamp" >= ((now() - '5 days'::interval) AT TIME ZONE 'utc'::text)) AND (sales_summary."timestamp" <= ((now() - '4 days'::interval) AT TIME ZONE 'utc'::text))) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_3,
+    sum(
+        CASE
+            WHEN ((sales_summary."timestamp" >= ((now() - '6 days'::interval) AT TIME ZONE 'utc'::text)) AND (sales_summary."timestamp" <= ((now() - '5 days'::interval) AT TIME ZONE 'utc'::text))) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_2,
+    sum(
+        CASE
+            WHEN ((sales_summary."timestamp" >= ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) AND (sales_summary."timestamp" <= ((now() - '6 days'::interval) AT TIME ZONE 'utc'::text))) THEN sales_summary.wax_price
+            ELSE (0)::double precision
+        END) AS wax_volume_day_1,
+    sales_summary.collection,
+    sales_summary.type
+   FROM public.sales_summary
+  WHERE (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text))
+  GROUP BY sales_summary.collection, sales_summary.type
   WITH NO DATA;
 
 
-ALTER TABLE public.templates_minted_mv OWNER TO postgres;
+ALTER TABLE public.sales_seven_day_chart_mv OWNER TO postgres;
 
 --
 -- Name: schema_stats_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -3852,27 +4958,22 @@ CREATE TABLE public.secondary_market_purchases (
 ALTER TABLE public.secondary_market_purchases OWNER TO postgres;
 
 --
--- Name: secondary_market_sales; Type: TABLE; Schema: public; Owner: postgres
+-- Name: seller_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.secondary_market_sales (
-    asset_ids bigint[],
-    seller character varying(13),
-    buyer character varying(13),
-    price double precision,
-    currency character varying(12),
-    listing_id bigint,
-    market character varying(13),
-    maker character varying(13),
-    taker character varying(13),
-    seq bigint,
-    block_num bigint,
-    "timestamp" timestamp without time zone,
-    wax_price double precision
-);
+CREATE MATERIALIZED VIEW public.seller_volumes_1_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.seller,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
 
 
-ALTER TABLE public.secondary_market_sales OWNER TO postgres;
+ALTER TABLE public.seller_volumes_1_mv OWNER TO postgres;
 
 --
 -- Name: seller_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -4419,13 +5520,12 @@ ALTER TABLE public.table_sizes OWNER TO postgres;
 --
 
 CREATE TABLE public.tag_suggestions (
-    transaction_id character varying(256),
-    seq bigint,
-    "timestamp" timestamp without time zone,
     suggester character varying(13),
     tag_id integer,
-    author character varying(13),
-    rejected boolean DEFAULT false
+    collection character varying(13),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
 );
 
 
@@ -4452,6 +5552,75 @@ ALTER TABLE public.tags_tag_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE public.tags_tag_id_seq OWNED BY public.tags.tag_id;
 
+
+--
+-- Name: templates_collection_sales_by_date_before_2024_mv; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.templates_collection_sales_by_date_before_2024_mv (
+    collection character varying(13),
+    schema character varying(16),
+    template_id integer,
+    to_date date,
+    wax_volume double precision,
+    usd_volume double precision,
+    buyers bigint,
+    sellers bigint,
+    sales bigint
+);
+
+
+ALTER TABLE public.templates_collection_sales_by_date_before_2024_mv OWNER TO postgres;
+
+--
+-- Name: templates_collection_sales_by_date_from_2024_mv; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.templates_collection_sales_by_date_from_2024_mv (
+    collection character varying(13),
+    schema character varying(16),
+    template_id integer,
+    to_date date,
+    wax_volume double precision,
+    usd_volume double precision,
+    buyers bigint,
+    sellers bigint,
+    sales bigint
+);
+
+
+ALTER TABLE public.templates_collection_sales_by_date_from_2024_mv OWNER TO postgres;
+
+--
+-- Name: template_collection_sales_by_date_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.template_collection_sales_by_date_mv AS
+ SELECT templates_collection_sales_by_date_from_2024_mv.collection,
+    templates_collection_sales_by_date_from_2024_mv.schema,
+    templates_collection_sales_by_date_from_2024_mv.template_id,
+    templates_collection_sales_by_date_from_2024_mv.to_date,
+    templates_collection_sales_by_date_from_2024_mv.wax_volume,
+    templates_collection_sales_by_date_from_2024_mv.usd_volume,
+    templates_collection_sales_by_date_from_2024_mv.buyers,
+    templates_collection_sales_by_date_from_2024_mv.sellers,
+    templates_collection_sales_by_date_from_2024_mv.sales
+   FROM public.templates_collection_sales_by_date_from_2024_mv
+UNION ALL
+ SELECT templates_collection_sales_by_date_before_2024_mv.collection,
+    templates_collection_sales_by_date_before_2024_mv.schema,
+    templates_collection_sales_by_date_before_2024_mv.template_id,
+    templates_collection_sales_by_date_before_2024_mv.to_date,
+    templates_collection_sales_by_date_before_2024_mv.wax_volume,
+    templates_collection_sales_by_date_before_2024_mv.usd_volume,
+    templates_collection_sales_by_date_before_2024_mv.buyers,
+    templates_collection_sales_by_date_before_2024_mv.sellers,
+    templates_collection_sales_by_date_before_2024_mv.sales
+   FROM public.templates_collection_sales_by_date_before_2024_mv
+  WITH NO DATA;
+
+
+ALTER TABLE public.template_collection_sales_by_date_mv OWNER TO postgres;
 
 --
 -- Name: token_updates; Type: TABLE; Schema: public; Owner: postgres
@@ -4726,6 +5895,26 @@ CREATE TABLE public.unverify_overwrite (
 
 
 ALTER TABLE public.unverify_overwrite OWNER TO postgres;
+
+--
+-- Name: user_collection_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_collection_volumes_from_2023_mv AS
+ SELECT sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales,
+    t.collection,
+    t.seller,
+    t.buyer,
+    t.type
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.collection, t.seller, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_collection_volumes_from_2023_mv OWNER TO postgres;
 
 --
 -- Name: user_collection_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -5008,6 +6197,23 @@ CREATE TABLE public.user_picture_updates (
 ALTER TABLE public.user_picture_updates OWNER TO postgres;
 
 --
+-- Name: user_pictures_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.user_pictures_mv AS
+ SELECT u.user_name,
+    i.image
+   FROM (public.user_picture_updates u
+     LEFT JOIN public.images i USING (image_id))
+  WHERE (u.seq = ( SELECT max(user_picture_updates.seq) AS max
+           FROM public.user_picture_updates
+          WHERE ((user_picture_updates.user_name)::text = (u.user_name)::text)))
+  WITH NO DATA;
+
+
+ALTER TABLE public.user_pictures_mv OWNER TO postgres;
+
+--
 -- Name: user_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -5083,6 +6289,22 @@ CREATE MATERIALIZED VIEW public.user_volumes_s_mv AS
 ALTER TABLE public.user_volumes_s_mv OWNER TO postgres;
 
 --
+-- Name: users_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.users_mv AS
+ SELECT collection_users_mv.owner,
+    sum(collection_users_mv.num_assets) AS num_assets,
+    sum(collection_users_mv.wax_value) AS wax_value,
+    sum(collection_users_mv.usd_value) AS usd_value
+   FROM public.collection_users_mv
+  GROUP BY collection_users_mv.owner
+  WITH NO DATA;
+
+
+ALTER TABLE public.users_mv OWNER TO postgres;
+
+--
 -- Name: verification_actions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5132,6 +6354,2865 @@ ALTER TABLE public.videos_video_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE public.videos_video_id_seq OWNED BY public.videos.video_id;
 
+
+--
+-- Name: volume_collection_market_user_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_14_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '14 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_14_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_15_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '15 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_15_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_180_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '180 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_180_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_1_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '1 day'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_1_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_2_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '2 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_2_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_30_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '30 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_30_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_365_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '365 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_365_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_3_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '3 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_3_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_60_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '60 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_60_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_7_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '7 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_7_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_90_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary t
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '90 days'::interval))
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_90_days_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_before_2024_mv AS
+ SELECT s.collection,
+    s.market,
+    s.maker,
+    s.taker,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(s.wax_price) AS wax_volume,
+    sum(s.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary s
+  WHERE (s."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY s.collection, s.market, s.maker, s.taker, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_before_2024_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_before_2024_mv AS
+ SELECT volume_collection_market_user_before_2024_mv.collection,
+    volume_collection_market_user_before_2024_mv.buyer,
+    volume_collection_market_user_before_2024_mv.type,
+    sum(volume_collection_market_user_before_2024_mv.wax_volume) AS wax_volume,
+    sum(volume_collection_market_user_before_2024_mv.usd_volume) AS usd_volume,
+    sum(volume_collection_market_user_before_2024_mv.sales) AS sales
+   FROM public.volume_collection_market_user_before_2024_mv
+  GROUP BY volume_collection_market_user_before_2024_mv.collection, volume_collection_market_user_before_2024_mv.buyer, volume_collection_market_user_before_2024_mv.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_before_2024_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_from_2024_mv AS
+ SELECT s.collection,
+    s.market,
+    s.maker,
+    s.taker,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(s.wax_price) AS wax_volume,
+    sum(s.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM public.sales_summary s
+  WHERE (s."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY s.collection, s.market, s.maker, s.taker, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_from_2024_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_from_2024_mv AS
+ SELECT volume_collection_market_user_from_2024_mv.collection,
+    volume_collection_market_user_from_2024_mv.buyer,
+    volume_collection_market_user_from_2024_mv.type,
+    sum(volume_collection_market_user_from_2024_mv.wax_volume) AS wax_volume,
+    sum(volume_collection_market_user_from_2024_mv.usd_volume) AS usd_volume,
+    sum(volume_collection_market_user_from_2024_mv.sales) AS sales
+   FROM public.volume_collection_market_user_from_2024_mv
+  GROUP BY volume_collection_market_user_from_2024_mv.collection, volume_collection_market_user_from_2024_mv.buyer, volume_collection_market_user_from_2024_mv.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_from_2024_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_all_time_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM ( SELECT volume_collection_buyer_from_2024_mv.collection,
+            volume_collection_buyer_from_2024_mv.buyer,
+            volume_collection_buyer_from_2024_mv.type,
+            volume_collection_buyer_from_2024_mv.wax_volume,
+            volume_collection_buyer_from_2024_mv.usd_volume,
+            volume_collection_buyer_from_2024_mv.sales
+           FROM public.volume_collection_buyer_from_2024_mv
+        UNION ALL
+         SELECT volume_collection_buyer_before_2024_mv.collection,
+            volume_collection_buyer_before_2024_mv.buyer,
+            volume_collection_buyer_before_2024_mv.type,
+            volume_collection_buyer_before_2024_mv.wax_volume,
+            volume_collection_buyer_before_2024_mv.usd_volume,
+            volume_collection_buyer_before_2024_mv.sales
+           FROM public.volume_collection_buyer_before_2024_mv) t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_buyer_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_buyer_all_time_mv AS
+ SELECT t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_buyer_all_time_mv t
+  GROUP BY t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_buyer_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_collection_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_14_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_15_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_180_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_1_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_2_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_30_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_365_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_3_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_60_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_7_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_90_days_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_user_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_user_all_time_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM ( SELECT volume_collection_market_user_from_2024_mv.collection,
+            volume_collection_market_user_from_2024_mv.market,
+            volume_collection_market_user_from_2024_mv.maker,
+            volume_collection_market_user_from_2024_mv.taker,
+            volume_collection_market_user_from_2024_mv.buyer,
+            volume_collection_market_user_from_2024_mv.seller,
+            volume_collection_market_user_from_2024_mv.type,
+            volume_collection_market_user_from_2024_mv.wax_volume,
+            volume_collection_market_user_from_2024_mv.usd_volume,
+            volume_collection_market_user_from_2024_mv.sales
+           FROM public.volume_collection_market_user_from_2024_mv
+        UNION ALL
+         SELECT volume_collection_market_user_before_2024_mv.collection,
+            volume_collection_market_user_before_2024_mv.market,
+            volume_collection_market_user_before_2024_mv.maker,
+            volume_collection_market_user_before_2024_mv.taker,
+            volume_collection_market_user_before_2024_mv.buyer,
+            volume_collection_market_user_before_2024_mv.seller,
+            volume_collection_market_user_before_2024_mv.type,
+            volume_collection_market_user_before_2024_mv.wax_volume,
+            volume_collection_market_user_before_2024_mv.usd_volume,
+            volume_collection_market_user_before_2024_mv.sales
+           FROM public.volume_collection_market_user_before_2024_mv) t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_user_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_collection_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_all_time_mv AS
+ SELECT t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_all_time_mv t
+  GROUP BY t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_14_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_15_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_180_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_1_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_2_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_30_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_365_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_3_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_60_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_7_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_buyer_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_buyer_90_days_mv AS
+ SELECT t.collection,
+    t.buyer,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.collection, t.buyer, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_buyer_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_14_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_15_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_180_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_1_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_2_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_30_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_365_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_3_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_60_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_7_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_90_days_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_market_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_market_all_time_mv AS
+ SELECT t.collection,
+    t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_all_time_mv t
+  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_market_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_14_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_15_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_180_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_1_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_2_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_30_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_365_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_3_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_60_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_7_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_90_days_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_before_2024_mv AS
+ SELECT volume_collection_market_user_before_2024_mv.collection,
+    volume_collection_market_user_before_2024_mv.seller,
+    volume_collection_market_user_before_2024_mv.type,
+    sum(volume_collection_market_user_before_2024_mv.wax_volume) AS wax_volume,
+    sum(volume_collection_market_user_before_2024_mv.usd_volume) AS usd_volume,
+    sum(volume_collection_market_user_before_2024_mv.sales) AS sales
+   FROM public.volume_collection_market_user_before_2024_mv
+  GROUP BY volume_collection_market_user_before_2024_mv.collection, volume_collection_market_user_before_2024_mv.seller, volume_collection_market_user_before_2024_mv.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_before_2024_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_from_2024_mv AS
+ SELECT volume_collection_market_user_from_2024_mv.collection,
+    volume_collection_market_user_from_2024_mv.seller,
+    volume_collection_market_user_from_2024_mv.type,
+    sum(volume_collection_market_user_from_2024_mv.wax_volume) AS wax_volume,
+    sum(volume_collection_market_user_from_2024_mv.usd_volume) AS usd_volume,
+    sum(volume_collection_market_user_from_2024_mv.sales) AS sales
+   FROM public.volume_collection_market_user_from_2024_mv
+  GROUP BY volume_collection_market_user_from_2024_mv.collection, volume_collection_market_user_from_2024_mv.seller, volume_collection_market_user_from_2024_mv.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_from_2024_mv OWNER TO root;
+
+--
+-- Name: volume_collection_seller_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_collection_seller_all_time_mv AS
+ SELECT t.collection,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM ( SELECT volume_collection_seller_from_2024_mv.collection,
+            volume_collection_seller_from_2024_mv.seller,
+            volume_collection_seller_from_2024_mv.type,
+            volume_collection_seller_from_2024_mv.wax_volume,
+            volume_collection_seller_from_2024_mv.usd_volume,
+            volume_collection_seller_from_2024_mv.sales
+           FROM public.volume_collection_seller_from_2024_mv
+        UNION ALL
+         SELECT volume_collection_seller_before_2024_mv.collection,
+            volume_collection_seller_before_2024_mv.seller,
+            volume_collection_seller_before_2024_mv.type,
+            volume_collection_seller_before_2024_mv.wax_volume,
+            volume_collection_seller_before_2024_mv.usd_volume,
+            volume_collection_seller_before_2024_mv.sales
+           FROM public.volume_collection_seller_before_2024_mv) t
+  GROUP BY t.collection, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_collection_seller_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_drop_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_14_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_14_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_15_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_15_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_180_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_180_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_1_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_1_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_2_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_2_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_30_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_30_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_365_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_365_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_3_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_3_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_60_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_60_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_7_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_7_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_90_days_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE (((sales_summary.type)::text = 'drops'::text) AND (sales_summary."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval)))
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_90_days_mv OWNER TO postgres;
+
+--
+-- Name: volume_drop_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.volume_drop_all_time_mv AS
+ SELECT sales_summary.collection,
+    sales_summary.listing_id AS drop_id,
+    sales_summary.market,
+    sum(sales_summary.wax_price) AS wax_volume,
+    sum(sales_summary.usd_price) AS usd_volume,
+    sum(sales_summary.num_items) AS sales,
+    count(DISTINCT sales_summary.buyer) AS buyers
+   FROM public.sales_summary
+  WHERE ((sales_summary.type)::text = 'drops'::text)
+  GROUP BY sales_summary.collection, sales_summary.listing_id, sales_summary.market
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_drop_all_time_mv OWNER TO postgres;
+
+--
+-- Name: volume_market_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_14_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_15_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_180_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_1_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_2_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_30_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_365_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_3_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_60_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_7_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_90_days_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_market_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_market_all_time_mv AS
+ SELECT t.market,
+    t.maker,
+    t.taker,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_collection_market_user_all_time_mv t
+  GROUP BY t.market, t.maker, t.taker, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_market_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_seller_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_14_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_14_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_15_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_15_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_180_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_180_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_1_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_1_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_2_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_2_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_30_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_30_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_365_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_365_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_3_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_3_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_60_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_60_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_7_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_7_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_90_days_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_market_user_90_days_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_seller_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_seller_all_time_mv AS
+ SELECT t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM public.volume_collection_seller_all_time_mv t
+  GROUP BY t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_seller_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_14_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '14 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_14_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_14_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_14_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_15_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '15 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_15_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_15_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_15_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_180_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '180 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_180_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_180_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_180_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_1_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '1 day'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_1_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_1_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_1_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_2_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '2 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_2_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_2_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_2_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_30_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '30 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_30_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_30_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_30_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_365_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '365 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_365_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_365_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_365_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_3_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '3 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_3_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_3_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_3_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_60_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '60 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_60_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_60_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_60_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_7_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '7 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_7_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_7_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_7_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_90_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     JOIN public.sales_summary s USING (seq))
+  WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '90 days'::interval))
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_90_days_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_90_days_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_90_days_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_before_2024_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(s.wax_price) AS wax_volume,
+    sum(s.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     LEFT JOIN public.sales_summary s USING (seq))
+  WHERE (s."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_before_2024_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_from_2024_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    s.buyer,
+    s.seller,
+    s.type,
+    sum(s.wax_price) AS wax_volume,
+    sum(s.usd_price) AS usd_volume,
+    count(1) AS sales
+   FROM (public.template_sales t
+     LEFT JOIN public.sales_summary s USING (seq))
+  WHERE (s."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.template_id, t.schema, t.collection, s.buyer, s.seller, s.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_from_2024_mv OWNER TO root;
+
+--
+-- Name: volume_template_user_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_user_all_time_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.buyer,
+    t.seller,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales
+   FROM ( SELECT volume_template_user_from_2024_mv.template_id,
+            volume_template_user_from_2024_mv.schema,
+            volume_template_user_from_2024_mv.collection,
+            volume_template_user_from_2024_mv.buyer,
+            volume_template_user_from_2024_mv.seller,
+            volume_template_user_from_2024_mv.type,
+            volume_template_user_from_2024_mv.wax_volume,
+            volume_template_user_from_2024_mv.usd_volume,
+            volume_template_user_from_2024_mv.sales
+           FROM public.volume_template_user_from_2024_mv
+        UNION ALL
+         SELECT volume_template_user_before_2024_mv.template_id,
+            volume_template_user_before_2024_mv.schema,
+            volume_template_user_before_2024_mv.collection,
+            volume_template_user_before_2024_mv.buyer,
+            volume_template_user_before_2024_mv.seller,
+            volume_template_user_before_2024_mv.type,
+            volume_template_user_before_2024_mv.wax_volume,
+            volume_template_user_before_2024_mv.usd_volume,
+            volume_template_user_before_2024_mv.sales
+           FROM public.volume_template_user_before_2024_mv) t
+  GROUP BY t.template_id, t.schema, t.collection, t.buyer, t.seller, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_user_all_time_mv OWNER TO root;
+
+--
+-- Name: volume_template_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+--
+
+CREATE MATERIALIZED VIEW public.volume_template_all_time_mv AS
+ SELECT t.template_id,
+    t.schema,
+    t.collection,
+    t.type,
+    sum(t.wax_volume) AS wax_volume,
+    sum(t.usd_volume) AS usd_volume,
+    sum(t.sales) AS sales,
+    count(DISTINCT t.seller) AS sellers,
+    count(DISTINCT t.buyer) AS buyers
+   FROM public.volume_template_user_all_time_mv t
+  GROUP BY t.template_id, t.schema, t.collection, t.type
+  WITH NO DATA;
+
+
+ALTER TABLE public.volume_template_all_time_mv OWNER TO root;
 
 --
 -- Name: whitelist_overwrite; Type: TABLE; Schema: public; Owner: postgres
@@ -6396,6 +10477,13 @@ CREATE INDEX collection_account_updates_seq_idx ON public.collection_account_upd
 
 
 --
+-- Name: collection_assets_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_assets_mv_collection_idx ON public.collection_assets_mv USING btree (collection);
+
+
+--
 -- Name: collection_badges_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -6414,6 +10502,55 @@ CREATE INDEX collection_fee_updates_block_num_idx ON public.collection_fee_updat
 --
 
 CREATE INDEX collection_fee_updates_seq_idx ON public.collection_fee_updates USING btree (seq DESC);
+
+
+--
+-- Name: collection_market_cap_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_market_cap_mv_collection_idx ON public.collection_market_cap_mv USING btree (collection);
+
+
+--
+-- Name: collection_sales_by_date_before_2024_mv_to_date_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX collection_sales_by_date_before_2024_mv_to_date_collection_idx ON public.collection_sales_by_date_before_2024_mv USING btree (to_date DESC, collection);
+
+
+--
+-- Name: collection_sales_by_date_before_202_collection_type_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_sales_by_date_before_202_collection_type_to_date_idx ON public.collection_sales_by_date_before_2024_mv USING btree (collection, type, to_date);
+
+
+--
+-- Name: collection_sales_by_date_from_2024__collection_type_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_sales_by_date_from_2024__collection_type_to_date_idx ON public.collection_sales_by_date_from_2024_mv USING btree (collection, type, to_date);
+
+
+--
+-- Name: collection_sales_by_date_from_2024_mv_to_date_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX collection_sales_by_date_from_2024_mv_to_date_collection_idx ON public.collection_sales_by_date_from_2024_mv USING btree (to_date DESC, collection);
+
+
+--
+-- Name: collection_sales_by_date_mv_collection_type_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_sales_by_date_mv_collection_type_to_date_idx ON public.collection_sales_by_date_mv USING btree (collection, type, to_date);
+
+
+--
+-- Name: collection_sales_by_date_mv_to_date_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX collection_sales_by_date_mv_to_date_collection_idx ON public.collection_sales_by_date_mv USING btree (to_date DESC, collection);
 
 
 --
@@ -6452,10 +10589,101 @@ CREATE INDEX collection_updates_seq_idx1 ON public.collection_updates USING btre
 
 
 --
--- Name: collection_volumes_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: collection_user_count_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX collection_volumes_mv_collection_type_idx ON public.collection_volumes_mv USING btree (collection, type);
+CREATE UNIQUE INDEX collection_user_count_mv_collection_idx ON public.collection_user_count_mv USING btree (collection);
+
+
+--
+-- Name: collection_users_mv_owner_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX collection_users_mv_owner_collection_idx ON public.collection_users_mv USING btree (owner, collection);
+
+
+--
+-- Name: collection_volumes_14_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_14_mv_collection_type_idx ON public.collection_volumes_14_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_15_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_15_mv_collection_type_idx ON public.collection_volumes_15_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_180_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_180_mv_collection_type_idx ON public.collection_volumes_180_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_1_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_1_mv_collection_type_idx ON public.collection_volumes_1_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_2_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_2_mv_collection_type_idx ON public.collection_volumes_2_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_30_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_30_mv_collection_type_idx ON public.collection_volumes_30_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_365_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_365_mv_collection_type_idx ON public.collection_volumes_365_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_3_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_3_mv_collection_type_idx ON public.collection_volumes_3_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_60_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_60_mv_collection_type_idx ON public.collection_volumes_60_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_7_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_7_mv_collection_type_idx ON public.collection_volumes_7_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_90_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_90_mv_collection_type_idx ON public.collection_volumes_90_mv USING btree (collection, type);
+
+
+--
+-- Name: collection_volumes_from_2023_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX collection_volumes_from_2023_mv_collection_type_idx ON public.collection_volumes_from_2023_mv USING btree (collection, type);
 
 
 --
@@ -7257,6 +11485,90 @@ CREATE INDEX market_actions_seq_idx ON public.market_actions USING btree (seq DE
 
 
 --
+-- Name: market_collection_volumes_14__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_14__collection_market_taker_maker_idx ON public.market_collection_volumes_14_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_15__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_15__collection_market_taker_maker_idx ON public.market_collection_volumes_15_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_180_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_180_collection_market_taker_maker_idx ON public.market_collection_volumes_180_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_1_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_1_m_collection_market_taker_maker_idx ON public.market_collection_volumes_1_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_2_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_2_m_collection_market_taker_maker_idx ON public.market_collection_volumes_2_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_30__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_30__collection_market_taker_maker_idx ON public.market_collection_volumes_30_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_365_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_365_collection_market_taker_maker_idx ON public.market_collection_volumes_365_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_3_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_3_m_collection_market_taker_maker_idx ON public.market_collection_volumes_3_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_60__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_60__collection_market_taker_maker_idx ON public.market_collection_volumes_60_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_7_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_7_m_collection_market_taker_maker_idx ON public.market_collection_volumes_7_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_90__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_90__collection_market_taker_maker_idx ON public.market_collection_volumes_90_mv USING btree (collection, market, taker, maker, type);
+
+
+--
+-- Name: market_collection_volumes_fro_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_collection_volumes_fro_collection_market_taker_maker_idx ON public.market_collection_volumes_from_2023_mv USING btree (collection, market, taker, maker, type);
+
+
+--
 -- Name: market_statuses_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7275,6 +11587,90 @@ CREATE UNIQUE INDEX market_statuses_market_list_name_collection_idx ON public.ma
 --
 
 CREATE INDEX market_statuses_seq_idx ON public.market_statuses USING btree (seq DESC);
+
+
+--
+-- Name: market_volumes_14_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_14_mv_market_taker_maker_type_idx ON public.market_volumes_14_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_15_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_15_mv_market_taker_maker_type_idx ON public.market_volumes_15_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_180_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_180_mv_market_taker_maker_type_idx ON public.market_volumes_180_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_1_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_1_mv_market_taker_maker_type_idx ON public.market_volumes_1_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_2_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_2_mv_market_taker_maker_type_idx ON public.market_volumes_2_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_30_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_30_mv_market_taker_maker_type_idx ON public.market_volumes_30_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_365_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_365_mv_market_taker_maker_type_idx ON public.market_volumes_365_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_3_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_3_mv_market_taker_maker_type_idx ON public.market_volumes_3_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_60_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_60_mv_market_taker_maker_type_idx ON public.market_volumes_60_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_7_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_7_mv_market_taker_maker_type_idx ON public.market_volumes_7_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_90_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_90_mv_market_taker_maker_type_idx ON public.market_volumes_90_mv USING btree (market, taker, maker, type);
+
+
+--
+-- Name: market_volumes_from_2023_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX market_volumes_from_2023_mv_market_taker_maker_type_idx ON public.market_volumes_from_2023_mv USING btree (market, taker, maker, type);
 
 
 --
@@ -7331,6 +11727,13 @@ CREATE INDEX mirror_swap_mints_block_num_idx ON public.mirror_swap_mints USING b
 --
 
 CREATE INDEX mirror_swap_mints_seq_idx ON public.mirror_swap_mints USING btree (seq DESC);
+
+
+--
+-- Name: monthly_collection_volume_mv_to_date_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX monthly_collection_volume_mv_to_date_collection_type_idx ON public.monthly_collection_volume_mv USING btree (to_date, collection, type);
 
 
 --
@@ -7446,6 +11849,20 @@ CREATE INDEX pfp_results_block_num_idx ON public.pfp_results USING btree (block_
 
 
 --
+-- Name: pfp_results_drop_id_result_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX pfp_results_drop_id_result_id_idx ON public.pfp_results USING btree (drop_id, result_id);
+
+
+--
+-- Name: pfp_results_result_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX pfp_results_result_id_idx ON public.pfp_results USING btree (result_id);
+
+
+--
 -- Name: pfp_results_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7464,6 +11881,34 @@ CREATE INDEX pfp_swap_mints_block_num_idx ON public.pfp_swap_mints USING btree (
 --
 
 CREATE INDEX pfp_swap_mints_seq_idx ON public.pfp_swap_mints USING btree (seq DESC);
+
+
+--
+-- Name: pfp_swap_results_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX pfp_swap_results_block_num_idx ON public.pfp_swap_results USING btree (block_num);
+
+
+--
+-- Name: pfp_swap_results_drop_id_result_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX pfp_swap_results_drop_id_result_id_idx ON public.pfp_swap_results USING btree (drop_id, result_id);
+
+
+--
+-- Name: pfp_swap_results_result_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX pfp_swap_results_result_id_idx ON public.pfp_swap_results USING btree (result_id);
+
+
+--
+-- Name: pfp_swap_results_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX pfp_swap_results_seq_idx ON public.pfp_swap_results USING btree (seq DESC);
 
 
 --
@@ -7789,6 +12234,13 @@ CREATE INDEX sales_seq_idx ON public.sales USING btree (seq DESC);
 
 
 --
+-- Name: sales_seven_day_chart_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX sales_seven_day_chart_mv_collection_type_idx ON public.sales_seven_day_chart_mv USING btree (collection, type);
+
+
+--
 -- Name: sales_summary_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7810,6 +12262,13 @@ CREATE INDEX sales_summary_seq_idx ON public.sales_summary USING btree (seq DESC
 
 
 --
+-- Name: sales_summary_timestamp_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sales_summary_timestamp_idx ON public.sales_summary USING btree ("timestamp" DESC);
+
+
+--
 -- Name: sales_summary_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7821,6 +12280,27 @@ CREATE INDEX sales_summary_type_idx ON public.sales_summary USING btree (type);
 --
 
 CREATE INDEX sales_summary_type_seq_idx ON public.sales_summary USING btree (type, seq DESC);
+
+
+--
+-- Name: sales_timestamp_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sales_timestamp_idx ON public.sales USING btree ("timestamp" DESC);
+
+
+--
+-- Name: sales_usd_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sales_usd_price_idx ON public.sales USING btree (usd_price DESC);
+
+
+--
+-- Name: sales_wax_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sales_wax_price_idx ON public.sales USING btree (wax_price DESC);
 
 
 --
@@ -7855,21 +12335,21 @@ CREATE INDEX schemas_seq_idx ON public.schemas USING btree (seq DESC);
 -- Name: secondary_market_sales_asset_ids_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX secondary_market_sales_asset_ids_idx ON public.secondary_market_sales USING gin (asset_ids);
+CREATE INDEX secondary_market_sales_asset_ids_idx ON public.market_myth_sales USING gin (asset_ids);
 
 
 --
 -- Name: secondary_market_sales_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX secondary_market_sales_block_num_idx ON public.secondary_market_sales USING btree (block_num);
+CREATE INDEX secondary_market_sales_block_num_idx ON public.market_myth_sales USING btree (block_num);
 
 
 --
 -- Name: secondary_market_sales_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX secondary_market_sales_seq_idx ON public.secondary_market_sales USING btree (seq DESC);
+CREATE INDEX secondary_market_sales_seq_idx ON public.market_myth_sales USING btree (seq DESC);
 
 
 --
@@ -8125,13 +12605,6 @@ CREATE INDEX stakes_seq_idx ON public.stakes USING btree (seq DESC);
 
 
 --
--- Name: tag_suggestions_seq_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX tag_suggestions_seq_idx ON public.tag_suggestions USING btree (seq DESC);
-
-
---
 -- Name: tag_updates_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -8150,6 +12623,20 @@ CREATE INDEX tag_updates_seq_idx ON public.tag_updates USING btree (seq DESC);
 --
 
 CREATE UNIQUE INDEX tags_mv_collection_tag_id_idx ON public.tags_mv USING btree (collection, tag_id);
+
+
+--
+-- Name: template_collection_sales_by__collection_schema_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX template_collection_sales_by__collection_schema_template_id_idx ON public.template_collection_sales_by_date_mv USING btree (collection, schema, template_id, to_date);
+
+
+--
+-- Name: template_collection_sales_by_date_mv_template_id_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_collection_sales_by_date_mv_template_id_to_date_idx ON public.template_collection_sales_by_date_mv USING btree (template_id, to_date DESC);
 
 
 --
@@ -8188,10 +12675,24 @@ CREATE INDEX template_sales_template_id_seq_idx ON public.template_sales USING b
 
 
 --
+-- Name: template_sales_template_id_usd_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_sales_template_id_usd_price_idx ON public.template_sales USING btree (template_id, usd_price DESC);
+
+
+--
 -- Name: template_sales_timestamp_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX template_sales_timestamp_idx ON public.template_sales USING btree ("timestamp" DESC);
+
+
+--
+-- Name: template_sales_usd_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_sales_usd_price_idx ON public.template_sales USING btree (usd_price DESC);
 
 
 --
@@ -8220,6 +12721,20 @@ CREATE INDEX templates_block_num_idx ON public.templates USING btree (block_num)
 --
 
 CREATE INDEX templates_collection_idx ON public.templates USING btree (collection);
+
+
+--
+-- Name: templates_collection_sales_by_collection_schema_template_i_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX templates_collection_sales_by_collection_schema_template_i_idx1 ON public.templates_collection_sales_by_date_from_2024_mv USING btree (collection, schema, template_id, to_date);
+
+
+--
+-- Name: templates_collection_sales_by_collection_schema_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX templates_collection_sales_by_collection_schema_template_id_idx ON public.templates_collection_sales_by_date_before_2024_mv USING btree (collection, schema, template_id, to_date);
 
 
 --
@@ -8384,6 +12899,181 @@ CREATE INDEX usd_prices_timestamp_idx1 ON public.usd_prices USING btree ("timest
 
 
 --
+-- Name: user_collection_volumes_14_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_14_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_14_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_14_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_14_mv_collection_idx ON public.user_collection_volumes_14_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_15_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_15_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_15_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_15_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_15_mv_collection_idx ON public.user_collection_volumes_15_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_180_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_180_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_180_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_180_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_180_mv_collection_idx ON public.user_collection_volumes_180_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_1_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_1_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_1_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_1_mv_collection_buyer_seller_type_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_1_mv_collection_buyer_seller_type_idx1 ON public.user_collection_volumes_1_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_1_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_1_mv_collection_idx ON public.user_collection_volumes_1_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_2_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_2_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_2_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_2_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_2_mv_collection_idx ON public.user_collection_volumes_2_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_30_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_30_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_30_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_30_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_30_mv_collection_idx ON public.user_collection_volumes_30_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_365_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_365_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_365_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_365_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_365_mv_collection_idx ON public.user_collection_volumes_365_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_3_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_3_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_3_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_3_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_3_mv_collection_idx ON public.user_collection_volumes_3_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_60_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_60_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_60_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_60_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_60_mv_collection_idx ON public.user_collection_volumes_60_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_7_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_7_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_7_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_7_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_7_mv_collection_idx ON public.user_collection_volumes_7_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_90_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_90_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_90_mv USING btree (collection, buyer, seller, type);
+
+
+--
+-- Name: user_collection_volumes_90_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_90_mv_collection_idx ON public.user_collection_volumes_90_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_from_2023_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_collection_volumes_from_2023_mv_collection_idx ON public.user_collection_volumes_from_2023_mv USING btree (collection);
+
+
+--
+-- Name: user_collection_volumes_from_2_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_collection_volumes_from_2_collection_buyer_seller_type_idx ON public.user_collection_volumes_from_2023_mv USING btree (collection, buyer, seller, type);
+
+
+--
 -- Name: user_collection_volumes_mv_user_name_collection_type_actor_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -8412,6 +13102,20 @@ CREATE INDEX user_picture_updates_seq_idx ON public.user_picture_updates USING b
 
 
 --
+-- Name: user_picture_updates_user_name_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX user_picture_updates_user_name_seq_idx ON public.user_picture_updates USING btree (user_name, seq DESC);
+
+
+--
+-- Name: user_pictures_mv_user_name_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX user_pictures_mv_user_name_idx ON public.user_pictures_mv USING btree (user_name);
+
+
+--
 -- Name: user_volumes_mv_user_name_type_actor_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -8423,6 +13127,13 @@ CREATE UNIQUE INDEX user_volumes_mv_user_name_type_actor_idx ON public.user_volu
 --
 
 CREATE UNIQUE INDEX user_volumes_s_mv_user_name_actor_type_idx ON public.user_volumes_s_mv USING btree (user_name, actor, type);
+
+
+--
+-- Name: users_mv_owner_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX users_mv_owner_idx ON public.users_mv USING btree (owner);
 
 
 --
@@ -8444,6 +13155,993 @@ CREATE INDEX verification_actions_seq_idx ON public.verification_actions USING b
 --
 
 CREATE UNIQUE INDEX videos_video_idx ON public.videos USING btree (video);
+
+
+--
+-- Name: volume_buyer_14_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_14_days_mv_buyer_type_idx ON public.volume_buyer_14_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_15_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_15_days_mv_buyer_type_idx ON public.volume_buyer_15_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_180_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_180_days_mv_buyer_type_idx ON public.volume_buyer_180_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_1_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_1_days_mv_buyer_type_idx ON public.volume_buyer_1_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_2_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_2_days_mv_buyer_type_idx ON public.volume_buyer_2_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_30_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_30_days_mv_buyer_type_idx ON public.volume_buyer_30_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_365_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_365_days_mv_buyer_type_idx ON public.volume_buyer_365_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_3_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_3_days_mv_buyer_type_idx ON public.volume_buyer_3_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_60_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_60_days_mv_buyer_type_idx ON public.volume_buyer_60_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_7_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_7_days_mv_buyer_type_idx ON public.volume_buyer_7_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_90_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_90_days_mv_buyer_type_idx ON public.volume_buyer_90_days_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_buyer_all_time_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_buyer_all_time_mv_buyer_type_idx ON public.volume_buyer_all_time_mv USING btree (buyer, type);
+
+
+--
+-- Name: volume_collection_14_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_14_days_mv_collection_type_idx ON public.volume_collection_14_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_15_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_15_days_mv_collection_type_idx ON public.volume_collection_15_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_180_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_180_days_mv_collection_type_idx ON public.volume_collection_180_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_1_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_1_days_mv_collection_type_idx ON public.volume_collection_1_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_2_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_2_days_mv_collection_type_idx ON public.volume_collection_2_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_30_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_30_days_mv_collection_type_idx ON public.volume_collection_30_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_365_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_365_days_mv_collection_type_idx ON public.volume_collection_365_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_3_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_3_days_mv_collection_type_idx ON public.volume_collection_3_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_60_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_60_days_mv_collection_type_idx ON public.volume_collection_60_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_7_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_7_days_mv_collection_type_idx ON public.volume_collection_7_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_90_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_90_days_mv_collection_type_idx ON public.volume_collection_90_days_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_all_time_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_all_time_mv_collection_type_idx ON public.volume_collection_all_time_mv USING btree (collection, type);
+
+
+--
+-- Name: volume_collection_buyer_14_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_14_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_14_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_15_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_15_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_15_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_180_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_180_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_180_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_1_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_1_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_1_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_2_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_2_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_2_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_30_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_30_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_30_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_365_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_365_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_365_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_3_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_3_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_3_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_60_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_60_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_60_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_7_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_7_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_7_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_90_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_90_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_90_days_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_all_time_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_all_time_mv_collection_buyer_type_idx ON public.volume_collection_buyer_all_time_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_before_2024_m_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_before_2024_m_collection_buyer_type_idx ON public.volume_collection_buyer_before_2024_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_buyer_from_2024_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_buyer_from_2024_mv_collection_buyer_type_idx ON public.volume_collection_buyer_from_2024_mv USING btree (collection, buyer, type);
+
+
+--
+-- Name: volume_collection_market_14_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_14_d_collection_market_maker_taker_idx ON public.volume_collection_market_14_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_15_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_15_d_collection_market_maker_taker_idx ON public.volume_collection_market_15_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_180__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_180__collection_market_maker_taker_idx ON public.volume_collection_market_180_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_1_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_1_da_collection_market_maker_taker_idx ON public.volume_collection_market_1_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_2_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_2_da_collection_market_maker_taker_idx ON public.volume_collection_market_2_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_30_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_30_d_collection_market_maker_taker_idx ON public.volume_collection_market_30_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_365__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_365__collection_market_maker_taker_idx ON public.volume_collection_market_365_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_3_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_3_da_collection_market_maker_taker_idx ON public.volume_collection_market_3_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_60_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_60_d_collection_market_maker_taker_idx ON public.volume_collection_market_60_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_7_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_7_da_collection_market_maker_taker_idx ON public.volume_collection_market_7_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_90_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_90_d_collection_market_maker_taker_idx ON public.volume_collection_market_90_days_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_all__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_all__collection_market_maker_taker_idx ON public.volume_collection_market_all_time_mv USING btree (collection, market, maker, taker, type);
+
+
+--
+-- Name: volume_collection_market_use_collection_market_maker_take_idx10; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx10 ON public.volume_collection_market_user_7_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_use_collection_market_maker_take_idx11; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx11 ON public.volume_collection_market_user_3_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_use_collection_market_maker_take_idx12; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx12 ON public.volume_collection_market_user_2_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_use_collection_market_maker_take_idx13; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx13 ON public.volume_collection_market_user_1_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_all_time_mv_collection_market_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE INDEX volume_collection_market_user_all_time_mv_collection_market_idx ON public.volume_collection_market_user_all_time_mv USING btree (collection, market);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx1; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx1 ON public.volume_collection_market_user_from_2024_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx2; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx2 ON public.volume_collection_market_user_all_time_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx3; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx3 ON public.volume_collection_market_user_365_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx4; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx4 ON public.volume_collection_market_user_180_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx5; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx5 ON public.volume_collection_market_user_90_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx6; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx6 ON public.volume_collection_market_user_60_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx7; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx7 ON public.volume_collection_market_user_30_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx8; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx8 ON public.volume_collection_market_user_15_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_take_idx9; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx9 ON public.volume_collection_market_user_14_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_market_user_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_taker_idx ON public.volume_collection_market_user_before_2024_mv USING btree (collection, market, maker, taker, buyer, seller, type);
+
+
+--
+-- Name: volume_collection_seller_14_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_14_days_mv_collection_seller_type_idx ON public.volume_collection_seller_14_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_15_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_15_days_mv_collection_seller_type_idx ON public.volume_collection_seller_15_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_180_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_180_days_mv_collection_seller_type_idx ON public.volume_collection_seller_180_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_1_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_1_days_mv_collection_seller_type_idx ON public.volume_collection_seller_1_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_2_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_2_days_mv_collection_seller_type_idx ON public.volume_collection_seller_2_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_30_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_30_days_mv_collection_seller_type_idx ON public.volume_collection_seller_30_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_365_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_365_days_mv_collection_seller_type_idx ON public.volume_collection_seller_365_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_3_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_3_days_mv_collection_seller_type_idx ON public.volume_collection_seller_3_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_60_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_60_days_mv_collection_seller_type_idx ON public.volume_collection_seller_60_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_7_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_7_days_mv_collection_seller_type_idx ON public.volume_collection_seller_7_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_90_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_90_days_mv_collection_seller_type_idx ON public.volume_collection_seller_90_days_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_all_time_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_all_time_mv_collection_seller_type_idx ON public.volume_collection_seller_all_time_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_before_2024_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_before_2024_collection_seller_type_idx ON public.volume_collection_seller_before_2024_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_collection_seller_from_2024_m_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_collection_seller_from_2024_m_collection_seller_type_idx ON public.volume_collection_seller_from_2024_mv USING btree (collection, seller, type);
+
+
+--
+-- Name: volume_drop_14_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_14_days_mv_collection_drop_id_market_idx ON public.volume_drop_14_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_15_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_15_days_mv_collection_drop_id_market_idx ON public.volume_drop_15_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_180_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_180_days_mv_collection_drop_id_market_idx ON public.volume_drop_180_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_1_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_1_days_mv_collection_drop_id_market_idx ON public.volume_drop_1_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_2_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_2_days_mv_collection_drop_id_market_idx ON public.volume_drop_2_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_30_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_30_days_mv_collection_drop_id_market_idx ON public.volume_drop_30_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_365_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_365_days_mv_collection_drop_id_market_idx ON public.volume_drop_365_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_3_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_3_days_mv_collection_drop_id_market_idx ON public.volume_drop_3_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_60_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_60_days_mv_collection_drop_id_market_idx ON public.volume_drop_60_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_7_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_7_days_mv_collection_drop_id_market_idx ON public.volume_drop_7_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_90_days_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_90_days_mv_collection_drop_id_market_idx ON public.volume_drop_90_days_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_drop_all_time_mv_collection_drop_id_market_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX volume_drop_all_time_mv_collection_drop_id_market_idx ON public.volume_drop_all_time_mv USING btree (collection, drop_id, market);
+
+
+--
+-- Name: volume_market_14_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_14_days_mv_market_maker_taker_type_idx ON public.volume_market_14_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_15_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_15_days_mv_market_maker_taker_type_idx ON public.volume_market_15_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_180_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_180_days_mv_market_maker_taker_type_idx ON public.volume_market_180_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_1_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_1_days_mv_market_maker_taker_type_idx ON public.volume_market_1_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_2_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_2_days_mv_market_maker_taker_type_idx ON public.volume_market_2_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_30_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_30_days_mv_market_maker_taker_type_idx ON public.volume_market_30_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_365_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_365_days_mv_market_maker_taker_type_idx ON public.volume_market_365_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_3_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_3_days_mv_market_maker_taker_type_idx ON public.volume_market_3_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_60_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_60_days_mv_market_maker_taker_type_idx ON public.volume_market_60_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_7_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_7_days_mv_market_maker_taker_type_idx ON public.volume_market_7_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_90_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_90_days_mv_market_maker_taker_type_idx ON public.volume_market_90_days_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_market_all_time_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_market_all_time_mv_market_maker_taker_type_idx ON public.volume_market_all_time_mv USING btree (market, maker, taker, type);
+
+
+--
+-- Name: volume_seller_14_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_14_days_mv_seller_type_idx ON public.volume_seller_14_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_15_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_15_days_mv_seller_type_idx ON public.volume_seller_15_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_180_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_180_days_mv_seller_type_idx ON public.volume_seller_180_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_1_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_1_days_mv_seller_type_idx ON public.volume_seller_1_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_2_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_2_days_mv_seller_type_idx ON public.volume_seller_2_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_30_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_30_days_mv_seller_type_idx ON public.volume_seller_30_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_365_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_365_days_mv_seller_type_idx ON public.volume_seller_365_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_3_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_3_days_mv_seller_type_idx ON public.volume_seller_3_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_60_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_60_days_mv_seller_type_idx ON public.volume_seller_60_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_7_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_7_days_mv_seller_type_idx ON public.volume_seller_7_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_90_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_90_days_mv_seller_type_idx ON public.volume_seller_90_days_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_seller_all_time_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_seller_all_time_mv_seller_type_idx ON public.volume_seller_all_time_mv USING btree (seller, type);
+
+
+--
+-- Name: volume_template_14_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_14_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_14_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_15_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_15_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_15_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_180_days_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_180_days_mv_template_id_schema_collection_t_idx ON public.volume_template_180_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_1_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_1_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_1_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_2_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_2_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_2_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_30_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_30_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_30_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_365_days_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_365_days_mv_template_id_schema_collection_t_idx ON public.volume_template_365_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_3_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_3_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_3_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_60_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_60_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_60_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_7_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_7_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_7_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_90_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_90_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_90_days_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_all_time_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_all_time_mv_template_id_schema_collection_t_idx ON public.volume_template_all_time_mv USING btree (template_id, schema, collection, type);
+
+
+--
+-- Name: volume_template_user_14_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_14_days__template_id_schema_collection_idx ON public.volume_template_user_14_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_15_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_15_days__template_id_schema_collection_idx ON public.volume_template_user_15_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_180_days_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_180_days_template_id_schema_collection_idx ON public.volume_template_user_180_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_1_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_1_days_m_template_id_schema_collection_idx ON public.volume_template_user_1_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_2_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_2_days_m_template_id_schema_collection_idx ON public.volume_template_user_2_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_30_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_30_days__template_id_schema_collection_idx ON public.volume_template_user_30_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_365_days_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_365_days_template_id_schema_collection_idx ON public.volume_template_user_365_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_3_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_3_days_m_template_id_schema_collection_idx ON public.volume_template_user_3_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_60_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_60_days__template_id_schema_collection_idx ON public.volume_template_user_60_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_7_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_7_days_m_template_id_schema_collection_idx ON public.volume_template_user_7_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_90_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_90_days__template_id_schema_collection_idx ON public.volume_template_user_90_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_all_time_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_all_time_template_id_schema_collection_idx ON public.volume_template_user_all_time_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_before_2_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_before_2_template_id_schema_collection_idx ON public.volume_template_user_before_2024_mv USING btree (template_id, schema, collection, buyer, seller, type);
+
+
+--
+-- Name: volume_template_user_from_202_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+--
+
+CREATE UNIQUE INDEX volume_template_user_from_202_template_id_schema_collection_idx ON public.volume_template_user_from_2024_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
