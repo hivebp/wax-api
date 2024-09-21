@@ -1153,12 +1153,9 @@ def get_buy_volume(user, days=1, type=None):
 
     try:
         result = session.execute(
-            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
-            'FROM ('
-            '   SELECT wax_volume, usd_volume '
-            '   FROM {table} '
-            '   WHERE TRUE {type_clause}{collection_clause} '
-            ') t '.format(
+            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales '
+            'FROM {table} '
+            'WHERE TRUE {type_clause}{collection_clause} '.format(
                 table=table,
                 volume_column=volume_column,
                 collection_clause=' AND buyer = :user ' if user and user != '*' else '',
@@ -1170,8 +1167,9 @@ def get_buy_volume(user, days=1, type=None):
         ).first()
 
         return {
-            'waxVolume': float(result.usd_volume if result.usd_volume else 0),
+            'waxVolume': float(result.wax_volume if result.wax_volume else 0),
             'usdVolume': float(result.usd_volume if result.usd_volume else 0),
+            'buys': int(result.sales if result.sales else 0)
         }
     except SQLAlchemyError as e:
         logging.error(e)
@@ -1193,12 +1191,9 @@ def get_sell_volume(user, days=1, type=None):
 
     try:
         result = session.execute(
-            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
-            'FROM ('
-            '   SELECT wax_volume, usd_volume '
-            '   FROM {table} '
-            '   WHERE TRUE {type_clause}{collection_clause} '
-            ') t '.format(
+            'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales '
+            'FROM {table} '
+            'WHERE TRUE {type_clause}{collection_clause} '.format(
                 table=table,
                 volume_column=volume_column,
                 collection_clause=' AND seller = :user ' if user and user != '*' else '',
@@ -1210,8 +1205,9 @@ def get_sell_volume(user, days=1, type=None):
         ).first()
 
         return {
-            'waxVolume': float(result.usd_volume if result.usd_volume else 0),
+            'waxVolume': float(result.wax_volume if result.wax_volume else 0),
             'usdVolume': float(result.usd_volume if result.usd_volume else 0),
+            'sales': int(result.sales if result.sales else 0)
         }
     except SQLAlchemyError as e:
         logging.error(e)
@@ -1867,17 +1863,23 @@ def get_collection_table(days, type, term, verified):
 
 
 @cache.memoize(timeout=300)
-def get_number_of_assets(collection):
+def get_number_of_assets(user, collection):
     session = create_session()
+    table = 'collection_assets_mv'
     try:
         result = session.execute(
-            'SELECT SUM(num_assets) AS num_assets FROM collection_assets_mv '
-            'WHERE TRUE {collection_clause}'.format(
-                collection_clause='AND collection = :collection' if collection else ''
-            ), {'collection': collection}).first()
+            'SELECT SUM(num_assets) AS num_assets, SUM(wax_value) AS wax_value, SUM(usd_value) AS usd_value '
+            'FROM collection_users_mv '
+            'WHERE TRUE {collection_clause} {user_clause}'.format(
+                table=table,
+                collection_clause='AND collection = :collection' if collection else '',
+                user_clause='AND owner = :user' if user else ''
+            ), {'collection': collection, 'user': user}).first()
 
         return {
             'numberOfAssets': int(result['num_assets']) if result['num_assets'] else 0,
+            'estimatedWaxValue': float(result['wax_value']) if result['wax_value'] else 0,
+            'estimatedUsdValue': float(result['usd_value']) if result['usd_value'] else 0,
         }
     except SQLAlchemyError as e:
         logging.error(e)
@@ -1909,6 +1911,84 @@ def get_number_of_users(collection):
 
 
 last_reported_seq = 0
+
+
+@cache.memoize(timeout=300)
+def get_price_history(asset_id=None, template_id=None):
+    session = create_session()
+    try:
+        if asset_id:
+            template_res = session.execute(
+                'SELECT template_id FROM assets WHERE asset_id = :asset_id', {
+                    'asset_id': asset_id
+                }
+            ).first()
+
+            if template_res and template_res['template_id']:
+                template_id = template_res['template_id']
+            else:
+                return {'priceHistory': []}
+
+        result = session.execute(
+            'SELECT wax_volume / sales as wax_price, usd_volume / sales as usd_price, sales, to_date '
+            'FROM template_collection_sales_by_date_mv t '
+            'WHERE {template_clause} '
+            'ORDER BY to_date DESC LIMIT 100'.format(
+                template_clause='t.template_id = :template_id ' if template_id else 't.template_id = (SELECT template_id FROM assets WHERE asset_id = :asset_id) '
+            ),
+            {'template_id': template_id}
+        )
+
+        price_history = {}
+
+        for item in result:
+            price_history[item['to_date'].strftime("%Y-%m-%d")] = {
+                'waxPrice': item['wax_price'],
+                'usdPrice': item['usd_price'],
+                'sales': item['sales'],
+            }
+
+        date_list = []
+        if len(price_history.keys()) > 0:
+            min_date = datetime.datetime.strptime(sorted(price_history.keys())[0], '%Y-%m-%d')
+            max_date = datetime.datetime.now()
+            if min_date > max_date - datetime.timedelta(days=30):
+                min_date = max_date - datetime.timedelta(days=30)
+
+            delta = max_date - min_date
+
+            for i in range(delta.days + 1):
+                day = (min_date + datetime.timedelta(days=i)).strftime('%Y-%m-%d')
+                if day not in price_history.keys():
+                    date_list.append(
+                        {
+                            'date': day,
+                            'waxPrice': None,
+                            'usdPrice': None,
+                            'sales': 0
+                        }
+                    )
+                else:
+                    date_list.append(
+                        {
+                            'date': day,
+                            'waxPrice': price_history[day]['waxPrice'],
+                            'usdPrice': price_history[day]['usdPrice'],
+                            'sales': price_history[day]['sales']
+                        }
+                    )
+
+        return {
+            'priceHistory': sorted(
+                date_list, key=lambda d: datetime.datetime.strptime(d['date'], '%Y-%m-%d')
+            )
+        }
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
 
 
 def get_newest_sales():

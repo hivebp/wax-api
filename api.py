@@ -503,13 +503,32 @@ def top_template_sales_table(template_id, days=None):
 @app.route('/v3/num-assets/<collection>')
 @catch_and_respond()
 def get_num_assets(collection=None):
-    return flaskify(oto_response.Response(stats_v3.get_number_of_assets(collection)))
+    return flaskify(oto_response.Response(stats_v3.get_number_of_assets(None, collection)))
+
+
+@app.route('/v3/user-assets/<user>')
+@app.route('/v3/user-assets/<user>/<collection>')
+@catch_and_respond()
+def get_user_assets(user=None, collection=None):
+    return flaskify(oto_response.Response(stats_v3.get_number_of_assets(user, collection)))
 
 
 @app.route('/v3/num-users/<collection>')
 @catch_and_respond()
 def get_num_users(collection):
     return flaskify(oto_response.Response(stats_v3.get_number_of_users(collection)))
+
+
+@app.route('/v3/price-history/<asset_id>')
+@catch_and_respond()
+def get_price_history(asset_id):
+    return flaskify(oto_response.Response(stats_v3.get_price_history(asset_id)))
+
+
+@app.route('/v3/price-history-template/<template_id>')
+@catch_and_respond()
+def get_price_history_template(template_id):
+    return flaskify(oto_response.Response(stats_v3.get_price_history(None, template_id)))
 
 
 @app.route('/v3/monthly-volume/<days>')
