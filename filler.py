@@ -1710,6 +1710,8 @@ def update_big_volumes():
     session.commit()
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_buyer_from_2024_mv')
     session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_from_2024_mv')
+    session.commit()
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_all_time_mv')
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_365_days_mv')
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_180_days_mv')
