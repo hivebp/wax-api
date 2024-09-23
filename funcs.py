@@ -4699,7 +4699,7 @@ def load_create_token(session, token):
     session_execute_logged(
         session,
         'INSERT INTO rwax_tokens ('
-        '   collection, symbol, contract, decimals, maximum_supply, template_ids, templates, trait_factors, '
+        '   collection, symbol, contract, decimals, maximum_supply, template_ids, templates_supply, trait_factors, '
         '   token_name, token_logo, token_logo_lg, timestamp, seq, block_num'
         ') '
         'SELECT :collection, :symbol, :contract, :decimals, :maximum_supply, :template_ids, :templates, '

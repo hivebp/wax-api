@@ -87,6 +87,17 @@ def to_lower_camel_case(snake_str):
     return snake_str[0].lower() + camel_string[1:]
 
 
+def _get_templates_object():
+    return (
+        'array_agg(json_build_object(\'template_id\', t.template_id, \'name\', tn.name, \'collection\', t.collection, '
+        '\'schema\', t.schema, \'immutableData\', td.data, \'image\', ti.image, \'video\', tv.video, '
+        '\'createdAt\', t.timestamp, \'createdBlockNum\', t.block_num, \'createdSeq\', t.seq, '
+        '\'traits\', {attributes_obj})) AS templates '.format(
+            attributes_obj=_get_template_attributes_object()
+        )
+    )
+
+
 def _get_assets_object():
     return (
         'array_agg(json_build_object(\'asset_id\', a.asset_id, \'name\', n.name, \'collection\', a.collection, '
@@ -131,6 +142,19 @@ def _get_attributes_object():
         'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
         'LEFT JOIN attribute_stats USING(attribute_id) '
         'WHERE asset_id = a.asset_id) '
+    )
+
+
+def _get_template_attributes_object():
+    return (
+        '(SELECT array_agg(json_build_object(\'attribute_id\', attribute_id, '
+        '\'attribute_name\', attribute_name, \'string_value\', string_value, \'int_value\', int_value, '
+        '\'float_value\', float_value, \'bool_value\', bool_value, \'floor_price\', floor_wax, '
+        '\'rarity_score\', rarity_score, \'total_schema\', total_schema)) '
+        'FROM templates '
+        'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
+        'LEFT JOIN attribute_stats USING(attribute_id) '
+        'WHERE template_id = t.template_id) '
     )
 
 
@@ -1884,6 +1908,72 @@ def get_tags(collection):
             tags.append({'tagId': tag['tag_id'], 'tagName': tag['tag_name']})
 
         return tags
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def _format_rwax_templates(templates, templates_supply):
+    template_list = []
+
+    supply_dict = json.loads(templates_supply)
+
+    for template in templates:
+        for supply in supply_dict:
+            if supply['template_id'] == template['template_id']:
+                template['maxAssets'] = supply['max_assets']
+        template_list.append(template)
+
+    return template_list
+
+
+
+def get_rwax_tokens(collection):
+    session = create_session()
+    try:
+        res = session.execute(
+            'SELECT symbol, contract, decimals, max_supply, token_name, token_logo, token_logo_lg, '
+            'rt.timestamp,c.collection, cn.name as display_name, ci.image AS collection_image, '
+            'c.verified, CAST(trait_factors AS text) AS trait_factors, '
+            'CAST(templates_supply AS text) AS templates_supply, {templates_obj} '
+            'FROM rwax_tokens rt '
+            'LEFT JOIN collections c USING (collection) '
+            'LEFT JOIN images ci USING (image_id) '
+            'LEFT JOIN names cn USING (name_id) '
+            'LEFT JOIN templates t ON t.template_id = ANY(template_ids) '
+            'LEFT JOIN images ti ON (t.image_id = ti.image_id) '
+            'LEFT JOIN videos tv ON (t.video_id = tv.video_id) '
+            'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
+            'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
+            'WHERE NOT blacklisted {collection_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14'.format(
+                templates_obj=_get_templates_object(),
+                collection_clause=' AND rt.collection = :collection ' if collection and collection != '*' else ''
+            ), {'collection': collection})
+        tokens = []
+        for token in res:
+            tokens.append({
+                'collection': {
+                    'collectionName': token['collection'],
+                    'displayName': token['display_name'],
+                    'collectionImage': token['collection_image'],
+                },
+                'symbol': token['symbol'],
+                'contract': token['contract'],
+                'decimals': token['decimals'],
+                'maxSupply': token['max_supply'],
+                'templates': _format_rwax_templates(token['templates'], token['templates_supply']),
+                'traitFactors': json.loads(token['trait_factors']),
+                'name': token['token_name'],
+                'tokenLogo': token['token_logo'],
+                'tokenLogoLarge': token['token_logo_lg'],
+                'created': token['timestamp'].strftime(DATE_FORMAT_STRING)
+            })
+
+        return tokens
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()
