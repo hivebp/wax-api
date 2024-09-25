@@ -405,6 +405,12 @@ def get_tags(collection):
     return flaskify(oto_response.Response(logic.get_tags(collection)))
 
 
+@app.route('/api/calc-rwax')
+@catch_and_respond()
+def calc_rwax_tokens():
+    return flaskify(oto_response.Response(logic.test_rwax_stuff()))
+
+
 @app.route('/api/rwax-tokens')
 @catch_and_respond()
 def get_rwax_tokens():

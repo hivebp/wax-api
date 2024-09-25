@@ -379,11 +379,12 @@ def _format_schema(schema):
             'volumeUSD': schema['volume_usd'],
         },
         'collection': {
-            'collection': schema['collection'],
-            'collectionName': schema['collection_name'],
+            'collectionName': schema['collection'],
+            'displayName': schema['display_name'],
             'collectionImage': schema['collection_image'],
             'tags': _format_tags(schema['tags']) if schema['tags'] else [],
-            'badges': _format_badges(schema['badges']) if schema['badges'] else []
+            'badges': _format_badges(schema['badges']) if schema['badges'] else [],
+            'verification': schema['verified']
         },
         'createdAt': {
             'date': schema['created_timestamp'].strftime(DATE_FORMAT_STRING),
@@ -411,8 +412,8 @@ def _format_listings(item):
         'maker': item['maker'], 'seller': item['seller'], 'listingId': item['listing_id'],
         'uniqueSaleId': item['sale_id'],
         'collection': {
-            'collection': item['collection'],
-            'collectionName': item['collection_name'],
+            'collectionName': item['collection'],
+            'displayName': item['display_name'],
             'collectionImage': item['collection_image'],
             'verification': item['verified']
         },
@@ -761,6 +762,8 @@ def filter_attributes(collection, schema=None, templates=None):
         value = attribute['string_value']
 
         attribute_type = None
+        min_value = 0
+        max_value = 0
 
         if value:
             attribute_type = 'string'
@@ -773,7 +776,6 @@ def filter_attributes(collection, schema=None, templates=None):
                 min_value = attribute['min_float_value']
                 max_value = attribute['max_float_value']
                 if min_value or max_value or max_value == 0.0:
-                    value = attribute['float_value']
                     attribute_type = 'float'
         if not attribute_type:
             value = attribute['bool_value']
@@ -1930,9 +1932,125 @@ def _format_rwax_templates(templates, templates_supply):
     return template_list
 
 
+def calc_avg_factor(trait_factors, nfts):
+    for trait in trait_factors:
+        total_factor = 0
+        for nft in nfts:
+            for trait_name in nft.keys():
+                factor = 0
+                trait_value = nft[trait_name]
+                if trait_name == trait['trait_name']:
+                    if len(trait['values']) > 0:
+                        for value in trait['values']:
+                            if value['value'] == trait_value:
+                                factor = value['factor']
+                    else:
+                        min_value = trait['min_value']
+                        max_value = trait['max_value']
+                        local_min_factor = trait['min_factor']
+                        local_max_factor = trait['max_factor']
+                        factor = get_factor(trait_value, local_max_factor, local_min_factor, max_value, min_value)
+                total_factor += factor
+        trait['avg_factor'] = total_factor / len(nfts)
+
+    return trait_factors
+
+
+def get_average_factor(trait_factors):
+    avg_factor = 1
+    for factor in trait_factors:
+        avg_factor *= factor['avg_factor']
+
+    return avg_factor
+
+
+def get_factor(x, max_factor, min_factor, max_value, min_value):
+    return ((max_factor - min_factor) / (max_value - min_value)) * (x - min_value) + min_factor
+
+
+def test_rwax_stuff():
+    trait_factors = [
+        {
+            'trait_name': 'rarity', 'min_factor': 1.0, 'max_factor': 5.0, 'values': [
+                {'value': 'common', 'factor': 1.0, 'amount': 5},
+                {'value': 'epic', 'factor': 2.0, 'amount': 3},
+                {'value': 'legendary', 'factor': 5.0, 'amount': 2}
+            ], 'token_share': 5000.00000
+        },
+        {
+            'trait_name': 'level', 'min_factor': 1.0, 'max_factor': 10.0, 'min_value': 1,
+            'max_value': 5, 'values': [], 'token_share': 2000.00000
+        },
+        {
+            'trait_name': 'charge', 'min_factor': 1.0, 'max_factor': 4.0, 'min_value': 0,
+            'max_value': 1, 'values': [], 'token_share': 1000.00000
+        },
+        {
+            'trait_name': 'age', 'min_factor': 1.0, 'max_factor': 2.0, 'min_value': 1,
+            'max_value': 5, 'values': [], 'token_share': 1000.00000
+        },
+        {
+            'trait_name': 'energy', 'min_factor': 1.0, 'max_factor': 100.0, 'min_value': 0,
+            'max_value': 100, 'values': [], 'token_share': 1000.00000
+        },
+    ]
+
+    nfts = [
+        {'rarity': 'common', 'level': 1, 'charge': 0.0, 'energy': 5.0},
+        {'rarity': 'common', 'level': 1, 'charge': 0.1, 'energy': 69.1},
+        {'rarity': 'common', 'level': 2},
+        {'rarity': 'common', 'charge': 0.2, 'energy': 31.2},
+        {'rarity': 'common', 'level': 3, 'charge': 0.31, 'energy': 5.51},
+        {'rarity': 'common', 'level': 1, 'charge': 0.1, 'energy': 90.1},
+        {'rarity': 'common', 'level': 2, 'charge': 0.12, 'energy': 20.12},
+        {'rarity': 'common', 'charge': 0.2},
+        {'rarity': 'common', 'level': 3, 'charge': 0.31, 'energy': 20.1},
+        {'rarity': 'epic', 'level': 4, 'charge': 0.5, 'energy': 56.5},
+        {'rarity': 'epic', 'level': 4, 'charge': 0.52, 'energy': 52},
+        {'rarity': 'epic', 'level': 4, 'energy': 7.6},
+        {'rarity': 'legendary', 'level': 5, 'charge': 0.9, 'energy': 10.20},
+        {'rarity': 'legendary', 'level': 5, 'energy': 22.0},
+    ]
+
+    tokens = 10000.0000
+
+    total_share = 0
+
+    trait_factors = calc_avg_factor(trait_factors, nfts)
+
+    trait_factor_tokens = 0
+    for trait in trait_factors:
+        trait_factor_tokens += trait['token_share']
+
+    for nft in nfts:
+        share = 0
+        for trait_name in nft.keys():
+            factor = 1
+            trait_value = nft[trait_name]
+            for trait in trait_factors:
+                token_share = trait['token_share']
+                avg_factor = trait['avg_factor']
+                if trait_name == trait['trait_name']:
+                    if len(trait['values']) > 0:
+                        for value in trait['values']:
+                            if value['value'] == trait_value:
+                                factor = value['factor']
+                    else:
+                        min_value = trait['min_value']
+                        max_value = trait['max_value']
+                        local_min_factor = trait['min_factor']
+                        local_max_factor = trait['max_factor']
+                        factor = get_factor(trait_value, local_max_factor, local_min_factor, max_value, min_value)
+                    share += (token_share / len(nfts)) * (factor / avg_factor)
+        share += (tokens - trait_factor_tokens) / len(nfts)
+        print('Tokens for this NFT: ' + str(share))
+        total_share += share
+    print('Tokens Total: ' + str(total_share))
+
 
 def get_rwax_tokens(collection):
     session = create_session()
+
     try:
         res = session.execute(
             'SELECT symbol, contract, decimals, max_supply, token_name, token_logo, token_logo_lg, '
@@ -1960,6 +2078,7 @@ def get_rwax_tokens(collection):
                     'collectionName': token['collection'],
                     'displayName': token['display_name'],
                     'collectionImage': token['collection_image'],
+                    'verification': token['verified'],
                 },
                 'symbol': token['symbol'],
                 'contract': token['contract'],
