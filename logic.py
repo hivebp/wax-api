@@ -610,7 +610,7 @@ def schemas(
         )
 
         columns_clause = (
-            'a.schema, cn.name AS collection_name, a.collection, schema_format, {badges_object}, {tags_obj}, '
+            'a.schema, cn.name AS display_name, a.collection, col.verified, schema_format, {badges_object}, {tags_obj}, '
             'ci.image as collection_image, a.timestamp AS created_timestamp, a.block_num AS created_block_num, '
             'a.seq AS created_seq, ts.num_minted, ts.num_templates, ts.num_burned, ts.volume_wax, '
             'ts.volume_usd, (SELECT MIN(floor_price) '
