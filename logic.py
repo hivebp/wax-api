@@ -1986,10 +1986,6 @@ def test_rwax_stuff():
             'max_value': 1, 'values': [], 'token_share': 1000.00000
         },
         {
-            'trait_name': 'age', 'min_factor': 1.0, 'max_factor': 2.0, 'min_value': 1,
-            'max_value': 5, 'values': [], 'token_share': 1000.00000
-        },
-        {
             'trait_name': 'energy', 'min_factor': 1.0, 'max_factor': 100.0, 'min_value': 0,
             'max_value': 100, 'values': [], 'token_share': 1000.00000
         },

@@ -4713,22 +4713,12 @@ def load_create_token(session, token):
         new_token['template_token_supply'] = (
             new_token['maximum_supply'] / max_assets_accumulated
         ) * template['max_assets']
+        new_token['template_id'] = template['template_id']
 
         session_execute_logged(
             session,
             'INSERT INTO rwax_templates ('
             '   template_id, collection, symbol, contract, max_assets, template_token_supply, seq, block_num, timestamp'
-            ') '
-            'SELECT :template_id, :collection, :symbol, :contract, :max_assets, :template_token_supply, :seq, '
-            ':block_num, :timestamp '
-            'WHERE NOT EXISTS (SELECT seq FROM rwax_templates WHERE seq = :seq)',
-            new_token
-        )
-
-        session_execute_logged(
-            session,
-            'INSERT INTO rwax_assets ('
-            '   asset_id, collection, schema, template_id, max_assets, template_token_supply, seq, block_num, timestamp'
             ') '
             'SELECT :template_id, :collection, :symbol, :contract, :max_assets, :template_token_supply, :seq, '
             ':block_num, :timestamp '
