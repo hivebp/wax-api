@@ -4848,7 +4848,7 @@ def load_rwax_redeem(session, redeem):
         session,
         'INSERT INTO removed_rwax_tokenizations '
         'SELECT r.*, :seq, :block_num '
-        'FROM rwax_tokenizations WHERE asset_id = :asset_id',
+        'FROM rwax_tokenizations r WHERE asset_id = :asset_id',
         new_token
     )
 
