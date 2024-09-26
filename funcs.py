@@ -4824,9 +4824,15 @@ def load_rwax_redeem(session, redeem):
     new_token = load_transaction_basics(redeem)
     new_token['asset_id'] = data['asset_id'] if 'asset_id' in data else 0
     new_token['redeemer'] = data['redeemer'] if 'redeemer' in data else 'anotherhiver'
-    new_token['symbol'] = data['amount']['quantity'].split(' ')[1]
-    new_token['amount'] = float(data['amount']['quantity'].split(' ')[0])
-    new_token['contract'] = data['amount']['contract']
+
+    if 'contract' in data:
+        new_token['contract'] = data['contract']
+        new_token['symbol'] = data['quantity'].split(' ')[1]
+        new_token['amount'] = float(data['quantity'].split(' ')[0])
+    else:
+        new_token['symbol'] = data['amount']['quantity'].split(' ')[1]
+        new_token['amount'] = float(data['amount']['quantity'].split(' ')[0])
+        new_token['contract'] = data['amount']['contract']
 
     session_execute_logged(
         session,
