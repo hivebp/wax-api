@@ -2002,7 +2002,7 @@ def test_rwax_stuff():
         {'rarity': 'common', 'charge': 0.2},
         {'rarity': 'common', 'level': 3, 'charge': 0.31, 'energy': 20.1},
         {'rarity': 'epic', 'level': 4, 'charge': 0.5, 'energy': 56.5},
-        {'rarity': 'epic', 'level': 4, 'charge': 0.52, 'energy': 52},
+        {'rarity': 'epic', 'charge': 0.52, 'energy': 52},
         {'rarity': 'epic', 'level': 4, 'energy': 7.6},
         {'rarity': 'legendary', 'level': 5, 'charge': 0.9, 'energy': 10.20},
         {'rarity': 'legendary', 'level': 5, 'energy': 22.0},
