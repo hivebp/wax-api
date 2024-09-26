@@ -743,10 +743,8 @@ def handle_transaction(action, block_num, timestamp, session):
                     'redeem', 'accept', 'reject', 'release'
                 ]) or (account == 'wufclaimtool' and name in [
                     'lognewdrop', 'addclaimers', 'delairdrop', 'claim', 'setready'
-                ]) or (account == 'wufclaimtool' and name in [
-                    'lognewdrop', 'addclaimers', 'delairdrop', 'claim', 'setready'
                 ]) or (account == 'rwax' and name in [
-                    'createtoken', 'logtokenize', 'redeem'
+                    'createtoken', 'logtokenize', 'redeem', 'erasetoken'
                 ])
 
                 if insert_transaction:

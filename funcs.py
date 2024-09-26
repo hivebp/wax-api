@@ -4710,22 +4710,70 @@ def load_create_token(session, token):
 
     for template in templates:
         new_token['max_assets'] = template['max_assets']
-        new_token['template_token_supply'] = (
-            new_token['maximum_supply'] / max_assets_accumulated
-        ) * template['max_assets']
         new_token['template_id'] = template['template_id']
 
         session_execute_logged(
             session,
             'INSERT INTO rwax_templates ('
-            '   template_id, collection, symbol, contract, max_assets, template_token_supply, seq, block_num, timestamp'
+            '   template_id, collection, symbol, decimals, contract, max_assets, seq, block_num, timestamp'
             ') '
-            'SELECT :template_id, :collection, :symbol, :contract, :max_assets, :template_token_supply, :seq, '
-            ':block_num, :timestamp '
-            'WHERE NOT EXISTS (SELECT seq FROM rwax_templates WHERE seq = :seq)',
+            'SELECT :template_id, :collection, :symbol, :decimals, :contract, :max_assets, :seq, :block_num, '
+            ':timestamp '
+            'WHERE NOT EXISTS (SELECT template_id FROM rwax_templates WHERE template_id = :template_id)',
             new_token
         )
 
+
+@catch_and_log()
+def load_rwax_erasetoken(session, erase):
+    data = _get_data(erase)
+    erased_token = load_transaction_basics(erase)
+    erased_token['authorized_account'] = data['authorized_account']
+    if 'token' in data:
+        contract = data['token']['contract']
+        quantity = data['token']['quantity']
+        symbol = quantity.split(' ')[1]
+        decimals = len(quantity.split(' ')[0].split('.')[1])
+    else:
+        contract = data['contract']
+        symbol = data['token_symbol'].split(',')[1]
+        decimals = int(data['token_symbol'].split(',')[0])
+
+    erased_token['contract'] = contract
+    erased_token['symbol'] = symbol
+    erased_token['decimals'] = decimals
+
+    session_execute_logged(
+        session,
+        'INSERT INTO rwax_erase_tokens ('
+        '   contract, decimals, symbol, timestamp, seq, block_num'
+        ') '
+        'SELECT :contract, :decimals, :symbol, :timestamp, :seq, :block_num '
+        'WHERE NOT EXISTS (SELECT seq FROM rwax_erase_tokens WHERE seq = :seq)',
+        erased_token
+    )
+
+    session_execute_logged(
+        session,
+        'INSERT INTO removed_rwax_tokens '
+        'SELECT r.*, :seq, :block_num FROM rwax_tokens r '
+        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        erased_token
+    )
+
+    session_execute_logged(
+        session,
+        'DELETE FROM rwax_tokens '
+        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        erased_token
+    )
+
+    session_execute_logged(
+        session,
+        'DELETE FROM rwax_templates '
+        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        erased_token
+    )
 
 
 @catch_and_log()
@@ -4787,6 +4835,21 @@ def load_rwax_redeem(session, redeem):
         ') '
         'SELECT :asset_id, :redeemer, :contract, :symbol, :amount, :timestamp, :seq, :block_num '
         'WHERE NOT EXISTS (SELECT seq FROM rwax_redemptions WHERE seq = :seq)',
+        new_token
+    )
+
+    session_execute_logged(
+        session,
+        'INSERT INTO removed_rwax_tokenizations '
+        'SELECT r.*, :seq, :block_num '
+        'FROM rwax_tokenizations WHERE asset_id = :asset_id',
+        new_token
+    )
+
+    session_execute_logged(
+        session,
+        'DELETE FROM rwax_tokenizations '
+        'WHERE asset_id = :asset_id',
         new_token
     )
 
