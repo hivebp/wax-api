@@ -1714,6 +1714,8 @@ def update_big_volumes():
     session.commit()
     session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_from_2024_mv')
     session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW template_collection_sales_by_date_from_2024_mv')
+    session.commit()
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_all_time_mv')
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_365_days_mv')
     session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_180_days_mv')
@@ -1727,7 +1729,9 @@ def update_big_volumes():
     session.commit()
     session.execute('REFRESH MATERIALIZED VIEW monthly_collection_volume_mv')
     session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_mv')
+    session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_sales_by_date_mv')
+    session.commit()
+    session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_collection_sales_by_date_mv')
     session.commit()
 
     try:

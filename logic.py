@@ -33,10 +33,6 @@ def _format_image(image):
     return image if image else ''
 
 
-def _format_author_thumbnail(author, original=None, size=80):
-    return _format_collection_thumbnail(original, author, size) if original else original
-
-
 def _format_thumbnail(image):
     if not image:
         return image
@@ -48,7 +44,7 @@ def _format_thumbnail(image):
             image.replace('DUNGEONS-&-DRAGONS', 'DUNGEONS-%26-DRAGONS'))
 
 
-def _format_collection_thumbnail(image, collection, size):
+def _format_collection_thumbnail(collection, image=None, size=80):
     if not image:
         return image
     return 'https://ipfs.hivebp.io/preview?collection={}&size={}&hash={}'.format(
@@ -106,12 +102,11 @@ def _get_assets_object():
         'ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
         '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
         '\'owner\', a.owner, \'burned\', burned, \'floor_price\', fp.floor_price, \'rwax_symbol\', r.symbol, '
-        '\'rwax_contract\', r.contract, \'template_token_supply\', r.template_token_supply, '
-        '\'rwax_max_assets\', r.max_assets, \'trait_factors\', rt.trait_factors, \'rwax_supply\', rt.maximum_supply, '
-        '\'rwax_decimals\', rt.decimals, \'rwax_token_name\', rt.token_name, \'rwax_token_logo\', rt.token_logo, '
-        '\'rwax_token_logo_lg\', rt.token_logo_lg, \'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, '
-        '\'num_sales\', ts.num_sales, \'num_minted\', tm.num_minted, \'favorited\', f.user_name IS NOT NULL, '
-        '\'template_id\', t.template_id, \'image\', img.image, \'video\', vid.video, '
+        '\'rwax_contract\', r.contract, \'rwax_max_assets\', r.max_assets, \'trait_factors\', rt.trait_factors, '
+        '\'rwax_supply\', rt.maximum_supply, \'rwax_decimals\', rt.decimals, \'rwax_token_name\', rt.token_name, '
+        '\'rwax_token_logo\', rt.token_logo, \'rwax_token_logo_lg\', rt.token_logo_lg, \'volume_wax\', ts.volume_wax, '
+        '\'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, \'num_minted\', tm.num_minted, \'favorited\', '
+        'f.user_name IS NOT NULL, \'template_id\', t.template_id, \'image\', img.image, \'video\', vid.video, '
         '\'mint\', a.mint, \'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, \'mint_seq\', a.seq, '
         '\'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, '
         '\'traits\', {attributes_obj})) AS assets '.format(attributes_obj=_get_attributes_object())
@@ -303,10 +298,10 @@ def _format_asset(asset):
             },
             'traits': _format_traits(asset['traits']) if asset['traits'] else [],
         }
-        if 'collection_name' in asset.keys():
+        if 'display_name' in asset.keys():
             asset_obj['collection'] = {
-                'collection': asset['collection'],
-                'collectionName': asset['collection_name'],
+                'collectionName': asset['collection'],
+                'displayName': asset['display_name'],
                 'collectionImage': asset['collection_image'],
                 'tags': _format_tags(asset['tags']) if asset['tags'] else [],
                 'badges': _format_badges(asset['badges']) if asset['badges'] else []
@@ -950,12 +945,12 @@ def assets(
             'a.mint, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, '
             'ts.last_sold_timestamp AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
             'ts.volume_usd, ts.num_sales, tm.num_minted AS num_minted, t.template_id, img.image, vid.video, '
-            'cn.name AS collection_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
+            'cn.name AS display_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
             'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
-            'r.symbol AS rwax_symbol, r.contract AS rwax_contract, r.template_token_supply, '
-            'r.max_assets AS rwax_max_assets, rt.trait_factors, rt.maximum_supply AS rwax_supply, '
-            'rt.decimals AS rwax_decimals, rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, '
-            'rt.token_logo_lg AS rwax_token_logo_lg, {badges_object}, {tags_obj}, {attributes_obj} AS traits'.format(
+            'r.symbol AS rwax_symbol, r.contract AS rwax_contract, r.max_assets AS rwax_max_assets, rt.trait_factors, '
+            'rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, rt.token_name AS rwax_token_name, '
+            'rt.token_logo AS rwax_token_logo, rt.token_logo_lg AS rwax_token_logo_lg, {badges_object}, {tags_obj}, '
+            '{attributes_obj} AS traits'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(), attributes_obj=_get_attributes_object()
             )
         )
@@ -1331,7 +1326,7 @@ def listings(
         columns_clause = (
             'l.market, l.seller, l.timestamp AS timestamp, l.listing_id, l.currency, '
             'l.sale_id, col.verified, l.maker, l.collection, l.price, ci.image as collection_image, '
-            'cn.name AS collection_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
+            'cn.name AS display_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
             '{badges_object}, {tags_obj}, {assets_object} '.format(
                 badges_object=_get_badges_object('l.'),
                 tags_obj=_get_tags_object('l.'),
@@ -1617,128 +1612,13 @@ def health():
         session.remove()
 
 
-@cache.memoize(timeout=3000)
-def attribute_names(author, category):
-    session = create_session()
-    try:
-        result = session.execute(
-            'SELECT key, value, category '
-            'FROM attribute_names an '
-            'WHERE author = :author '
-            'GROUP BY 1, 2, 3'.format(
-                category_clause=' category = :category ' if category else ' category IS NULL '
-            ), {'author': author, 'category': category}
-        )
-
-        names = {
-            'variant': 'Variant',
-            'rarity': 'Rarity',
-            'number': 'Number',
-            'type': 'Type',
-            'color': 'Color',
-            'border': 'Border',
-            'attr7': '',
-            'attr8': '',
-            'attr9': '',
-            'attr10': ''
-        }
-
-        default_names = names.copy()
-
-        for row in result:
-            if category and row['category'] and category == row['category']:
-                names[row['key']] = row['value']
-            elif category and not row['category'] and names[row['key']] == default_names[row['key']]:
-                names[row['key']] = row['value']
-            elif not category and not row['category']:
-                names[row['key']] = row['value']
-
-        return names
-    except SQLAlchemyError as e:
-        logging.error(e)
-        session.rollback()
-        raise e
-    finally:
-        session.remove()
-
-
-def buyoffer(offer_id):
-    session = create_session()
-    try:
-        buyoffer = session.execute(
-            'SELECT timestamp, offer, currency, buyer, template_id, author, name, active, author_id, image, video '
-            'FROM buyoffers '
-            'WHERE offer_id = :offer_id',
-            {'offer_id': offer_id}
-        ).first()
-
-        return {
-            'timestamp': str(buyoffer['timestamp']),
-            'offer': buyoffer['offer'],
-            'currency': buyoffer['currency'],
-            'buyer': buyoffer['buyer'],
-            'template_id': buyoffer['template_id'],
-            'author': buyoffer['author'],
-            'name': buyoffer['name'],
-            'active': buyoffer['active'],
-            'author_id': buyoffer['author_id'],
-            'image': _format_image(buyoffer['image']),
-            'preview': _format_banner(buyoffer['image']) if buyoffer['image'] else None,
-            'video': _format_video(buyoffer['video']),
-        }
-    except SQLAlchemyError as e:
-        logging.error(e)
-        session.rollback()
-        raise e
-    finally:
-        session.remove()
-
-
-def active_buyoffers(buyer):
-    session = create_session()
-    query = (
-        'SELECT timestamp, offer, currency, buyer, template_id, author, name, active, author_id, image, video ' 
-        'FROM buyoffers ' 
-        'WHERE active '
-    )
-    if buyer:
-        query += 'AND buyer = :buyer'
-    try:
-        res = session.execute(query, {'buyer': buyer})
-        buyoffers = []
-        for buyoffer in res:
-            buyoffers.append(
-                {
-                    'timestamp': str(buyoffer['timestamp']),
-                    'offer': buyoffer['offer'],
-                    'currency': buyoffer['currency'],
-                    'buyer': buyoffer['buyer'],
-                    'template_id': buyoffer['template_id'],
-                    'author': buyoffer['author'],
-                    'name': buyoffer['name'],
-                    'active': buyoffer['active'],
-                    'author_id': buyoffer['author_id'],
-                    'image': buyoffer['image'],
-                    'video': buyoffer['video'],
-                }
-            )
-        return buyoffers
-
-    except SQLAlchemyError as e:
-        logging.error(e)
-        session.rollback()
-        raise e
-    finally:
-        session.remove()
-
-
 def _format_collection_overview(row, type, size=80):
     return {
         'collection': row['collection'],
         'name': row['name'],
         'authorized': row['authorized'],
         'image': _format_image(row['image']),
-        'thumbnail': _format_author_thumbnail(row['collection'], row['image'], size),
+        'thumbnail': _format_collection_thumbnail(row['collection'], row['image'], size),
         'verified': row['verified'],
         'blacklisted': row['blacklisted'],
         'waxVolume24h': row['wax_volume_1_day'],
@@ -1864,10 +1744,10 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
             'LEFT JOIN volume_collection_7_days_mv cv7 ON (c.collection = cv7.collection {cv7_type_join}) '
             'LEFT JOIN volume_collection_14_days_mv cv14 ON (c.collection = cv14.collection {cv14_type_join}) '
             'LEFT JOIN volume_collection_all_time_mv cvat ON (c.collection = cvat.collection {cvat_type_join}) '
-            'WHERE TRUE {author_clause} {tag_clause} {verified_clause} {search_clause} '
+            'WHERE TRUE {collection_clause} {tag_clause} {verified_clause} {search_clause} '
             'GROUP BY 1, 2, 3, 4, 5, 6, 17, 18 '
             'ORDER BY {sort_clause} NULLS LAST, c.collection ASC LIMIT :limit offset 0'.format(
-                author_clause=(
+                collection_clause=(
                     ' AND (c.collection ilike :term OR cn.name ilike :term) '
                 ) if collection and collection != '*' else '',
                 sort_clause=sort_clause,
@@ -2049,8 +1929,8 @@ def get_rwax_tokens(collection):
 
     try:
         res = session.execute(
-            'SELECT symbol, contract, decimals, max_supply, token_name, token_logo, token_logo_lg, '
-            'rt.timestamp,c.collection, cn.name as display_name, ci.image AS collection_image, '
+            'SELECT symbol, contract, decimals, maximum_supply, token_name, token_logo, token_logo_lg, '
+            'rt.timestamp,c.collection, cn.name AS display_name, ci.image AS collection_image, '
             'c.verified, CAST(trait_factors AS text) AS trait_factors, '
             'CAST(templates_supply AS text) AS templates_supply, {templates_obj} '
             'FROM rwax_tokens rt '
@@ -2079,7 +1959,7 @@ def get_rwax_tokens(collection):
                 'symbol': token['symbol'],
                 'contract': token['contract'],
                 'decimals': token['decimals'],
-                'maxSupply': token['max_supply'],
+                'maxSupply': token['maximum_supply'],
                 'templates': _format_rwax_templates(token['templates'], token['templates_supply']),
                 'traitFactors': json.loads(token['trait_factors']),
                 'name': token['token_name'],
@@ -2150,5 +2030,179 @@ def get_collection_schemas(collection):
         logging.error(e)
         session.rollback()
         return []
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_collection_filter(verified='verified', term='', market='', type='', owner='', collection='', pfps_only=False):
+    session = create_session()
+
+    verified_clause = ''
+    join_clause = ''
+    with_clause = ''
+
+    search_dict = {'term': '%{}%'.format(term)} if term else {}
+    search_dict['owner'] = owner
+    search_dict['limit'] = 100
+
+    order_clause = 'cv.wax_volume DESC NULLS LAST'
+    cnt_clause = ''
+
+    if type == 'drops':
+        join_clause = ' INNER JOIN drops d ON (d.collection = c.collection AND NOT d.erased) '
+        if market:
+            join_clause = (
+                ' INNER JOIN drops d ON (d.collection = c.collection AND NOT d.erased AND d.contract = :market) '
+            )
+            search_dict['market'] = market
+
+    if type == 'crafts':
+        join_clause = ' INNER JOIN crafts d ON (d.collection = c.collection AND NOT d.erased) '
+
+    if type in ['assets', 'bulk_burn', 'bulk_distribute', 'bulk_transfer', 'bulk_multi_sell', 'bulk_sell',
+                'bulk_sell_dupes', 'bulk_sell_highest_duplicates', 'bulk_transfer_duplicates',
+                'bulk_transfer_lowest_mints', 'inventory'] and owner:
+        with_clause = (
+            'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt FROM assets WHERE owner = :owner GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        order_clause = 'ua.cnt DESC'
+        cnt_clause = ', ua.cnt'
+
+    if type == 'my_packs' and owner:
+        with_clause = (
+            'WITH user_assets AS ('
+            'SELECT a.collection, COUNT(1) AS cnt FROM assets a '
+            'INNER JOIN packs p ON (a.template_id = p.template_id AND p.pack_id = ('
+            '   SELECT MAX(pack_id) FROM packs WHERE template_id = a.template_id)'
+            ') '
+            'WHERE owner = :owner '
+            'GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        order_clause = 'ua.cnt DESC'
+        cnt_clause = ', ua.cnt'
+
+    if type in ['sales', 'bulk_edit', 'bulk_cancel'] and owner:
+        with_clause = (
+            'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt FROM listings WHERE seller = :owner GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        order_clause = 'ua.cnt DESC'
+        cnt_clause = ', ua.cnt'
+
+    if (type == 'sells' or type == 'buys') and owner:
+        with_clause = (
+            'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt '
+            'FROM sales WHERE seller = :owner GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        order_clause = 'ua.cnt DESC'
+        cnt_clause = ', ua.cnt'
+
+    if verified == 'verified':
+        verified_clause = ' AND verified '
+    elif verified == 'unverified':
+        verified_clause = (
+            ' AND NOT verified '
+            ' AND NOT blacklisted '
+        )
+    elif verified == 'all':
+        verified_clause = ' AND NOT blacklisted '
+    elif verified == 'blacklisted':
+        verified_clause = ' AND blacklisted '
+
+    collection_clause = ''
+    if collection:
+        collection_clause = ' AND c.collection != :collection '
+        search_dict['collection'] = collection
+        search_dict['limit'] = 99
+
+    if pfps_only or type == 'pfps':
+        join_clause = ' INNER JOIN pfp_schemas USING(collection) '
+
+    try:
+        collections = {
+            'collections': [],
+            'images': {},
+            'names': {},
+            'verified': {},
+            'blacklisted': {},
+            'volume24h': {}
+        }
+
+        if collection:
+            result1 = session.execute(
+                'SELECT c.collection, ci.image, cn.name, verified, blacklisted, cv.wax_volume '
+                'FROM collections c '
+                'LEFT JOIN names cn ON (c.name_id = cn.name_id) '
+                'LEFT JOIN images ci ON (c.image_id = ci.image_id) '
+                'LEFT JOIN collection_volumes_1_mv cv ON c.collection = cv.collection '
+                'WHERE c.collection = :collection '
+                'GROUP BY 1, 2, 3, 4, 5, 6 '
+                'LIMIT 1',
+                search_dict
+            )
+
+            for row in result1:
+                collection = row.collection
+                name = row.name
+                image = row.image
+                verified = row.verified
+                blacklisted = row.blacklisted
+                volume_24h = row.wax_volume
+
+                if collection not in collections['collection']:
+                    collections['collections'].append(collection)
+                    collections['images'][collection] = _format_collection_thumbnail(collection, image)
+                    collections['names'][collection] = name
+                    collections['verified'][collection] = verified
+                    collections['blacklisted'][collection] = blacklisted
+                    collections['volume24h'][collection] = volume_24h
+
+        result = session.execute(
+            '{with_clause} '
+            'SELECT c.collection, ci.image, cn.name, verified, blacklisted, cv.wax_volume {cnt_clause} '
+            'FROM collections c '
+            'LEFT JOIN names cn ON (c.name_id = cn.name_id) '
+            'LEFT JOIN images ci ON (c.image_id = ci.image_id) '
+            '{join_clause} '
+            'LEFT JOIN collection_volumes_1_mv cv ON c.collection = cv.collection '
+            'WHERE TRUE {verified_clause} {term_clause} {collection_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6 {cnt_clause} '
+            'ORDER BY {order_clause}, collection ASC '
+            'LIMIT :limit'.format(
+                verified_clause=verified_clause,
+                join_clause=join_clause,
+                with_clause=with_clause,
+                collection_clause=collection_clause,
+                order_clause=order_clause,
+                cnt_clause=cnt_clause,
+                term_clause=' AND (c.collection ilike :term OR cn.name ilike :term) ' if term else ''
+            ), search_dict
+        )
+
+        for row in result:
+            collection = row.collection
+            name = row.name
+            image = row.image
+            verified = row.verified
+            blacklisted = row.blacklisted
+            volume_24h = row.wax_volume
+
+            if collection not in collections['collections']:
+                collections['collections'].append(collection)
+                collections['images'][collection] = _format_collection_thumbnail(collection, image)
+                collections['names'][collection] = name
+                collections['verified'][collection] = verified
+                collections['blacklisted'][collection] = blacklisted
+                collections['volume24h'][collection] = volume_24h
+
+        return collections
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
     finally:
         session.remove()

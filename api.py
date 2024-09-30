@@ -418,6 +418,20 @@ def get_rwax_tokens():
     return flaskify(oto_response.Response(logic.get_rwax_tokens(collection)))
 
 
+@app.route('/api/collection-filter')
+@catch_and_respond()
+def get_collection_filter():
+    term = request.args.get('term')
+    market = request.args.get('market')
+    type = request.args.get('type')
+    owner = request.args.get('owner')
+    collection = request.args.get('collection')
+    pfps_only = request.args.get('pfps_only', 'false') == 'true'
+    verified = request.args.get('verified', 'true') == 'true'
+    return flaskify(oto_response.Response(logic.get_collection_filter(
+        verified, term, market, type, owner, collection, pfps_only)))
+
+
 @app.route('/v3/collection-stats/<collection>')
 @catch_and_respond()
 def collection_stats(collection):
