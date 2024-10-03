@@ -378,19 +378,25 @@ def listings():
     return flaskify(oto_response.Response(search_res))
 
 
-@app.route('/api/collections-overview/<collection>')
-@app.route('/api/collections-overview')
+@app.route('/api/collections/<collection>')
+@app.route('/api/collections')
 @catch_and_respond()
-def get_collections_overview(collection='*'):
+def get_collections(collection='*'):
     collection = request.args.get('collection', collection)
     collection = _format_collection(collection)
     type = request.args.get('type')
     tag_id = request.args.get('tag_id')
     limit = request.args.get('limit', 100)
+    offset = request.args.get('offset', 0)
     verified = request.args.get('verified', 'verified')
     trending = request.args.get('trending', 'false') == 'true'
+
+    market = request.args.get('market')
+    owner = request.args.get('owner')
+    pfps_only = request.args.get('pfps_only', 'false') == 'true'
+
     return flaskify(oto_response.Response(logic.get_collections_overview(
-        collection, type, tag_id, verified, trending, limit)))
+        collection, type, tag_id, verified, trending, market, owner, pfps_only, limit, offset)))
 
 
 @app.route('/api/collection-schemas/<collection>')

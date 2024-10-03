@@ -1642,7 +1642,9 @@ def _format_collection_overview(row, type, size=80):
 
 
 @cache.memoize(timeout=300)
-def get_collections_overview(collection, type, tag_id, verified, trending, limit=100):
+def get_collections_overview(
+    collection, type, tag_id, verified, trending, market, owner, pfps_only, limit=100, offset=0
+):
     session = create_session()
 
     sort_clause = '7 DESC'
@@ -1706,6 +1708,82 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
     else:
         verified_clause = ''
 
+    search_dict = {
+        'term': '%{}%'.format(collection), 'type': type, 'tag_id': tag_id, 'limit': limit,
+        'rel_tag_id': rel_tag_id, 'offset': offset, 'owner': owner
+    }
+
+    join_clause = ''
+    with_clause = ''
+    cnt_clause = ''
+
+    if type == 'drops':
+        join_clause = ' INNER JOIN drops d ON (d.collection = c.collection AND NOT d.erased) '
+        if market:
+            join_clause = (
+                ' INNER JOIN drops d ON (d.collection = c.collection AND NOT d.erased AND d.contract = :market) '
+            )
+            search_dict['market'] = market
+
+    if type == 'crafts':
+        join_clause = ' INNER JOIN crafts d ON (d.collection = c.collection AND NOT d.erased) '
+
+    if type in ['assets', 'bulk_burn', 'bulk_distribute', 'bulk_transfer', 'bulk_multi_sell', 'bulk_sell',
+                'bulk_sell_dupes', 'bulk_sell_highest_duplicates', 'bulk_transfer_duplicates',
+                'bulk_transfer_lowest_mints', 'inventory'] and owner:
+        with_clause = (
+            'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt FROM assets WHERE owner = :owner GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        sort_clause = 'cnt DESC'
+        cnt_clause = ', cnt'
+
+    if type == 'my_packs' and owner:
+        with_clause = (
+            'WITH user_assets AS ('
+            'SELECT a.collection, COUNT(1) AS cnt FROM assets a '
+            'INNER JOIN packs p ON (a.template_id = p.template_id AND p.pack_id = ('
+            '   SELECT MAX(pack_id) FROM packs WHERE template_id = a.template_id)'
+            ') '
+            'WHERE owner = :owner '
+            'GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        sort_clause = 'cnt DESC'
+        cnt_clause = ', cnt'
+
+    if type in ['sales', 'bulk_edit', 'bulk_cancel'] and owner:
+        with_clause = (
+            'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt FROM listings WHERE seller = :owner GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        sort_clause = 'cnt DESC'
+        cnt_clause = ', cnt'
+
+    if (type == 'sells' or type == 'buys') and owner:
+        with_clause = (
+            'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt '
+            'FROM sales WHERE seller = :owner GROUP BY 1)'
+        )
+        join_clause = ' INNER JOIN user_assets ua USING (collection) '
+        sort_clause = ' cnt DESC NULLS LAST '
+        cnt_clause = ', cnt'
+
+    if verified == 'verified':
+        verified_clause = ' AND verified '
+    elif verified == 'unverified':
+        verified_clause = (
+            ' AND NOT verified '
+            ' AND NOT blacklisted '
+        )
+    elif verified == 'all':
+        verified_clause = ' AND NOT blacklisted '
+    elif verified == 'blacklisted':
+        verified_clause = ' AND blacklisted '
+
+    if pfps_only or type == 'pfps':
+        join_clause = ' INNER JOIN pfp_schemas USING(collection) '
+
     search_clause = ''
     type_join = False
     if trending:
@@ -1723,7 +1801,8 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
 
     try:
         result = session.execute(
-            'SELECT c.collection, c.authorized, ci.image, name, verified, blacklisted, '
+            '{with_clause} '
+            'SELECT c.*, '
             'SUM(COALESCE(cv1.wax_volume, 0)) AS wax_volume_1_day, '
             'SUM(COALESCE(cv1.usd_volume, 0)) AS usd_volume_1_day, '
             'SUM(COALESCE(cv2.wax_volume, 0)) AS wax_volume_2_days, '
@@ -1734,19 +1813,23 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
             'SUM(COALESCE(cv14.usd_volume, 0)) AS usd_volume_14_days, '
             'SUM(COALESCE(cvat.wax_volume, 0)) AS wax_volume_all_time, '
             'SUM(COALESCE(cvat.usd_volume, 0)) AS usd_volume_all_time, '
-            'wax_market_cap, usd_market_cap '
-            'FROM collections c '
-            'LEFT JOIN images ci USING (image_id) '
-            'LEFT JOIN names cn USING (name_id) '
+            'wax_market_cap, usd_market_cap{cnt_clause} '
+            'FROM ('
+            '   SELECT c.collection, c.authorized, ci.image, name, verified, blacklisted{cnt_clause} '
+            '   FROM collections c '
+            '   LEFT JOIN images ci USING (image_id) '
+            '   LEFT JOIN names cn USING (name_id) '
+            '   {join_clause} '
+            '   WHERE TRUE {collection_clause} {tag_clause} {verified_clause} {search_clause} '
+            ') c '
             'LEFT JOIN collection_market_cap_mv cmc ON (c.collection = cmc.collection) '
             'LEFT JOIN volume_collection_1_days_mv cv1 ON (c.collection = cv1.collection {cv1_type_join}) '
             'LEFT JOIN volume_collection_2_days_mv cv2 ON (c.collection = cv2.collection {cv2_type_join}) '
             'LEFT JOIN volume_collection_7_days_mv cv7 ON (c.collection = cv7.collection {cv7_type_join}) '
             'LEFT JOIN volume_collection_14_days_mv cv14 ON (c.collection = cv14.collection {cv14_type_join}) '
             'LEFT JOIN volume_collection_all_time_mv cvat ON (c.collection = cvat.collection {cvat_type_join}) '
-            'WHERE TRUE {collection_clause} {tag_clause} {verified_clause} {search_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 17, 18 '
-            'ORDER BY {sort_clause} NULLS LAST, c.collection ASC LIMIT :limit offset 0'.format(
+            'GROUP BY 1, 2, 3, 4, 5, 6, wax_market_cap, usd_market_cap{cnt_clause} '
+            'ORDER BY {sort_clause}, c.collection ASC LIMIT :limit offset :offset'.format(
                 collection_clause=(
                     ' AND (c.collection ilike :term OR cn.name ilike :term) '
                 ) if collection and collection != '*' else '',
@@ -1754,15 +1837,15 @@ def get_collections_overview(collection, type, tag_id, verified, trending, limit
                 tag_clause=tag_clause,
                 search_clause=search_clause,
                 verified_clause=verified_clause,
+                join_clause=join_clause,
+                with_clause=with_clause,
+                cnt_clause=cnt_clause,
                 cv1_type_join=' AND cv1.type = \'sales\'' if type_join else '',
                 cv2_type_join=' AND cv2.type = \'sales\'' if type_join else '',
                 cv7_type_join=' AND cv7.type = \'sales\'' if type_join else '',
                 cv14_type_join=' AND cv14.type = \'sales\'' if type_join else '',
                 cvat_type_join=' AND cvat.type = \'sales\'' if type_join else ''
-            ), {
-                'term': '%{}%'.format(collection), 'type': type, 'tag_id': tag_id, 'limit': limit,
-                'rel_tag_id': rel_tag_id
-            }
+            ), search_dict
         )
 
         collections = []
