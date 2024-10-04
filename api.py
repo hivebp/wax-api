@@ -399,6 +399,48 @@ def get_collections(collection='*'):
         collection, type, tag_id, verified, trending, market, owner, pfps_only, limit, offset)))
 
 
+@app.route('/api/drops')
+@catch_and_respond()
+def get_drops():
+    drop_id = request.args.get('drop_id')
+    schema = request.args.get('schema')
+    term = request.args.get('term')
+    collection = request.args.get('collection')
+    market = request.args.get('market')
+    offset = request.args.get('offset', 0)
+    if offset and (isinstance(offset, int) or (isinstance(offset, str) and offset.isnumeric())):
+        offset = int(offset)
+    else:
+        offset = 0
+    limit = request.args.get('limit', 40)
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'drop_id_desc'
+    verified = request.args.get('verified')
+    token = request.args.get('token')
+    highlight = request.args.get('highlight') == 'true'
+    home = request.args.get('home') == 'home'
+    upcoming = request.args.get('upcoming') == 'true'
+    user_name = request.args.get('user', None)
+    currency = request.args.get('currency', None)
+
+    if collection:
+        collection = _format_collection(collection)
+
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 40
+    else:
+        limit = 40
+
+    search_res = logic.get_drops(
+        drop_id, collection, schema, term, limit, order_by, offset, verified, market, token, highlight, upcoming,
+        user_name, currency, home
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/collection-schemas/<collection>')
 @catch_and_respond()
 def get_collection_schemas(collection):
@@ -422,20 +464,6 @@ def calc_rwax_tokens():
 def get_rwax_tokens():
     collection = request.args.get('collection', None)
     return flaskify(oto_response.Response(logic.get_rwax_tokens(collection)))
-
-
-@app.route('/api/collection-filter')
-@catch_and_respond()
-def get_collection_filter():
-    term = request.args.get('term')
-    market = request.args.get('market')
-    type = request.args.get('type')
-    owner = request.args.get('owner')
-    collection = request.args.get('collection')
-    pfps_only = request.args.get('pfps_only', 'false') == 'true'
-    verified = request.args.get('verified', 'true') == 'true'
-    return flaskify(oto_response.Response(logic.get_collection_filter(
-        verified, term, market, type, owner, collection, pfps_only)))
 
 
 @app.route('/v3/collection-stats/<collection>')

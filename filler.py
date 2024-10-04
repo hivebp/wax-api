@@ -1038,6 +1038,10 @@ def parse_action(session, action):
                 funcs.load_settag(session, action)
             elif name == 'suggesttag':
                 funcs.load_suggesttag(session, action)
+            elif name == 'addfilter':
+                funcs.load_tag_filter(session, action)
+            elif name == 'remfilter':
+                funcs.load_tag_filter(session, action)
         elif account == 'atomhubtools':
             if name == 'addaccvalues':
                 funcs.load_account_values(session, action)
@@ -1207,10 +1211,16 @@ def update_small_views():
         session.commit()
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY user_pictures_mv')
         session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY tag_filters_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_actions_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_mv')
+        session.commit()
 
-        return flaskify(oto_response.Response('Floor Prices Updated'))
+        return flaskify(oto_response.Response('Small Views Updated'))
     except SQLAlchemyError as err:
-        log_error('update_floor_prices: {}'.format(err))
+        log_error('update_small_views: {}'.format(err))
         session.rollback()
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:

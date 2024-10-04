@@ -4777,6 +4777,26 @@ def load_rwax_erasetoken(session, erase):
 
 
 @catch_and_log()
+def load_tag_filter(session, action):
+    act = action['act']
+    data = act['data']
+    action_name = act['name']
+    if 'data' in data:
+        data = data['data']
+
+    new_filter = load_transaction_basics(action)
+    new_filter['tag_id'] = data['tag_id']
+    new_filter['user_name'] = data['user_name']
+    new_filter['action_name'] = action_name
+
+    session_execute_logged(
+        session,
+        'INSERT INTO tag_filters '
+        'SELECT :user_name, :tag_id, :action_name, :seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM tag_filters WHERE seq = :seq) ', new_filter
+    )
+
+@catch_and_log()
 def load_log_tokenize(session, tokenize):
     data = _get_data(tokenize)
     new_token = load_transaction_basics(tokenize)

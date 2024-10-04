@@ -87,6 +87,11 @@ def _get_templates_object():
     return (
         'array_agg(json_build_object(\'template_id\', t.template_id, \'name\', tn.name, \'collection\', t.collection, '
         '\'schema\', t.schema, \'immutableData\', td.data, \'image\', ti.image, \'video\', tv.video, '
+        '\'avgWaxPrice\', ts.avg_wax_price, \'avgUsdPrice\', ts.avg_usd_price, '
+        '\'lastSoldWax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
+        '\'lastSoldListingId\', last_sold_listing_id, \'lastSoldTimestamp\', ts.last_sold_timestamp, '
+        '\'floorPrice\', fp.floor_price, \'numBurned\', tm.num_burned, \'numMinted\', tm.num_minted, '
+        '\'volumeWax\', ts.volume_wax, \'volumeUsd\', ts.volume_usd, \'numSales\', ts.num_sales, '
         '\'createdAt\', t.timestamp, \'createdBlockNum\', t.block_num, \'createdSeq\', t.seq, '
         '\'traits\', {attributes_obj})) AS templates '.format(
             attributes_obj=_get_template_attributes_object()
@@ -1881,6 +1886,35 @@ def get_tags(collection):
         session.remove()
 
 
+def _format_templates(templates):
+    response = []
+    for template in templates:
+        if template['traits']:
+            traits = []
+            for trait in template['traits']:
+                formatted_trait = {}
+                formatted_trait['name'] = trait['attribute_name']
+                if trait['int_value'] or trait['int_value'] == 0:
+                    formatted_trait['value'] = trait['int_value']
+                elif trait['float_value'] or trait['float_value'] == 0.0:
+                    formatted_trait['value'] = trait['float_value']
+                elif trait['string_value']:
+                    formatted_trait['value'] = trait['string_value']
+                else:
+                    formatted_trait['value'] = trait['bool_value']
+                if trait['floor_price']:
+                    formatted_trait['floorPrice'] = trait['floor_price']
+                if trait['rarity_score']:
+                    formatted_trait['rarityScore'] = trait['rarity_score']
+                if trait['total_schema']:
+                    formatted_trait['totalSchema'] = trait['total_schema']
+                traits.append(formatted_trait)
+            template['traits'] = traits
+        response.append(template)
+
+    return response
+
+
 def _format_rwax_templates(templates, templates_supply):
     template_list = []
 
@@ -2021,6 +2055,9 @@ def get_rwax_tokens(collection):
             'LEFT JOIN images ci USING (image_id) '
             'LEFT JOIN names cn USING (name_id) '
             'LEFT JOIN templates t ON t.template_id = ANY(template_ids) '
+            'LEFT JOIN template_stats_mv ts USING (template_id) '
+            'LEFT JOIN templates_minted_mv tm USING (template_id) '
+            'LEFT JOIN template_floor_prices_mv fp USING (template_id) '
             'LEFT JOIN images ti ON (t.image_id = ti.image_id) '
             'LEFT JOIN videos tv ON (t.video_id = tv.video_id) '
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
@@ -2032,6 +2069,7 @@ def get_rwax_tokens(collection):
             ), {'collection': collection})
         tokens = []
         for token in res:
+            templates = _format_templates(token['templates'])
             tokens.append({
                 'collection': {
                     'collectionName': token['collection'],
@@ -2043,7 +2081,7 @@ def get_rwax_tokens(collection):
                 'contract': token['contract'],
                 'decimals': token['decimals'],
                 'maxSupply': token['maximum_supply'],
-                'templates': _format_rwax_templates(token['templates'], token['templates_supply']),
+                'templates': _format_rwax_templates(templates, token['templates_supply']),
                 'traitFactors': json.loads(token['trait_factors']),
                 'name': token['token_name'],
                 'tokenLogo': token['token_logo'],
@@ -2283,6 +2321,224 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
                 collections['volume24h'][collection] = volume_24h
 
         return collections
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_drops(
+    drop_id, collection, schema, term, limit, order_by, offset, verified, market, token, highlight, upcoming, user_name,
+    currency, home
+):
+    session = create_session()
+    try:
+        order_dir = 'DESC'
+        if '_asc' in order_by:
+            order_dir = 'ASC'
+            order_by = order_by.replace('_asc', '')
+        elif '_desc' in order_by:
+            order_dir = 'DESC'
+            order_by = order_by.replace('_desc', '')
+
+        search_dict = {'limit': limit, 'offset': offset, 'order_dir': order_dir}
+
+        market_clause = ''
+        if market:
+            market_clause = ' AND contract = :contract '
+            search_dict['contract'] = market
+
+        collection_clause = ''
+
+        if collection and collection != '*':
+            search_dict['collection'] = collection
+            collection_clause = ' AND d2.collection = :collection '
+
+        order_clause = ''
+
+        if order_by == 'drop_id':
+            order_clause = 'ORDER BY drop_id {}'.format(order_dir)
+
+        if order_by == 'template_id':
+            order_clause = 'ORDER BY d2.template_id {}'.format(order_dir)
+
+        if order_by == 'collection':
+            order_clause = 'ORDER BY d2.collection {}'.format(order_dir)
+
+        if order_by == 'date' and upcoming:
+            order_clause = (
+                'ORDER BY d2.start_time {dir} NULLS LAST, drop_id {dir}'.format(dir=order_dir)
+            )
+        elif order_by == 'date':
+            order_clause = (
+                'ORDER BY COALESCE(d2.start_time, d2.timestamp) {dir} NULLS LAST, drop_id {dir}'.format(dir=order_dir)
+            )
+
+        if order_by == 'price':
+            order_clause = (
+                'ORDER BY (CASE WHEN currency = \'WAX\' THEN price ELSE price / (SELECT usd FROM usd_rate) END) {}'
+            ).format('ASC' if order_dir == 'ASC' else 'DESC')
+
+        search_clause = ''
+
+        if home:
+            search_clause += (
+                ' AND (d2.drop_id = ('
+                '   SELECT MAX(drop_id) FROM drops WHERE contract = \'nfthivedrops\' AND collection = d2.collection'
+                ') OR highlighted OR 10 > (SELECT COUNT(1) FROM drops '
+                'WHERE contract = \'nfthivedrops\' AND collection = d2.collection '
+                'AND timestamp > NOW() AT time zone \'UTC\' - INTERVAL \'7 days\' )) '
+                'AND ('
+                '   SELECT COUNT(1) FROM drop_updates '
+                '   WHERE drop_id = d2.drop_id AND contract = \'nfthivedrops\' '
+                '   AND start_time is NOT NULL'
+                ') < 3 '
+            )
+
+        if highlight:
+            search_clause += (
+                ' AND highlighted '
+            )
+
+        if schema:
+            search_clause += (
+                ' AND t.category = :schema '
+            )
+            search_dict['schema'] = schema
+
+        if term:
+            if isinstance(term, int) or (isinstance(term, str) and term.isnumeric()):
+                template = session.execute('SELECT template_id FROM templates WHERE template_id = :term', {
+                    'term': term
+                }).first()
+                if template:
+                    search_dict['template_id'] = template['template_id']
+                    search_clause += (
+                        ' AND t.template_id = :template_id '
+                    )
+            else:
+                search_dict['name'] = term
+                search_clause += (
+                    ' AND tn.name LIKE :name '
+                )
+
+        if currency:
+            search_clause += (
+                ' AND (drop_id, contract) IN (SELECT drop_id, contract FROM drop_prices_mv '
+                ' WHERE :currency = ANY(currencies) AND drop_id = d2.drop_id AND contract = d2.contract) '
+            )
+            search_dict['currency'] = currency.upper()
+
+        if upcoming:
+            search_clause += (
+                ' AND start_time > NOW() '
+            )
+        else:
+            search_clause += (
+                'AND (d2.start_time IS NULL OR d2.start_time < NOW()) '
+            )
+
+        if verified == 'verified':
+            search_clause += ' AND verified '
+        elif verified == 'unverified':
+            search_clause += (
+                ' AND NOT verified AND NOT blacklisted '
+            )
+        elif verified == 'all':
+            search_clause += ' AND NOT blacklisted '
+
+        if drop_id:
+            search_dict['drop_id'] = drop_id
+            search_clause += ' AND drop_id = :drop_id '
+
+        if token:
+            search_clause += ' AND currency ilike :token '
+            search_dict['token'] = token
+
+        if user_name and (not collection or collection == '*'):
+            search_clause += (
+                ' AND d2.collection NOT IN (SELECT collection FROM tags_mv WHERE tag_id IN ('
+                '   SELECT tag_id FROM tag_filters_mv WHERE user_name = :user_name)'
+                ') '
+                ' AND d2.collection NOT IN (SELECT collection FROM personal_blacklist_mv WHERE account = :user_name) '
+            )
+            search_dict['user_name'] = user_name
+
+        sql = (
+            'WITH usd_rate AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
+            'SELECT drop_id, price, currency, fee, '
+            'extract(epoch from start_time AT time zone \'Europe/Berlin\')::bigint AS start_time, '
+            'extract(epoch from end_time AT time zone \'Europe/Berlin\')::bigint AS end_time, d2.timestamp, '
+            'account_limit, account_limit_cooldown, max_claimable, num_claimed, verified, '
+            'display_data, (SELECT usd FROM usd_rate) as wax_usd, contract, cn.name as display_name, t.collection, '
+            'auth_required, ci.image AS collection_image, name_pattern, pd.drop_id AS is_pfp, '
+            '(SELECT SUM(amount) FROM drop_actions '
+            'WHERE drop_id = d2.drop_id AND contract = d2.contract AND '
+            'action = \'claim\') AS num_bought, {templates_obj} '
+            'FROM drops d2 '
+            'INNER JOIN templates t ON (t.template_id = ANY(d2.templates_to_mint)) '
+            'LEFT JOIN template_stats_mv ts USING (template_id) '
+            'LEFT JOIN templates_minted_mv tm USING (template_id) '
+            'LEFT JOIN template_floor_prices_mv fp USING (template_id) '
+            'LEFT JOIN images ti ON (t.image_id = ti.image_id) '
+            'LEFT JOIN videos tv ON (t.video_id = tv.video_id) '
+            'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
+            'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
+            'LEFT JOIN pfp_drop_data pd USING (drop_id, contract) '
+            'INNER JOIN collections c ON (d2.collection = c.collection) '
+            'LEFT JOIN names cn ON (c.name_id = cn.name_id) '
+            'LEFT JOIN images ci ON (c.image_id = ci.image_id) '
+            'WHERE TRUE '
+            'AND (end_time IS NULL OR end_time >= NOW() AT time zone \'UTC\') '
+            'AND NOT erased AND NOT is_hidden {collection_clause} {search_clause} '
+            'AND (currency IS NOT NULL OR price IS NULL OR price = 0) '
+            '{market_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 '
+            '{order_clause} LIMIT :limit OFFSET :offset'.format(
+                order_clause=order_clause,
+                market_clause=market_clause,
+                collection_clause=collection_clause,
+                search_clause=search_clause,
+                templates_obj=_get_templates_object()
+            )
+        )
+
+        res = session.execute(
+            sql,
+            search_dict)
+
+        drops = []
+
+        for drop in res:
+            templates = _format_templates(drop['templates'])
+            drops.append({
+                'dropId': drop['drop_id'],
+                'price': drop['price'],
+                'currency': drop['currency'],
+                'startTime': drop['start_time'],
+                'endTime': drop['end_time'],
+                'createdAt': datetime.datetime.timestamp(drop['timestamp']),
+                'accountLimit': drop['account_limit'],
+                'accountLimitCooldown': drop['account_limit_cooldown'],
+                'maxClaimable': drop['max_claimable'],
+                'numClaimed': drop['num_claimed'],
+                'verified': drop['verified'],
+                'displayData': drop['display_data'],
+                'authRequired': drop['auth_required'],
+                'namePattern': drop['name_pattern'],
+                'isPfp': drop['is_pfp'],
+                'collection': {
+                    'collectionName': drop['collection'],
+                    'displayName': drop['display_name'],
+                    'collectionImage': drop['collection_image'],
+                    'verification': drop['verified'],
+                },
+                'templatesToMint': templates
+            })
+
+        return drops
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()
