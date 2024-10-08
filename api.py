@@ -399,6 +399,42 @@ def get_collections(collection='*'):
         collection, type, tag_id, verified, trending, market, owner, pfps_only, limit, offset)))
 
 
+@app.route('/api/crafts')
+@catch_and_respond()
+def get_crafts():
+    craft_id = request.args.get('craft_id')
+    collection = request.args.get('collection')
+    offset = request.args.get('offset', 0)
+    limit = request.args.get('limit', 40)
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'craft_id_desc'
+    verified = request.args.get('verified', 'verified')
+
+    if collection:
+        author = _format_collection(collection)
+
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 40
+    else:
+        limit = 40
+
+    if offset:
+        try:
+            offset = int(offset)
+        except Exception as err:
+            offset = 0
+    else:
+        offset = 0
+
+    search_res = logic.get_crafts(
+        craft_id, collection, limit, order_by, offset, verified
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/drops')
 @catch_and_respond()
 def get_drops():

@@ -83,16 +83,41 @@ def to_lower_camel_case(snake_str):
     return snake_str[0].lower() + camel_string[1:]
 
 
+def _format_object(item):
+    if isinstance(item, dict):
+        new_item = {}
+        for key in item.keys():
+            val = item[key]
+            if hasattr(val, "__len__") and not isinstance(val, str) and not isinstance(val, dict):
+                new_item[to_lower_camel_case(key)] = []
+                for e in val:
+                    obj = _format_object(e)
+                    if obj:
+                        new_item[to_lower_camel_case(key)].append(obj)
+            elif val:
+                new_item[to_lower_camel_case(key)] = _format_object(val)
+    elif hasattr(item, "__len__") and not isinstance(item, str):
+        new_item = []
+        for e in item:
+            obj = _format_object(e)
+            if obj:
+                new_item.append(obj)
+    else:
+        return item
+
+    return new_item
+
+
 def _get_templates_object():
     return (
         'array_agg(json_build_object(\'template_id\', t.template_id, \'name\', tn.name, \'collection\', t.collection, '
-        '\'schema\', t.schema, \'immutableData\', td.data, \'image\', ti.image, \'video\', tv.video, '
-        '\'avgWaxPrice\', ts.avg_wax_price, \'avgUsdPrice\', ts.avg_usd_price, '
-        '\'lastSoldWax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
-        '\'lastSoldListingId\', last_sold_listing_id, \'lastSoldTimestamp\', ts.last_sold_timestamp, '
-        '\'floorPrice\', fp.floor_price, \'numBurned\', tm.num_burned, \'numMinted\', tm.num_minted, '
-        '\'volumeWax\', ts.volume_wax, \'volumeUsd\', ts.volume_usd, \'numSales\', ts.num_sales, '
-        '\'createdAt\', t.timestamp, \'createdBlockNum\', t.block_num, \'createdSeq\', t.seq, '
+        '\'schema\', t.schema, \'immutable_data\', td.data, \'image\', ti.image, \'video\', tv.video, '
+        '\'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', ts.avg_usd_price, '
+        '\'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
+        '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
+        '\'floor_price\', fp.floor_price, \'num_burned\', tm.num_burned, \'num_minted\', tm.num_minted, '
+        '\'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, '
+        '\'created_at\', t.timestamp, \'block_num\', t.block_num, \'created_seq\', t.seq, '
         '\'traits\', {attributes_obj})) AS templates '.format(
             attributes_obj=_get_template_attributes_object()
         )
@@ -1792,6 +1817,10 @@ def get_collections_overview(
     search_clause = ''
     type_join = False
     if trending:
+        join_clause = (
+            ' INNER JOIN volume_collection_1_days_mv cv1 ON (cv1.collection = c.collection AND cv1.type = \'sales\') '
+            ' INNER JOIN volume_collection_2_days_mv cv2 ON (cv2.collection = c.collection AND cv2.type = \'sales\') '
+        )
         sort_clause = (
             ' (SUM(COALESCE(cv1.wax_volume, 0)) - '
             '(SUM(COALESCE(cv2.wax_volume, 0)) - SUM(COALESCE(cv1.wax_volume, 0)))) '
@@ -2329,6 +2358,147 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
         session.remove()
 
 
+def get_crafts(craft_id, collection, limit, order_by, offset, verified):
+    session = create_session()
+    try:
+        order_dir = 'DESC'
+        if '_asc' in order_by:
+            order_dir = 'ASC'
+            order_by = order_by.replace('_asc', '')
+        elif '_desc' in order_by:
+            order_dir = 'DESC'
+            order_by = order_by.replace('_desc', '')
+
+        search_dict = {'limit': limit, 'offset': offset, 'order_dir': order_dir}
+
+        collection_clause = ''
+
+        if collection and collection != '*':
+            collection_clause = ' AND c.collection = :collection '
+            search_dict['collection'] = collection
+
+        order_clause = ''
+
+        if order_by == 'craft_id':
+            order_clause = 'ORDER BY craft_id {}'.format(order_dir)
+
+        if order_by == 'collection':
+            order_clause = 'ORDER BY c.collection {}'.format(order_dir)
+
+        if order_by == 'date':
+            order_clause = 'ORDER BY c.timestamp {dir} NULLS LAST, craft_id {dir}'.format(dir=order_dir)
+
+        search_clause = ''
+
+        if verified == 'verified':
+            search_clause += ' AND verified '
+        elif verified == 'unverified':
+            search_clause += (
+                ' AND NOT verified AND NOT blacklisted '
+            )
+        elif verified == 'all':
+            search_clause += ' AND NOT blacklisted '
+
+        if craft_id:
+            search_dict['craft_id'] = craft_id
+            search_clause += ' AND craft_id = :craft_id '
+
+        sql = (
+            'SELECT c.*, c2.outcomes, c2.recipe FROM ('
+            'SELECT craft_id, extract(epoch from unlock_time AT time zone \'Europe/Berlin\')::bigint AS unlock_time, '
+            'c.timestamp, num_crafted, total, display_data, col.verified, '
+            'ci.image AS collection_image, cn.name AS display_name, c.collection, ' 
+            'array_agg(CASE WHEN outcome_template_id IS NOT NULL THEN json_build_object('
+            '\'template_id\', outcome_template_id, \'name\', tn1.name, \'collection\', json_build_object('
+            '\'collection_name\', t1.collection, \'verification\', col1.verified, \'collection_image\', '
+            'ci1.image, \'display_name\', cn1.name), \'image\', ti1.image, \'video\', tv1.video, \'schema\', t1.schema)'
+            'ELSE NULL END) AS outcome_templates, '
+            'array_agg(CASE WHEN recipe_template_id IS NOT NULL THEN json_build_object('
+            '\'template_id\', recipe_template_id, \'name\', tn2.name, \'collection\', json_build_object('
+            '\'collection_name\', t2.collection, \'verification\', col2.verified, \'collection_image\', ti2.image, '
+            '\'display_name\', cn2.name), \'image\', ti2.image, \'video\', tv2.video, \'schema\', t2.schema)'
+            'ELSE NULL END) AS recipe_templates ' 
+            'FROM ('
+            '    SELECT c.craft_id, c.unlock_time, c.timestamp, c.display_data, c.collection, (SELECT COUNT(1) '
+            '    FROM craft_actions WHERE craft_id = c.craft_id) AS num_crafted, c2.total, '
+            '    CAST('
+            '       json_array_elements(c2.outcomes->\'outcomes\')->>\'template_id\' AS bigint'
+            '    ) AS outcome_template_id, '
+            '    CAST('
+            '       json_array_elements(c2.recipe->\'ingredients\')->>\'template_id\' AS bigint'
+            '    ) AS recipe_template_id, '
+            '    json_array_elements(outcomes->\'token_outcomes\') AS token_outcomes, '
+            '    json_array_elements(recipe->\'ingredients\')AS token_ingredients '
+            '    FROM ('
+            '       SELECT craft_id, unlock_time, c.timestamp, display_data, collection '
+            '       FROM crafts c '
+            '       LEFT JOIN collections col USING(collection) '
+            '       WHERE NOT erased AND ready AND NOT is_hidden {collection_clause} {search_clause} {order_clause} '
+            '       LIMIT :limit OFFSET :offset '
+            '   ) c INNER JOIN crafts c2 USING (craft_id) '
+            ') c '
+            'LEFT JOIN collections col USING (collection) '
+            'LEFT JOIN images ci ON col.image_id = ci.image_id '
+            'LEFT JOIN names cn ON col.name_id = cn.name_id '
+            'LEFT JOIN templates t1 ON (outcome_template_id = t1.template_id) '
+            'LEFT JOIN names tn1 ON (tn1.name_id = t1.name_id) '
+            'LEFT JOIN images ti1 ON (ti1.image_id = t1.image_id) '
+            'LEFT JOIN videos tv1 ON (tv1.video_id = t1.video_id) '
+            'LEFT JOIN collections col1 ON (col1.collection = t1.collection) '
+            'LEFT JOIN images ci1 ON col1.image_id = ci1.image_id '
+            'LEFT JOIN names cn1 ON col1.name_id = cn1.name_id '
+            'LEFT JOIN templates t2 ON (recipe_template_id = t2.template_id) '
+            'LEFT JOIN names tn2 ON (tn2.name_id = t2.name_id) '
+            'LEFT JOIN images ti2 ON (ti2.image_id = t2.image_id) '
+            'LEFT JOIN videos tv2 ON (tv2.video_id = t2.video_id) '
+            'LEFT JOIN collections col2 ON (col2.collection = t2.collection) '
+            'LEFT JOIN images ci2 ON col2.image_id = ci2.image_id '
+            'LEFT JOIN names cn2 ON col2.name_id = cn2.name_id '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 '
+            '{order_clause} '
+            ') c LEFT JOIN crafts c2 USING(craft_id) '
+            '{order_clause} '.format(
+                order_clause=order_clause,
+                collection_clause=collection_clause,
+                search_clause=search_clause
+            )
+        )
+
+        res = session.execute(
+            sql,
+            search_dict)
+
+        recipes = []
+
+        for item in res:
+            recipes.append({
+                'craftId': item['craft_id'],
+                'outcomes': _format_object(item['outcomes']),
+                'recipe': _format_object(item['recipe']),
+                'unlockTime': item['unlock_time'],
+                'timestamp': datetime.datetime.timestamp(item['timestamp']),
+                'displayData': item['display_data'],
+                'collection': {
+                    'collectionName': item['collection'],
+                    'displayName': item['display_name'],
+                    'collectionImage': item['collection_image'],
+                    'verification': item['verified'],
+                },
+                'numCrafted': item['num_crafted'],
+                'total': item['total'],
+                'outcomeTemplates': _format_object(item['outcome_templates']),
+                'recipeTemplates': _format_object(item['recipe_templates'])
+            })
+
+        return recipes
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def get_drops(
     drop_id, collection, schema, term, limit, order_by, offset, verified, market, token, highlight, upcoming, user_name,
     currency, home
@@ -2513,7 +2683,7 @@ def get_drops(
 
         for drop in res:
             templates = _format_templates(drop['templates'])
-            drops.append({
+            drop_item = {
                 'dropId': drop['drop_id'],
                 'price': drop['price'],
                 'currency': drop['currency'],
@@ -2527,16 +2697,18 @@ def get_drops(
                 'verified': drop['verified'],
                 'displayData': drop['display_data'],
                 'authRequired': drop['auth_required'],
-                'namePattern': drop['name_pattern'],
-                'isPfp': drop['is_pfp'],
                 'collection': {
                     'collectionName': drop['collection'],
                     'displayName': drop['display_name'],
                     'collectionImage': drop['collection_image'],
                     'verification': drop['verified'],
                 },
-                'templatesToMint': templates
-            })
+                'templatesToMint': _format_object(templates)
+            }
+            if drop['is_pfp']:
+                drop_item['namePattern'] = drop['name_pattern'],
+                drop_item['isPfp'] = drop['is_pfp']
+            drops.append(drop_item)
 
         return drops
     except SQLAlchemyError as e:
