@@ -4884,7 +4884,7 @@ def load_tag_filter(session, action):
 
     session_execute_logged(
         session,
-        'INSERT INTO tag_filters '
+        'INSERT INTO tag_filter_actions '
         'SELECT :user_name, :tag_id, :action_name, :seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM tag_filters WHERE seq = :seq) ', new_filter
     )
