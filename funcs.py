@@ -579,6 +579,31 @@ def load_drop(session, update, contract):
             new_drop
         )
 
+    if 'alternative_prices' in data:
+        prices = [{
+            'price': new_drop['price'],
+            'currency': new_drop['currency']
+        }]
+        currencies = [new_drop['currency']]
+        for price in data['alternative_prices']:
+            prices.append({
+                'price': float(price.split(' ')[0]),
+                'currency': price.split(' ')[1]
+            })
+            currencies.append(price.split(' ')[1])
+
+        new_drop['prices'] = json.dumps(prices)
+        new_drop['currencies'] = currencies
+
+        session_execute_logged(
+            session,
+           'INSERT INTO drop_log_prices ('
+           '    drop_id, contract, prices, currencies, seq, block_num, timestamp'
+           ') '
+           'SELECT :drop_id, :contract, :prices, :currencies, :seq, :block_num, :timestamp '
+           'WHERE NOT EXISTS (SELECT seq FROM drop_log_prices WHERE seq = :seq) ', new_drop
+        )
+
     session_execute_logged(
         session,
         'INSERT INTO drops (drop_id, collection, price, currency, fee, display_data, '
@@ -726,6 +751,30 @@ def load_drop_price_update(session, update, contract):
         lp = data[listing_price_key].split(' ')
         drop['price'] = float(lp[0])
         drop['currency'] = lp[1]
+
+    if 'alternative_prices' in data:
+        prices = [{
+            'price': drop['price'],
+            'currency': drop['currency']
+        }]
+        currencies = [drop['currency']]
+        for price in data['alternative_prices']:
+            prices.append({
+                'price': float(price.split(' ')[0]),
+                'currency': price.split(' ')[1]
+            })
+            currencies.append(price.split(' ')[1])
+
+        drop['prices'] = json.dumps(prices)
+        drop['currencies'] = currencies
+
+        session_execute_logged(
+            session,
+           'INSERT INTO drop_log_prices ('
+           '    drop_id, contract, prices, currencies, seq, block_num, timestamp'
+           ') '
+           'SELECT :drop_id, :contract, :prices, :currencies, :seq, :block_num, :timestamp '
+           'WHERE NOT EXISTS (SELECT seq FROM drop_log_prices WHERE seq = :seq) ', drop)
 
     session_execute_logged(
         session,
@@ -1115,6 +1164,36 @@ def load_remint_pfp(session, mint):
         'WHERE NOT EXISTS (SELECT seq FROM pfp_swap_mints WHERE seq = :seq)',
         transaction
     )
+
+
+@catch_and_log()
+def load_logprices(session, update, contract):
+    act = update['act']
+    data = act['data']
+    if 'data' in data:
+        data = data['data']
+
+    drop = load_transaction_basics(update)
+
+    drop['drop_id'] = data['drop_id']
+    drop['contract'] = contract
+    prices = []
+    currencies = []
+    for price in data['listing_prices']:
+        prices.append({
+            'price': float(price.split(' ')[0]),
+            'currency': price.split(' ')[1]
+        })
+        currencies.append(price.split(' ')[1])
+
+    drop['prices'] = json.dumps(prices)
+    drop['currencies'] = currencies
+
+    session_execute_logged(
+        session,
+        'INSERT INTO drop_log_prices (drop_id, contract, prices, currencies, seq, block_num, timestamp) '
+        'SELECT :drop_id, :contract, :prices, :currencies, :seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM drop_log_prices WHERE seq = :seq) ', drop)
 
 
 @catch_and_log()
@@ -2128,6 +2207,20 @@ def calc_atomic_mints(session):
         'WHERE template_id > 0 '
         'AND asset_id > (SELECT MAX(asset_id) FROM asset_mints) '
         'AND timestamp < NOW() AT time zone \'utc\' - INTERVAL \'10 minutes\'  ORDER BY asset_id ASC LIMIT 1'
+    )
+
+    session.commit()
+
+    res = session_execute_logged(
+        session,
+        'UPDATE assets a SET mint = am.mint '
+        'FROM ('
+        '   SELECT asset_id, m.mint '
+        '   FROM asset_mints m '
+        '   INNER JOIN assets a2 USING(asset_id) '
+        '   WHERE a2.mint IS NULL LIMIT 10000'
+        ') am '
+        'WHERE a.asset_id = am.asset_id'
     )
 
     session.commit()

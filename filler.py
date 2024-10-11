@@ -873,6 +873,8 @@ def parse_action(session, action):
                 funcs.add_swap_pfp(session, action)
             elif name == 'remintpfp':
                 funcs.load_remint_pfp(session, action)
+            elif name == 'logprices' and account == 'nfthivedrops':
+                funcs.load_logprices(session, action, account)
         elif account == 'atomicmarket':
             if name == 'purchasesale':
                 funcs.load_atomic_market_buy(session, action)
@@ -1216,6 +1218,8 @@ def update_small_views():
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_actions_mv')
         session.commit()
         session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY drop_prices_mv')
         session.commit()
 
         return flaskify(oto_response.Response('Small Views Updated'))

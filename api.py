@@ -125,9 +125,8 @@ def initial_listing_feed():
         collection = request.args.get('collection', None)
         schema = request.args.get('schema', None)
         template_id = request.args.get('template_id', None)
-        rarity = request.args.get('rarity', None)
 
-        return flaskify(oto_response.Response(logic.newest_listings(collection, schema, rarity, template_id)))
+        return flaskify(oto_response.Response(logic.newest_listings(collection, schema, template_id)))
     except Exception as err:
         logging.error(err)
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
@@ -209,7 +208,6 @@ def schemas(collection):
     schema = request.args.get('schema')
     limit = request.args.get('limit', 40)
     offset = request.args.get('offset', 0)
-    verified = request.args.get('verified', 'all')
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
     exact_search = request.args.get('exact_search') == 'true'
 
@@ -226,7 +224,45 @@ def schemas(collection):
         offset = 0
 
     search_res = logic.schemas(
-        term, collection, schema, limit, order_by, exact_search, offset, verified
+        term, collection, schema, limit, order_by, exact_search, offset
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
+@app.route('/api/templates')
+@catch_and_respond()
+def templates():
+    term = request.args.get('term')
+    collection = request.args.get('collection')
+    schema = request.args.get('schema')
+    tags = request.args.get('tags')
+    limit = int(request.args.get('limit', 40))
+    offset = int(request.args.get('offset', 0))
+    recently_sold = request.args.get('recent')
+    verified = request.args.get('verified', 'verified')
+    favorites = request.args.get('favorites', 'false') == 'true'
+    user = request.args.get('user', '')
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
+    exact_search = request.args.get('exact_search') == 'true'
+    search_type = request.args.get('search_type') if request.args.get('search_type') else ''
+    attributes = request.args.get('attributes', None)
+
+    if collection:
+        collection = _format_collection(collection)
+
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 100
+    else:
+        limit = 100
+
+    search_res = logic.templates(
+        term, collection, schema, tags, limit, order_by,
+        exact_search, search_type, offset, verified,
+        user, favorites, recently_sold, attributes
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -329,7 +365,6 @@ def listings():
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
     favorites = request.args.get('favorites', 'false') == 'true'
-    backed = request.args.get('backed', 'false') == 'true'
     contract = request.args.get('contract')
     user = request.args.get('user', '')
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
@@ -372,7 +407,7 @@ def listings():
     search_res = logic.listings(
         term, owner, market, collection, schema, limit, order_by,
         exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
-        user, favorites, backed, recently_sold, attributes, only
+        user, favorites, recently_sold, attributes, only
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -410,7 +445,7 @@ def get_crafts():
     verified = request.args.get('verified', 'verified')
 
     if collection:
-        author = _format_collection(collection)
+        collection = _format_collection(collection)
 
     if limit:
         try:
@@ -439,7 +474,6 @@ def get_crafts():
 @catch_and_respond()
 def get_drops():
     drop_id = request.args.get('drop_id')
-    schema = request.args.get('schema')
     term = request.args.get('term')
     collection = request.args.get('collection')
     market = request.args.get('market')
@@ -470,7 +504,7 @@ def get_drops():
         limit = 40
 
     search_res = logic.get_drops(
-        drop_id, collection, schema, term, limit, order_by, offset, verified, market, token, highlight, upcoming,
+        drop_id, collection, term, limit, order_by, offset, verified, market, token, highlight, upcoming,
         user_name, currency, home
     )
 
