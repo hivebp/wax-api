@@ -5,6 +5,7 @@ import pytest
 import requests
 
 
+#@pytest.mark.skip
 class TestListings(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -38,6 +39,7 @@ class TestListings(object):
         assert len(response.json()) == 1
 
 
+#@pytest.mark.skip
 class TestInitialListingFeed(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -60,6 +62,7 @@ class TestInitialListingFeed(object):
         assert len(response.json()) > 0
 
 
+#@pytest.mark.skip
 class TestSchemas(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -83,6 +86,7 @@ class TestSchemas(object):
         assert len(response.json()) == 1
 
 
+#@pytest.mark.skip
 class TestTemplates(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -110,6 +114,7 @@ class TestTemplates(object):
         assert len(response.json()) == 1
 
 
+#@pytest.mark.skip
 class TestAssets(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -153,6 +158,7 @@ class TestAssets(object):
         assert len(response.json()) == 1
 
 
+#@pytest.mark.skip
 class TestFilterAttributes(object):
     def test_succeeds(self):
         """Test successful response."""
@@ -168,6 +174,7 @@ class TestFilterAttributes(object):
         assert len(response.json()) > 1
 
 
+#@pytest.mark.skip
 class TestCollectionFilters(object):
     def test_succeeds(self):
         """Test successful response."""
@@ -183,6 +190,7 @@ class TestCollectionFilters(object):
         assert len(response.json()) > 1
 
 
+#@pytest.mark.skip
 class TestCollections(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -212,6 +220,7 @@ class TestCollections(object):
         assert len(response.json()) == 1
 
 
+#@pytest.mark.skip
 class TestCrafts(object):
     @pytest.mark.parametrize(
         'filter', [
@@ -260,3 +269,5 @@ class TestDrops(object):
             response.reason, response.url)
 
         assert len(response.json()) == 1
+
+

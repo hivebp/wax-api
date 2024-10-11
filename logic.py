@@ -2859,7 +2859,7 @@ def get_drops(
                         ' AND t.template_id = :template_id '
                     )
             else:
-                search_dict['name'] = term
+                search_dict['name'] = '%{}%'.format(term)
                 search_clause += (
                     ' AND tn.name ILIKE :name '
                 )
@@ -2935,7 +2935,7 @@ def get_drops(
             'AND NOT erased AND NOT is_hidden {collection_clause} {search_clause} '
             'AND (currency IS NOT NULL OR price IS NULL OR price = 0) '
             '{market_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, start_time, end_time '
             '{order_clause} LIMIT :limit OFFSET :offset'.format(
                 order_clause=order_clause,
                 market_clause=market_clause,
