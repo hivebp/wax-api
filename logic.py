@@ -245,7 +245,7 @@ def construct_category_clause(
                 attribute_ids.append(attribute_id['attribute_id'])
 
     if len(attribute_ids) > 1:
-        category_clause += ' AND :attribute_ids <@ {}attribute_ids '.format(prefix)
+        category_clause += ' AND :attribute_ids && {}attribute_ids '.format(prefix)
         format_dict['attribute_ids'] = attribute_ids
     elif len(attribute_ids) == 1:
         category_clause += ' AND :attribute_id = ANY({}attribute_ids) '.format(prefix)
@@ -1555,10 +1555,10 @@ def listings(
 
             if schema:
                 format_dict['schema'] = schema
-                search_category_clause += ' AND a.schema = :schema '
-                search_category_clause += construct_category_clause(
-                    session, format_dict, collection, schema, attributes, 'a.'
-                )
+            search_category_clause += ' AND a.schema = :schema '
+            search_category_clause += construct_category_clause(
+                session, format_dict, collection, schema, attributes, 'a.'
+            )
             search_clause += search_category_clause
 
         if name:
