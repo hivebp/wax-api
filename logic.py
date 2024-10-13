@@ -205,19 +205,18 @@ def construct_category_clause(
         for attr in attr_arr:
             key = attr.split(':')[0]
             value = attr.split(':')[1]
-            attr_sql = 'SELECT attribute_id FROM attributes WHERE collection = :collection '
+            attr_sql = 'SELECT schema, attribute_id FROM attributes WHERE collection = :collection '
 
             attr_dict = {
                 'collection': collection
             }
 
-            if schema:
-                if ',' in schema:
-                    attr_dict['schemas'] = tuple(schema.split(','))
-                    attr_sql += ' AND schema IN :schemas'
-                else:
-                    attr_dict['schema'] = schema
-                    attr_sql += ' AND schema = :schema'
+            if ',' in schema:
+                attr_dict['schemas'] = tuple(schema.split(','))
+                attr_sql += ' AND schema IN :schemas'
+            else:
+                attr_dict['schema'] = schema
+                attr_sql += ' AND schema = :schema'
 
             attr_dict['attribute_name'] = key
 
@@ -241,14 +240,18 @@ def construct_category_clause(
 
             res = session.execute(attr_sql, attr_dict)
 
-            for attribute_id in res:
-                attribute_ids.append(attribute_id['attribute_id'])
+            for attribute in res:
+                attribute_ids.append(attribute['attribute_id'])
 
     if len(attribute_ids) > 1:
-        category_clause += ' AND :attribute_ids <@ {}attribute_ids '.format(prefix)
+        category_clause += ' AND :attribute_ids <@ {}attribute_ids '.format(
+            prefix
+        )
         format_dict['attribute_ids'] = attribute_ids
     elif len(attribute_ids) == 1:
-        category_clause += ' AND :attribute_id = ANY({}attribute_ids) '.format(prefix)
+        category_clause += ' AND :attribute_id = ANY({}attribute_ids) '.format(
+            prefix
+        )
         format_dict['attribute_id'] = attribute_ids[0]
     elif attributes and len(attribute_ids) == 0:
         category_clause += ' AND FALSE '
@@ -1236,7 +1239,6 @@ def assets(
             if schema:
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
-
                 search_category_clause += construct_category_clause(
                     session, format_dict, collection, schema, attributes, 'a.'
                 )
