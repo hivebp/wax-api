@@ -292,6 +292,9 @@ def assets():
     exact_search = request.args.get('exact_search') == 'true'
     search_type = request.args.get('search_type') if request.args.get('search_type') else ''
     attributes = request.args.get('attributes', None)
+    only = request.args.get('only', None)
+    rwax_symbol = request.args.get('rwax_symbol', None)
+    rwax_contract = request.args.get('rwax_contract', None)
 
     if collection:
         collection = _format_collection(collection)
@@ -317,7 +320,7 @@ def assets():
     search_res = logic.assets(
         term, owner, collection, schema, tags, limit, order_by,
         exact_search, search_type, min_average, max_average, min_mint, max_mint, contract, offset, verified,
-        user, favorites, backed, recently_sold, attributes
+        user, favorites, backed, recently_sold, attributes, only, rwax_symbol, rwax_contract
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -372,6 +375,8 @@ def listings():
     search_type = request.args.get('search_type') if request.args.get('search_type') else ''
     attributes = request.args.get('attributes', None)
     only = request.args.get('only', None)
+    rwax_symbol = request.args.get('rwax_symbol', None)
+    rwax_contract = request.args.get('rwax_contract', None)
 
     if collection:
         collection = _format_collection(collection)
@@ -407,7 +412,7 @@ def listings():
     search_res = logic.listings(
         term, owner, market, collection, schema, limit, order_by,
         exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
-        user, favorites, recently_sold, attributes, only
+        user, favorites, recently_sold, attributes, only, rwax_symbol, rwax_contract
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -533,7 +538,9 @@ def calc_rwax_tokens():
 @catch_and_respond()
 def get_rwax_tokens():
     collection = request.args.get('collection', None)
-    return flaskify(oto_response.Response(logic.get_rwax_tokens(collection)))
+    symbol = request.args.get('symbol', None)
+    contract = request.args.get('contract', None)
+    return flaskify(oto_response.Response(logic.get_rwax_tokens(collection, symbol, contract)))
 
 
 @app.route('/v3/collection-stats/<collection>')

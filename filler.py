@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import funcs
 from app_runner import run_loader
-from config import PostgresFillerConfig, PostgresDevConfig
+from config import PostgresFillerConfig
 
 from flask_executor import Executor
 

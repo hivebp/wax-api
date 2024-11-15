@@ -367,11 +367,9 @@ def handle_simpleassets_updates_reversed(session, block_num):
             ).first()
 
             try:
-                data = funcs.parse_data(
-                    json.loads(update['idata'])
-                ) if 'idata' in update.keys() and update['idata'] else {}
+                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] else {}
                 if 'mdata' in update.keys() and update['mdata']:
-                    data.update(funcs.parse_data(json.loads(update['mdata'])))
+                    data.update(json.loads(update['mdata']))
 
                 new_asset = {}
 
@@ -492,6 +490,22 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         handle_simpleassets_burns_reversed(session, block_num)
         handle_simpleassets_updates_reversed(session, block_num)
         handle_transfers_reversed(session, block_num)
+
+        session.commit()
+
+        removed_tables = session.execute(
+            'SELECT t1.table_name '
+            'FROM tables_with_block_num t1 '
+            'WHERE t1.table_name LIKE \'removed_%\' '
+        )
+
+        for tables in removed_tables:
+            session.execute(
+                'INSERT INTO {table_name} FROM {removed_table_name} WHERE block_num >= :block_num'.format(
+                    table_name=tables['table_name'].replace('removed_', ''),
+                    removed_table_name=tables['table_name']
+                ), {'block_num': block_num}
+            )
 
         session.commit()
 

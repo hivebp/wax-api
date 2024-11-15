@@ -127,6 +127,7 @@ def _get_templates_object():
 def _get_assets_object():
     return (
         'array_agg(json_build_object(\'asset_id\', a.asset_id, \'name\', n.name, \'collection\', a.collection, '
+        '\'verified\', col.verified, \'collection_image\', ci.image, \'display_name\', cn.name, '
         '\'schema\', a.schema, \'mutable_data\', m.data, \'immutable_data\', i.data, \'template_immutable_data\', '
         'td.data, \'num_burned\', tm.num_burned, \'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', '
         'ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
@@ -415,8 +416,8 @@ def _format_asset(asset):
                 'collectionName': asset['collection'],
                 'displayName': asset['display_name'],
                 'collectionImage': asset['collection_image'],
-                'tags': _format_tags(asset['tags']) if asset['tags'] else [],
-                'badges': _format_badges(asset['badges']) if asset['badges'] else []
+                'tags': _format_tags(asset['tags']) if 'tags' in asset.keys() and asset['tags'] else [],
+                'badges': _format_badges(asset['badges']) if 'badges' in asset.keys() and asset['badges'] else []
             }
         if asset['rarity_score']:
             asset_obj['rarityScore'] = asset['rarity_score']
@@ -1196,7 +1197,7 @@ def assets(
     term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
     contract=None, offset=0, verified='verified', user='', favorites=False, backed=False, recently_sold=None,
-    attributes=None
+    attributes=None, only=None, rwax_symbol=None, rwax_contract=None
 ):
     session = create_session()
 
@@ -1284,15 +1285,21 @@ def assets(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(), attributes_obj=_get_attributes_object()
             )
         )
-        if search_type == 'packs':
+        if only == 'packs':
             filter_join_clause += 'INNER JOIN packs USING (template_id) '
-        elif search_type == 'pfps':
+        elif only == 'pfps':
             specific_search_clause += (
                 ' AND p.asset_id IS NOT NULL '
             )
-        elif search_type == 'rwax':
+        elif only == 'rwax':
             filter_join_clause += 'INNER JOIN rwax_assets ra2 ON (a.asset_id = ra2.asset_id) '
-        elif search_type == 'staked':
+            if rwax_symbol:
+                search_clause += 'AND rt.symbol = :rwax_symbol '
+                format_dict['rwax_symbol'] = rwax_symbol
+            if rwax_contract:
+                search_clause += 'AND rt.contract = :rwax_contract '
+                format_dict['rwax_contract'] = rwax_contract
+        elif only == 'staked':
             filter_join_clause += 'INNER JOIN stakes s USING (asset_id) '
 
         if verified == 'verified':
@@ -1508,10 +1515,9 @@ def assets(
 
 def listings(
     term=None, owner=None, market=None, collection=None, schema=None, limit=100, order_by='name_asc',
-    exact_search=False, search_type='listings', min_price=None, max_price=None,
-    min_mint=None, max_mint=None, contract=None, offset=0,
-    verified='verified', user='', favorites=False, recently_sold=None,
-    attributes=None, only=False
+    exact_search=False, search_type='listings', min_price=None, max_price=None, min_mint=None, max_mint=None,
+    contract=None, offset=0, verified='verified', user='', favorites=False, recently_sold=None,
+    attributes=None, only=False, rwax_symbol=None, rwax_contract=None
 ):
     session = create_session()
 
@@ -1594,6 +1600,7 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
+            'LEFT JOIN rwax_templates rt ON (a.template_id = rt.template_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
             'LEFT JOIN collections col ON (col.collection = l.collection) '
@@ -1681,6 +1688,12 @@ def listings(
             search_clause += (
                 'AND ra.asset_id IS NOT NULL '
             )
+            if rwax_symbol:
+                search_clause += 'AND rt.symbol = :rwax_symbol '
+                format_dict['rwax_symbol'] = rwax_symbol
+            if rwax_contract:
+                search_clause += 'AND rt.contract = :rwax_contract '
+                format_dict['rwax_contract'] = rwax_contract
         elif only == 'backed':
             search_clause += ' AND ba.amount IS NOT NULL '
 
@@ -1735,6 +1748,7 @@ def listings(
                     '{join_clause} '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
                     'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
+                    'LEFT JOIN rwax_templates rt ON (a.template_id = rt.template_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -2346,8 +2360,24 @@ def test_rwax_stuff():
     print('Tokens Total: ' + str(total_share))
 
 
-def get_rwax_tokens(collection):
+def get_rwax_tokens(collection, symbol, contract):
     session = create_session()
+
+    search_dict = {}
+
+    token_clause = ''
+
+    if symbol:
+        token_clause += ' AND rt.symbol = :symbol '
+        search_dict['symbol'] = symbol
+
+    if contract:
+        token_clause += ' AND rt.contract = :contract '
+        search_dict['contract'] = contract
+
+    if collection:
+        token_clause += ' AND rt.collection = :collection '
+        search_dict['collection'] = collection
 
     try:
         res = session.execute(
@@ -2367,11 +2397,11 @@ def get_rwax_tokens(collection):
             'LEFT JOIN videos tv ON (t.video_id = tv.video_id) '
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
-            'WHERE NOT blacklisted {collection_clause} '
+            'WHERE NOT blacklisted {token_clause} '
             'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14'.format(
                 templates_obj=_get_templates_object(),
-                collection_clause=' AND rt.collection = :collection ' if collection and collection != '*' else ''
-            ), {'collection': collection})
+                token_clause=token_clause
+            ), search_dict)
         tokens = []
         for token in res:
             templates = _format_templates(token['templates'])
