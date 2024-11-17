@@ -494,15 +494,18 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         session.commit()
 
         removed_tables = session.execute(
-            'SELECT t1.table_name '
-            'FROM tables_with_block_num t1 '
-            'WHERE t1.table_name LIKE \'removed_%\' '
+            'SELECT table_name, \'SELECT \' || array_to_string(ARRAY(SELECT \' r\' || \'.\' || c.column_name'
+            'FROM information_schema.columns c '
+            'WHERE table_name = t.table_name AND c.column_name NOT IN(\'removed_seq\', \'removed_block_num\')'
+            '), \',\') || \' FROM \' || t.table_name || \' r\' AS query FROM tables_with_block_num t '
+            'WHERE table_name LIKE \'removed_%\''
         )
 
         for tables in removed_tables:
             session.execute(
-                'INSERT INTO {table_name} FROM {removed_table_name} WHERE block_num >= :block_num'.format(
+                'INSERT INTO {table_name} {query} WHERE block_num >= :block_num'.format(
                     table_name=tables['table_name'].replace('removed_', ''),
+                    query=tables['query'],
                     removed_table_name=tables['table_name']
                 ), {'block_num': block_num}
             )
