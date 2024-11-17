@@ -505,7 +505,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
             session.execute(
                 'INSERT INTO {table_name} {query} WHERE removed_block_num >= :block_num'.format(
                     table_name=tables['table_name'].replace('removed_atomic_', '').replace(
-                        'removed_simplemarket_', '').replace('removed_waxplorercom_', '').replace('removed_', ''),
+                        'removed_atomicmarket_auctions', 'auctions').replace('removed_simplemarket_', '').replace(
+                        'removed_waxplorercom_', '').replace('removed_', ''),
                     query=tables['query'],
                     removed_table_name=tables['table_name']
                 ), {'block_num': block_num}
