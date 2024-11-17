@@ -494,7 +494,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         session.commit()
 
         removed_tables = session.execute(
-            'SELECT table_name, \'SELECT \' || array_to_string(ARRAY(SELECT \' r\' || \'.\' || c.column_name'
+            'SELECT table_name, \'SELECT \' || array_to_string(ARRAY(SELECT \' r\' || \'.\' || c.column_name '
             'FROM information_schema.columns c '
             'WHERE table_name = t.table_name AND c.column_name NOT IN(\'removed_seq\', \'removed_block_num\')'
             '), \',\') || \' FROM \' || t.table_name || \' r\' AS query FROM tables_with_block_num t '
