@@ -9,9 +9,6 @@ from api import cache
 from api import executor
 from api import db
 
-import time
-import requests
-
 DATE_FORMAT_STRING = "%Y-%m-%d %H:%M:%S"
 DATE_FROM_STRING_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
 DATE_FROM_STRING_SPLIT_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -1397,12 +1394,12 @@ def assets(
                     search_clause += ' AND a.asset_id = max_mint'
             else:
                 search_clause += ' AND a.owner = :owner '
-        if order_by == 'rarity_score' and search_type == 'pfps':
+        if order_by == 'rarity_score' and only == 'pfps':
             order_clause = 'ORDER BY p.collection, p.schema, p.rarity_score {}'.format(order_dir)
         elif order_by == 'rarity_score':
             order_clause = 'ORDER BY a.collection, a.schema, p.rarity_score {}'.format(order_dir)
             search_clause += ' AND p.rarity_score IS NOT NULL '
-        elif order_by == 'date' and search_type == 'staked':
+        elif order_by == 'date' and only == 'staked':
             order_clause = 'ORDER BY s.seq {}'.format(order_dir)
         elif order_by == 'date':
             order_clause = 'ORDER BY a.seq {}'.format(order_dir)

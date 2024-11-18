@@ -73,80 +73,6 @@ def add_trend(res):
 
 
 @cache.memoize(timeout=300)
-def get_collection_tokens(collection):
-    session = create_session()
-    try:
-        sql = (
-            'SELECT symbol, contract, ti,image AS token_image, collection_name, c.image as collection_image, '
-            'c.name AS display_name, '
-            'volume_1_day AS volume_1_day, '
-            'usd_volume_2_days - usd_volume_1_day AS prev_usd_volume, '
-            'volume_2_days - volume_1_day AS prev_volume, '
-            'volume_1_day, usd_volume_1_day, '
-            'volume_2_days, usd_volume_2_days, '
-            'volume_3_days, usd_volume_3_days, '
-            'volume_7_days, usd_volume_7_days, '
-            'wax_price, usd_price, wax_price_prev, usd_price_prev '
-            'FROM token_collection_mapping s '
-            'LEFT JOIN token_volumes_s USING (symbol, contract) '
-            'LEFT JOIN token_prices_mv USING (symbol, contract) '
-            'LEFT JOIN collections c USING (collection_name) '
-            'WHERE collection_name = :collection '
-        )
-
-        token_results = session.execute(
-            sql, {
-                'collection': collection
-            }
-        )
-
-        tokens = []
-
-        for token in token_results:
-            tokens.append(
-                {
-                    'collection': {
-                        'name': token.collection_name,
-                        'image': token.collection_image,
-                        'displayName': token.display_name,
-                    },
-                    'token': {
-                        'contract': token.contract,
-                        'symbol': token.symbol,
-                        'image': token.token_image,
-                    },
-                    'stats': {
-                        'usdVolume1Day': float(token.usd_volume_1_day if token.usd_volume_1_day else 0),
-                        'volume1Day': float(token.volume_1_day if token.volume_1_day else 0),
-                        'usdVolume1DayPrev': float(token.prev_usd_volume if token.prev_usd_volume else 0),
-                        'volume1DayPrev': float(token.prev_volume if token.prev_volume else 0),
-                        'usdVolume2Days': float(token.usd_volume_2_days if token.usd_volume_2_days else 0),
-                        'volume2Days': float(token.volume_2_days if token.volume_2_days else 0),
-                        'usdVolume3Days': float(token.usd_volume_3_days if token.usd_volume_3_days else 0),
-                        'volume3Days': float(token.volume_3_days if token.volume_3_days else 0),
-                        'usdVolume7Days': float(token.usd_volume_7_days if token.usd_volume_7_days else 0),
-                        'volume7Days': float(token.volume_7_days if token.volume_7_days else 0),
-                        'waxPrice': float(token.wax_price if token.wax_price else 0),
-                        'usdPrice': float(token.usd_price if token.usd_price else 0),
-                        'usdChange': float(
-                            ((token.usd_price - token.usd_price_prev) / token.usd_price_prev)
-                            if token.usd_price and token.usd_price_prev else 0),
-                        'change': float(
-                            ((token.wax_price - token.wax_price_prev) / token.wax_price_prev)
-                            if token.wax_price and token.wax_price_prev else 0),
-                    }
-                }
-            )
-
-        return tokens
-    except SQLAlchemyError as e:
-        logging.error(e)
-        session.rollback()
-    finally:
-        session.remove()
-
-
-@cache.memoize(timeout=300)
 def user_stats(user):
     session = create_session()
     try:
@@ -248,7 +174,7 @@ def get_user_info(user):
             return {
                 'name': 'Error',
                 'image': 'Error',
-                'value': 'Error',
+                'waxValue': 'Error',
                 'usdValue': 'Error',
                 'numAssets': 'Error'
             }
@@ -504,12 +430,12 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
             }
         )
 
-        dates = _create_empty_chart('volume', int(days), 'usdVolume', 'sales')
+        dates = _create_empty_chart('waxVolume', int(days), 'usdVolume', 'sales')
         for item in sales_volume:
             date = item['date'].strftime("%Y-%m-%d")
             for date_item in dates:
                 if date_item['date'] == date:
-                    date_item['volume'] = float(item['volume'])
+                    date_item['waxVolume'] = float(item['waxVolume'])
                     date_item['usdVolume'] = float(item['usd_volume'])
                     date_item['sales'] = int(item['sales'])
 
@@ -639,7 +565,7 @@ def get_drops_table(days, limit, offset):
                     },
                     'stats': {
                         'days': days,
-                        'volume': float(drop.wax_volume if drop.wax_volume else 0),
+                        'waxVolume': float(drop.wax_volume if drop.wax_volume else 0),
                         'usdVolume': float(drop.usd_volume if drop.usd_volume else 0),
                         'buyers': int(drop.buyers),
                         'claims': int(drop.claims),
@@ -1451,98 +1377,6 @@ def get_top_sales_table(days, collection, limit, offset):
 
 
 @cache.memoize(timeout=300)
-def get_token_table(days, term):
-    session = create_session()
-    try:
-        volume_column = 'volume_1_day'
-        usd_volume_column = 'usd_volume_1_day'
-        days_queried = 1
-
-        search_clause = ''
-        if term:
-            search_clause = (
-                ' HAVING ('
-                'collection_name ilike :term '
-                'OR display_name ilike :term '
-                'OR symbol ilike :term '
-                'OR contract ilike :term) '
-            )
-
-        if days and int(days) > 1 and int(days) in [2, 3, 7]:
-            days_queried = int(days)
-            volume_column = 'volume_{}_days'.format(days)
-            usd_volume_column = 'usd_volume_{}_days'.format(days)
-
-        sql = (
-            'SELECT * '
-            'FROM (SELECT symbol, contract, ti.image AS token_image, c.collection_name, c.image AS collection_image, '
-            'c.name AS display_name, wax_price, usd_price, wax_price_prev, usd_price_prev, '
-            'SUM({volume_column}) as volume, SUM({usd_volume_column}) AS usd_volume, '
-            'SUM(volume_1_day) AS volume_1_day, '
-            'SUM(volume_2_days) - SUM(volume_1_day) AS prev_usd_volume, '
-            'ROW_NUMBER() OVER (ORDER BY SUM({volume_column}) DESC) AS rank '
-            'FROM token_volumes_s s '
-            'LEFT JOIN token_images ti USING (symbol, contract) '
-            'LEFT JOIN token_prices_mv USING (symbol, contract) '
-            'LEFT JOIN token_collection_mapping USING (symbol, contract) '
-            'LEFT JOIN collections c USING (collection_name) '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10) f '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 {search_clause} ORDER BY volume DESC ' 
-            ''.format(
-                search_clause=search_clause, volume_column=volume_column, usd_volume_column=usd_volume_column
-            )
-        )
-
-        token_results = session.execute(
-            sql, {
-                'term': '%{}%'.format(term.lower()) if term else ''
-            }
-        )
-
-        tokens = []
-
-        index = 0
-        for token in token_results:
-            index += 1
-            tokens.append(
-                {
-                    'rank': token.rank,
-                    'total': token_results.rowcount,
-                    'collection': {
-                        'name': token.collection_name,
-                        'image': token.collection_image,
-                        'displayName': token.display_name,
-                    },
-                    'token': {
-                        'contract': token.contract,
-                        'symbol': token.symbol,
-                        'image': token.token_image,
-                    },
-                    'stats': {
-                        'days': days_queried,
-                        'usdVolume': float(token.usd_volume if token.usd_volume else 0),
-                        'volume': float(token.volume if token.volume else 0),
-                        'waxPrice': float(token.wax_price if token.wax_price else 0),
-                        'usdPrice': float(token.usd_price if token.usd_price else 0),
-                        'usdChange': float(
-                            ((token.usd_price - token.usd_price_prev) / token.usd_price_prev)
-                            if token.usd_price and token.usd_price_prev else 0),
-                        'change': float(
-                            ((token.wax_price - token.wax_price_prev) / token.wax_price_prev)
-                            if token.wax_price and token.wax_price_prev else 0),
-                    }
-                }
-            )
-
-        return tokens
-    except SQLAlchemyError as e:
-        logging.error(e)
-        session.rollback()
-    finally:
-        session.remove()
-
-
-@cache.memoize(timeout=300)
 def get_market_table(days, collection, type):
     session = create_session()
     try:
@@ -1691,8 +1525,8 @@ def get_collection_volume_graph(days, topx, type, collection):
         top_x_collections = tuple(collections.keys())
 
         volumes = {
-            'combined': {'name': 'Combined', 'graph': _create_empty_chart('volume', int(days), 'usdVolume')},
-            'others': {'name': 'Other', 'graph': _create_empty_chart('volume', int(days), 'usdVolume')}
+            'combined': {'name': 'Combined', 'graph': _create_empty_chart('waxVolume', int(days), 'usdVolume')},
+            'others': {'name': 'Other', 'graph': _create_empty_chart('waxVolume', int(days), 'usdVolume')}
         }
 
         if len(top_x_collections) == 0:
@@ -1720,7 +1554,7 @@ def get_collection_volume_graph(days, topx, type, collection):
         for collection in top_x_collections:
             volumes[collection] = {
                 'name': collections[collection]['name'],
-                'graph': _create_empty_chart('volume', int(days), 'usdVolume')
+                'graph': _create_empty_chart('waxVolume', int(days), 'usdVolume')
             }
 
         date_list = _create_date_list(int(days))

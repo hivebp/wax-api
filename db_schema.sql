@@ -2664,6 +2664,23 @@ CREATE TABLE public.drop_limit_updates_reversed (
 ALTER TABLE public.drop_limit_updates_reversed OWNER TO postgres;
 
 --
+-- Name: drop_log_prices; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.drop_log_prices (
+    drop_id integer,
+    contract character varying(13),
+    prices json,
+    currencies character varying(12)[],
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.drop_log_prices OWNER TO postgres;
+
+--
 -- Name: drop_max_updates; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -2738,6 +2755,24 @@ CREATE TABLE public.drop_price_updates_reversed (
 
 
 ALTER TABLE public.drop_price_updates_reversed OWNER TO postgres;
+
+--
+-- Name: drop_prices_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.drop_prices_mv AS
+ SELECT lp.drop_id,
+    lp.contract,
+    lp.prices,
+    lp.currencies
+   FROM public.drop_log_prices lp
+  WHERE (lp.seq = ( SELECT max(drop_log_prices.seq) AS max
+           FROM public.drop_log_prices
+          WHERE ((drop_log_prices.drop_id = lp.drop_id) AND ((drop_log_prices.contract)::text = (lp.contract)::text))))
+  WITH NO DATA;
+
+
+ALTER TABLE public.drop_prices_mv OWNER TO postgres;
 
 --
 -- Name: drop_times_updates; Type: TABLE; Schema: public; Owner: postgres
@@ -3074,25 +3109,6 @@ ALTER SEQUENCE public.images_image_id_seq OWNED BY public.images.image_id;
 
 
 --
--- Name: listing_prices_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.listing_prices_mv AS
- SELECT a1.sale_id,
-        CASE
-            WHEN ((a1.currency)::text = 'WAX'::text) THEN a1.price
-            ELSE (a1.price / ( SELECT usd_prices.usd
-               FROM public.usd_prices
-              ORDER BY usd_prices."timestamp" DESC
-             LIMIT 1))
-        END AS price
-   FROM public.listings a1
-  WITH NO DATA;
-
-
-ALTER TABLE public.listing_prices_mv OWNER TO postgres;
-
---
 -- Name: listings_floor_breakdown_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -3110,6 +3126,18 @@ CREATE MATERIALIZED VIEW public.listings_floor_breakdown_mv AS
 
 
 ALTER TABLE public.listings_floor_breakdown_mv OWNER TO postgres;
+
+--
+-- Name: names; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.names (
+    name_id integer NOT NULL,
+    name character varying(256)
+);
+
+
+ALTER TABLE public.names OWNER TO postgres;
 
 --
 -- Name: pfp_assets; Type: TABLE; Schema: public; Owner: postgres
@@ -3153,13 +3181,15 @@ ALTER TABLE public.template_floor_prices_mv OWNER TO postgres;
 CREATE MATERIALIZED VIEW public.listings_helper_mv AS
  SELECT l.sale_id,
     a.mint,
+    n.name,
     p.rarity_score,
     p.rank,
     a.template_id,
     a.schema,
     f.floor_price
-   FROM (((public.listings l
+   FROM ((((public.listings l
      JOIN public.assets a ON ((a.asset_id = l.asset_ids[1])))
+     LEFT JOIN public.names n USING (name_id))
      LEFT JOIN public.pfp_assets p USING (asset_id))
      LEFT JOIN public.template_floor_prices_mv f ON ((f.template_id = a.template_id)))
   WITH NO DATA;
@@ -3925,18 +3955,6 @@ CREATE MATERIALIZED VIEW public.monthly_collection_volume_mv AS
 ALTER TABLE public.monthly_collection_volume_mv OWNER TO postgres;
 
 --
--- Name: names; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.names (
-    name_id integer NOT NULL,
-    name character varying(256)
-);
-
-
-ALTER TABLE public.names OWNER TO postgres;
-
---
 -- Name: names_name_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -4133,6 +4151,38 @@ CREATE TABLE public.packs (
 
 
 ALTER TABLE public.packs OWNER TO postgres;
+
+--
+-- Name: personal_blacklist_actions_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.personal_blacklist_actions_mv AS
+ SELECT account_value_actions.seq,
+    account_value_actions.account,
+    account_value_actions.action_name,
+    unnest(account_value_actions."values") AS collection
+   FROM public.account_value_actions
+  WHERE (((account_value_actions.list_name)::text = 'col.blist'::text) AND ((account_value_actions.account)::text <> 'atomhubtools'::text))
+  WITH NO DATA;
+
+
+ALTER TABLE public.personal_blacklist_actions_mv OWNER TO postgres;
+
+--
+-- Name: personal_blacklist_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.personal_blacklist_mv AS
+ SELECT pb.account,
+    pb.collection
+   FROM public.personal_blacklist_actions_mv pb
+  WHERE (((pb.action_name)::text = 'addaccvalues'::text) AND (pb.seq = ( SELECT max(personal_blacklist_actions_mv.seq) AS max
+           FROM public.personal_blacklist_actions_mv
+          WHERE (((personal_blacklist_actions_mv.account)::text = (pb.account)::text) AND ((personal_blacklist_actions_mv.collection)::text = (pb.collection)::text)))))
+  WITH NO DATA;
+
+
+ALTER TABLE public.personal_blacklist_mv OWNER TO postgres;
 
 --
 -- Name: pfp_attribute_blacklist; Type: TABLE; Schema: public; Owner: postgres
@@ -4659,6 +4709,52 @@ CREATE TABLE public.removed_pools (
 ALTER TABLE public.removed_pools OWNER TO postgres;
 
 --
+-- Name: removed_rwax_tokenizations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.removed_rwax_tokenizations (
+    asset_id bigint,
+    tokenizer character varying(13),
+    symbol character varying(12),
+    contract character varying(13),
+    amount double precision,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    removed_seq bigint,
+    removed_block_num bigint
+);
+
+
+ALTER TABLE public.removed_rwax_tokenizations OWNER TO postgres;
+
+--
+-- Name: removed_rwax_tokens; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.removed_rwax_tokens (
+    collection character varying(13),
+    symbol character varying(12),
+    contract character varying(13),
+    decimals integer,
+    maximum_supply double precision,
+    template_ids integer[],
+    templates_supply json,
+    trait_factors json,
+    token_name character varying(64),
+    token_logo character varying(256),
+    token_logo_lg character varying(256),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    removed_seq bigint,
+    removed_block_num bigint
+);
+
+
+ALTER TABLE public.removed_rwax_tokens OWNER TO postgres;
+
+--
 -- Name: removed_simplemarket_listings; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4767,6 +4863,22 @@ CREATE TABLE public.rwax_assets (
 ALTER TABLE public.rwax_assets OWNER TO postgres;
 
 --
+-- Name: rwax_erase_tokens; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.rwax_erase_tokens (
+    contract character varying(13),
+    decimals integer,
+    symbol character varying(12),
+    "timestamp" timestamp without time zone,
+    seq bigint,
+    block_num bigint
+);
+
+
+ALTER TABLE public.rwax_erase_tokens OWNER TO postgres;
+
+--
 -- Name: rwax_redemptions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4791,10 +4903,10 @@ ALTER TABLE public.rwax_redemptions OWNER TO postgres;
 CREATE TABLE public.rwax_templates (
     template_id integer NOT NULL,
     collection character varying(13),
+    decimals integer,
     symbol character varying(12),
     contract character varying(13),
     max_assets integer,
-    template_token_supply double precision,
     seq bigint,
     block_num bigint,
     "timestamp" timestamp without time zone
@@ -4832,7 +4944,7 @@ CREATE TABLE public.rwax_tokens (
     decimals integer,
     maximum_supply double precision,
     template_ids integer[],
-    templates json,
+    templates_supply json,
     trait_factors json,
     token_name character varying(64),
     token_logo character varying(256),
@@ -5516,6 +5628,38 @@ CREATE VIEW public.table_sizes AS
 ALTER TABLE public.table_sizes OWNER TO postgres;
 
 --
+-- Name: tag_filter_actions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tag_filter_actions (
+    user_name character varying(13),
+    tag_id integer,
+    action_name character varying(13),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.tag_filter_actions OWNER TO postgres;
+
+--
+-- Name: tag_filters_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.tag_filters_mv AS
+ SELECT t.user_name,
+    t.tag_id
+   FROM public.tag_filter_actions t
+  WHERE (((t.action_name)::text = 'addfilter'::text) AND (t.seq = ( SELECT max(tag_filter_actions.seq) AS max
+           FROM public.tag_filter_actions
+          WHERE (((tag_filter_actions.user_name)::text = (t.user_name)::text) AND (tag_filter_actions.tag_id = t.tag_id)))))
+  WITH NO DATA;
+
+
+ALTER TABLE public.tag_filters_mv OWNER TO postgres;
+
+--
 -- Name: tag_suggestions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5554,69 +5698,77 @@ ALTER SEQUENCE public.tags_tag_id_seq OWNED BY public.tags.tag_id;
 
 
 --
--- Name: templates_collection_sales_by_date_before_2024_mv; Type: TABLE; Schema: public; Owner: postgres
+-- Name: template_collection_sales_by_date_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.templates_collection_sales_by_date_before_2024_mv (
-    collection character varying(13),
-    schema character varying(16),
-    template_id integer,
-    to_date date,
-    wax_volume double precision,
-    usd_volume double precision,
-    buyers bigint,
-    sellers bigint,
-    sales bigint
-);
+CREATE MATERIALIZED VIEW public.template_collection_sales_by_date_before_2024_mv AS
+ SELECT t.collection,
+    t.schema,
+    t.template_id,
+    to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text) AS to_date,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT sales_summary.buyer) AS buyers,
+    count(DISTINCT sales_summary.seller) AS sellers,
+    count(1) AS sales
+   FROM (public.template_sales t
+     LEFT JOIN public.sales_summary USING (seq))
+  WHERE (t."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.collection, t.schema, t.template_id, (to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text))
+  WITH NO DATA;
 
 
-ALTER TABLE public.templates_collection_sales_by_date_before_2024_mv OWNER TO postgres;
+ALTER TABLE public.template_collection_sales_by_date_before_2024_mv OWNER TO postgres;
 
 --
--- Name: templates_collection_sales_by_date_from_2024_mv; Type: TABLE; Schema: public; Owner: postgres
+-- Name: template_collection_sales_by_date_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.templates_collection_sales_by_date_from_2024_mv (
-    collection character varying(13),
-    schema character varying(16),
-    template_id integer,
-    to_date date,
-    wax_volume double precision,
-    usd_volume double precision,
-    buyers bigint,
-    sellers bigint,
-    sales bigint
-);
+CREATE MATERIALIZED VIEW public.template_collection_sales_by_date_from_2024_mv AS
+ SELECT t.collection,
+    t.schema,
+    t.template_id,
+    to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text) AS to_date,
+    sum(t.wax_price) AS wax_volume,
+    sum(t.usd_price) AS usd_volume,
+    count(DISTINCT sales_summary.buyer) AS buyers,
+    count(DISTINCT sales_summary.seller) AS sellers,
+    count(1) AS sales
+   FROM (public.template_sales t
+     LEFT JOIN public.sales_summary USING (seq))
+  WHERE (t."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
+  GROUP BY t.collection, t.schema, t.template_id, (to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text))
+  WITH NO DATA;
 
 
-ALTER TABLE public.templates_collection_sales_by_date_from_2024_mv OWNER TO postgres;
+ALTER TABLE public.template_collection_sales_by_date_from_2024_mv OWNER TO postgres;
 
 --
 -- Name: template_collection_sales_by_date_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.template_collection_sales_by_date_mv AS
- SELECT templates_collection_sales_by_date_from_2024_mv.collection,
-    templates_collection_sales_by_date_from_2024_mv.schema,
-    templates_collection_sales_by_date_from_2024_mv.template_id,
-    templates_collection_sales_by_date_from_2024_mv.to_date,
-    templates_collection_sales_by_date_from_2024_mv.wax_volume,
-    templates_collection_sales_by_date_from_2024_mv.usd_volume,
-    templates_collection_sales_by_date_from_2024_mv.buyers,
-    templates_collection_sales_by_date_from_2024_mv.sellers,
-    templates_collection_sales_by_date_from_2024_mv.sales
-   FROM public.templates_collection_sales_by_date_from_2024_mv
+ SELECT template_collection_sales_by_date_from_2024_mv.collection,
+    template_collection_sales_by_date_from_2024_mv.schema,
+    template_collection_sales_by_date_from_2024_mv.template_id,
+    template_collection_sales_by_date_from_2024_mv.to_date,
+    template_collection_sales_by_date_from_2024_mv.wax_volume,
+    template_collection_sales_by_date_from_2024_mv.usd_volume,
+    template_collection_sales_by_date_from_2024_mv.buyers,
+    template_collection_sales_by_date_from_2024_mv.sellers,
+    template_collection_sales_by_date_from_2024_mv.sales
+   FROM public.template_collection_sales_by_date_from_2024_mv
 UNION ALL
- SELECT templates_collection_sales_by_date_before_2024_mv.collection,
-    templates_collection_sales_by_date_before_2024_mv.schema,
-    templates_collection_sales_by_date_before_2024_mv.template_id,
-    templates_collection_sales_by_date_before_2024_mv.to_date,
-    templates_collection_sales_by_date_before_2024_mv.wax_volume,
-    templates_collection_sales_by_date_before_2024_mv.usd_volume,
-    templates_collection_sales_by_date_before_2024_mv.buyers,
-    templates_collection_sales_by_date_before_2024_mv.sellers,
-    templates_collection_sales_by_date_before_2024_mv.sales
-   FROM public.templates_collection_sales_by_date_before_2024_mv
+ SELECT template_collection_sales_by_date_before_2024_mv.collection,
+    template_collection_sales_by_date_before_2024_mv.schema,
+    template_collection_sales_by_date_before_2024_mv.template_id,
+    template_collection_sales_by_date_before_2024_mv.to_date,
+    template_collection_sales_by_date_before_2024_mv.wax_volume,
+    template_collection_sales_by_date_before_2024_mv.usd_volume,
+    template_collection_sales_by_date_before_2024_mv.buyers,
+    template_collection_sales_by_date_before_2024_mv.sellers,
+    template_collection_sales_by_date_before_2024_mv.sales
+   FROM public.template_collection_sales_by_date_before_2024_mv
   WITH NO DATA;
 
 
@@ -9609,6 +9761,13 @@ CREATE UNIQUE INDEX assets_asset_id_idx ON public.assets USING btree (asset_id);
 
 
 --
+-- Name: assets_asset_id_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assets_asset_id_idx1 ON public.assets USING btree (asset_id) WHERE (mint IS NULL);
+
+
+--
 -- Name: assets_asset_id_schema_attribute_ids_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -9637,6 +9796,13 @@ CREATE INDEX assets_collection_idx ON public.assets USING btree (collection);
 
 
 --
+-- Name: assets_collection_name_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assets_collection_name_id_idx ON public.assets USING btree (collection, name_id);
+
+
+--
 -- Name: assets_collection_schema_attribute_ids_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -9644,10 +9810,31 @@ CREATE INDEX assets_collection_schema_attribute_ids_idx ON public.assets USING b
 
 
 --
+-- Name: assets_collection_schema_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assets_collection_schema_idx ON public.assets USING btree (collection, schema);
+
+
+--
 -- Name: assets_collection_schema_name_id_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX assets_collection_schema_name_id_idx ON public.assets USING btree (collection, schema, name_id);
+
+
+--
+-- Name: assets_collection_schema_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assets_collection_schema_seq_idx ON public.assets USING btree (collection, schema, seq DESC);
+
+
+--
+-- Name: assets_collection_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assets_collection_seq_idx ON public.assets USING btree (collection, seq DESC);
 
 
 --
@@ -9662,6 +9849,13 @@ CREATE INDEX assets_image_id_idx ON public.assets USING btree (image_id) WHERE (
 --
 
 CREATE INDEX assets_mint_idx ON public.assets USING btree (mint);
+
+
+--
+-- Name: assets_name_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX assets_name_id_idx ON public.assets USING btree (name_id);
 
 
 --
@@ -11100,6 +11294,27 @@ CREATE INDEX drop_limit_updates_seq_idx ON public.drop_limit_updates USING btree
 
 
 --
+-- Name: drop_log_prices_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX drop_log_prices_block_num_idx ON public.drop_log_prices USING btree (block_num);
+
+
+--
+-- Name: drop_log_prices_drop_id_contract_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX drop_log_prices_drop_id_contract_seq_idx ON public.drop_log_prices USING btree (drop_id, contract, seq DESC);
+
+
+--
+-- Name: drop_log_prices_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX drop_log_prices_seq_idx ON public.drop_log_prices USING btree (seq DESC);
+
+
+--
 -- Name: drop_max_updates_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -11160,6 +11375,13 @@ CREATE INDEX drop_price_updates_reversed_seq_idx ON public.drop_price_updates_re
 --
 
 CREATE INDEX drop_price_updates_seq_idx ON public.drop_price_updates USING btree (seq DESC);
+
+
+--
+-- Name: drop_prices_mv_drop_id_contract_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX drop_prices_mv_drop_id_contract_idx ON public.drop_prices_mv USING btree (drop_id, contract);
 
 
 --
@@ -11247,10 +11469,59 @@ CREATE INDEX favorites_seq_idx ON public.favorites USING btree (seq DESC);
 
 
 --
+-- Name: favorites_user_name_asset_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX favorites_user_name_asset_id_idx ON public.favorites USING btree (user_name, asset_id);
+
+
+--
+-- Name: favorites_user_name_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX favorites_user_name_idx ON public.favorites USING btree (user_name);
+
+
+--
+-- Name: favorites_user_name_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX favorites_user_name_template_id_idx ON public.favorites USING btree (user_name, template_id);
+
+
+--
 -- Name: floor_prices_by_date_template_id_floor_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX floor_prices_by_date_template_id_floor_date_idx ON public.floor_prices_by_date USING btree (template_id, floor_date DESC);
+
+
+--
+-- Name: floor_prices_mv_floor_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX floor_prices_mv_floor_price_idx ON public.floor_prices_mv USING btree (floor_price);
+
+
+--
+-- Name: floor_prices_mv_floor_price_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX floor_prices_mv_floor_price_idx1 ON public.floor_prices_mv USING btree (floor_price DESC);
+
+
+--
+-- Name: floor_prices_mv_template_id_floor_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX floor_prices_mv_template_id_floor_price_idx ON public.floor_prices_mv USING btree (template_id, floor_price DESC);
+
+
+--
+-- Name: floor_prices_mv_template_id_floor_price_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX floor_prices_mv_template_id_floor_price_idx1 ON public.floor_prices_mv USING btree (template_id, floor_price);
 
 
 --
@@ -11314,13 +11585,6 @@ CREATE INDEX handle_fork_block_num_idx ON public.handle_fork USING btree (block_
 --
 
 CREATE UNIQUE INDEX images_image_idx ON public.images USING btree (image);
-
-
---
--- Name: listing_prices_mv_sale_id_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX listing_prices_mv_sale_id_idx ON public.listing_prices_mv USING btree (sale_id);
 
 
 --
@@ -11401,10 +11665,31 @@ CREATE UNIQUE INDEX listings_floor_breakdown_mv_collection_schema_template_id_a_
 
 
 --
+-- Name: listings_helper_mv_mint_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX listings_helper_mv_mint_idx ON public.listings_helper_mv USING btree (mint DESC);
+
+
+--
+-- Name: listings_helper_mv_name_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX listings_helper_mv_name_idx ON public.listings_helper_mv USING btree (name);
+
+
+--
 -- Name: listings_helper_mv_sale_id_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX listings_helper_mv_sale_id_idx ON public.listings_helper_mv USING btree (sale_id);
+
+
+--
+-- Name: listings_helper_mv_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX listings_helper_mv_template_id_idx ON public.listings_helper_mv USING btree (template_id);
 
 
 --
@@ -11807,6 +12092,27 @@ CREATE INDEX packs_template_id_idx ON public.packs USING btree (template_id);
 
 
 --
+-- Name: personal_blacklist_actions_mv_account_collection_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX personal_blacklist_actions_mv_account_collection_seq_idx ON public.personal_blacklist_actions_mv USING btree (account, collection, seq DESC);
+
+
+--
+-- Name: personal_blacklist_actions_mv_account_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX personal_blacklist_actions_mv_account_idx ON public.personal_blacklist_actions_mv USING btree (account);
+
+
+--
+-- Name: personal_blacklist_mv_account_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX personal_blacklist_mv_account_collection_idx ON public.personal_blacklist_mv USING btree (account, collection);
+
+
+--
 -- Name: pfp_assets_attribute_ids_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -12003,6 +12309,13 @@ CREATE UNIQUE INDEX recently_sold_week_mv_template_id_idx ON public.recently_sol
 
 
 --
+-- Name: removed_atomic_listings_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_atomic_listings_removed_block_num_idx ON public.removed_atomic_listings USING btree (removed_block_num);
+
+
+--
 -- Name: removed_atomic_listings_removed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -12028,6 +12341,13 @@ CREATE INDEX removed_atomicasset_offers_offer_id_idx ON public.removed_atomicass
 --
 
 CREATE INDEX removed_atomicasset_offers_seq_idx ON public.removed_atomicassets_offers USING btree (seq DESC);
+
+
+--
+-- Name: removed_atomicassets_offers_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_atomicassets_offers_removed_block_num_idx ON public.removed_atomicassets_offers USING btree (removed_block_num);
 
 
 --
@@ -12059,6 +12379,13 @@ CREATE INDEX removed_atomicmarket_buy_offers_buyoffer_id_idx ON public.removed_a
 
 
 --
+-- Name: removed_atomicmarket_buy_offers_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_atomicmarket_buy_offers_removed_block_num_idx ON public.removed_atomicmarket_buy_offers USING btree (removed_block_num);
+
+
+--
 -- Name: removed_atomicmarket_buy_offers_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -12077,6 +12404,13 @@ CREATE INDEX removed_atomicmarket_template_buy_offers_block_num_idx ON public.re
 --
 
 CREATE UNIQUE INDEX removed_atomicmarket_template_buy_offers_buyoffer_id_idx ON public.removed_atomicmarket_template_buy_offers USING btree (buyoffer_id);
+
+
+--
+-- Name: removed_atomicmarket_template_buy_offers_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_atomicmarket_template_buy_offers_removed_block_num_idx ON public.removed_atomicmarket_template_buy_offers USING btree (removed_block_num);
 
 
 --
@@ -12115,6 +12449,13 @@ CREATE INDEX removed_pool_assets_block_num_idx ON public.removed_pool_assets USI
 
 
 --
+-- Name: removed_pool_assets_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_pool_assets_removed_block_num_idx ON public.removed_pool_assets USING btree (removed_block_num);
+
+
+--
 -- Name: removed_pool_assets_removed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -12129,17 +12470,52 @@ CREATE INDEX removed_pool_assets_seq_idx ON public.removed_pool_assets USING btr
 
 
 --
+-- Name: removed_pools_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_pools_removed_block_num_idx ON public.removed_pools USING btree (removed_block_num);
+
+
+--
+-- Name: removed_rwax_tokenizations_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_rwax_tokenizations_removed_block_num_idx ON public.removed_rwax_tokenizations USING btree (removed_block_num);
+
+
+--
+-- Name: removed_rwax_tokenizations_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_rwax_tokenizations_seq_idx ON public.removed_rwax_tokenizations USING btree (seq DESC);
+
+
+--
+-- Name: removed_rwax_tokens_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_rwax_tokens_removed_block_num_idx ON public.removed_rwax_tokens USING btree (removed_block_num);
+
+
+--
+-- Name: removed_rwax_tokens_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_rwax_tokens_seq_idx ON public.removed_rwax_tokens USING btree (seq DESC);
+
+
+--
+-- Name: removed_simplemarket_listings_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_simplemarket_listings_removed_block_num_idx ON public.removed_simplemarket_listings USING btree (removed_block_num);
+
+
+--
 -- Name: removed_simplemarket_listings_removed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX removed_simplemarket_listings_removed_seq_idx ON public.removed_simplemarket_listings USING btree (removed_seq DESC);
-
-
---
--- Name: removed_simplemarket_listings_removed_seq_idx1; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX removed_simplemarket_listings_removed_seq_idx1 ON public.removed_simplemarket_listings USING btree (removed_seq);
 
 
 --
@@ -12150,10 +12526,38 @@ CREATE INDEX removed_simplemarket_listings_sale_id_idx ON public.removed_simplem
 
 
 --
+-- Name: removed_stakes_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_stakes_removed_block_num_idx ON public.removed_stakes USING btree (removed_block_num);
+
+
+--
+-- Name: removed_waxplorercom_listings_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_waxplorercom_listings_removed_block_num_idx ON public.removed_waxplorercom_listings USING btree (removed_block_num);
+
+
+--
 -- Name: removed_waxplorercom_listings_sale_id_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX removed_waxplorercom_listings_sale_id_idx ON public.removed_waxplorercom_listings USING btree (sale_id);
+
+
+--
+-- Name: removed_wuffi_airdrops_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_wuffi_airdrops_removed_block_num_idx ON public.removed_wuffi_airdrops USING btree (removed_block_num);
+
+
+--
+-- Name: rwax_redemptions_asset_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_redemptions_asset_id_idx ON public.rwax_redemptions USING btree (asset_id);
 
 
 --
@@ -12164,6 +12568,13 @@ CREATE INDEX rwax_redemptions_block_num_idx ON public.rwax_redemptions USING btr
 
 
 --
+-- Name: rwax_redemptions_contract_symbol_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_redemptions_contract_symbol_idx ON public.rwax_redemptions USING btree (contract, symbol);
+
+
+--
 -- Name: rwax_redemptions_seq_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -12171,10 +12582,45 @@ CREATE INDEX rwax_redemptions_seq_idx ON public.rwax_redemptions USING btree (se
 
 
 --
+-- Name: rwax_templates_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_templates_block_num_idx ON public.rwax_templates USING btree (block_num);
+
+
+--
+-- Name: rwax_templates_contract_symbol_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_templates_contract_symbol_idx ON public.rwax_templates USING btree (contract, symbol);
+
+
+--
+-- Name: rwax_templates_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_templates_seq_idx ON public.rwax_templates USING btree (seq DESC);
+
+
+--
+-- Name: rwax_tokenizations_asset_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_tokenizations_asset_id_idx ON public.rwax_tokenizations USING btree (asset_id);
+
+
+--
 -- Name: rwax_tokenizations_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX rwax_tokenizations_block_num_idx ON public.rwax_tokenizations USING btree (block_num);
+
+
+--
+-- Name: rwax_tokenizations_contract_symbol_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_tokenizations_contract_symbol_idx ON public.rwax_tokenizations USING btree (contract, symbol);
 
 
 --
@@ -12189,6 +12635,13 @@ CREATE INDEX rwax_tokenizations_seq_idx ON public.rwax_tokenizations USING btree
 --
 
 CREATE INDEX rwax_tokens_block_num_idx ON public.rwax_tokens USING btree (block_num);
+
+
+--
+-- Name: rwax_tokens_contract_symbol_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rwax_tokens_contract_symbol_idx ON public.rwax_tokens USING btree (contract, symbol);
 
 
 --
@@ -12245,6 +12698,13 @@ CREATE UNIQUE INDEX sales_seven_day_chart_mv_collection_type_idx ON public.sales
 --
 
 CREATE INDEX sales_summary_block_num_idx ON public.sales_summary USING btree (block_num);
+
+
+--
+-- Name: sales_summary_buyer_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sales_summary_buyer_idx ON public.sales_summary USING btree (buyer);
 
 
 --
@@ -12605,6 +13065,34 @@ CREATE INDEX stakes_seq_idx ON public.stakes USING btree (seq DESC);
 
 
 --
+-- Name: tag_filter_actions_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX tag_filter_actions_block_num_idx ON public.tag_filter_actions USING btree (block_num);
+
+
+--
+-- Name: tag_filter_actions_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX tag_filter_actions_seq_idx ON public.tag_filter_actions USING btree (seq DESC);
+
+
+--
+-- Name: tag_filter_actions_user_name_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX tag_filter_actions_user_name_seq_idx ON public.tag_filter_actions USING btree (user_name, seq DESC);
+
+
+--
+-- Name: tag_filters_mv_user_name_tag_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX tag_filters_mv_user_name_tag_id_idx ON public.tag_filters_mv USING btree (user_name, tag_id);
+
+
+--
 -- Name: tag_updates_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -12626,17 +13114,38 @@ CREATE UNIQUE INDEX tags_mv_collection_tag_id_idx ON public.tags_mv USING btree 
 
 
 --
--- Name: template_collection_sales_by__collection_schema_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: template_collection_sales_by_date_befor_template_id_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX template_collection_sales_by__collection_schema_template_id_idx ON public.template_collection_sales_by_date_mv USING btree (collection, schema, template_id, to_date);
+CREATE UNIQUE INDEX template_collection_sales_by_date_befor_template_id_to_date_idx ON public.template_collection_sales_by_date_before_2024_mv USING btree (template_id, to_date DESC);
+
+
+--
+-- Name: template_collection_sales_by_date_from__template_id_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX template_collection_sales_by_date_from__template_id_to_date_idx ON public.template_collection_sales_by_date_from_2024_mv USING btree (template_id, to_date DESC);
 
 
 --
 -- Name: template_collection_sales_by_date_mv_template_id_to_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX template_collection_sales_by_date_mv_template_id_to_date_idx ON public.template_collection_sales_by_date_mv USING btree (template_id, to_date DESC);
+CREATE UNIQUE INDEX template_collection_sales_by_date_mv_template_id_to_date_idx ON public.template_collection_sales_by_date_mv USING btree (template_id, to_date DESC);
+
+
+--
+-- Name: template_floor_prices_mv_floor_price_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_floor_prices_mv_floor_price_idx ON public.template_floor_prices_mv USING btree (floor_price);
+
+
+--
+-- Name: template_floor_prices_mv_floor_price_idx1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_floor_prices_mv_floor_price_idx1 ON public.template_floor_prices_mv USING btree (floor_price DESC);
 
 
 --
@@ -12721,20 +13230,6 @@ CREATE INDEX templates_block_num_idx ON public.templates USING btree (block_num)
 --
 
 CREATE INDEX templates_collection_idx ON public.templates USING btree (collection);
-
-
---
--- Name: templates_collection_sales_by_collection_schema_template_i_idx1; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX templates_collection_sales_by_collection_schema_template_i_idx1 ON public.templates_collection_sales_by_date_from_2024_mv USING btree (collection, schema, template_id, to_date);
-
-
---
--- Name: templates_collection_sales_by_collection_schema_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX templates_collection_sales_by_collection_schema_template_id_idx ON public.templates_collection_sales_by_date_before_2024_mv USING btree (collection, schema, template_id, to_date);
 
 
 --

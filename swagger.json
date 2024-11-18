@@ -1,0 +1,3558 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "WAX marketcap",
+    "description" : "General usage statistics of the WAX Blockchain. Provided with pride by Hive Digital UG",
+    "version" : "v2"
+  },
+  "servers" : [ {
+    "url" : "https://wax-api.hivebp.io"
+  } ],
+  "paths" : {
+    "/v3/top-sales" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the all time top sales on the WAX blockchain",
+        "parameters" : [ {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "All-time metrics of sales that happened on the WAX blockchain, ordered by price (descending).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "rank" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "assets" : {
+                        "type" : "array",
+                        "items" : {
+                          "$ref" : "#/components/schemas/stats_asset_v3"
+                        }
+                      },
+                      "days" : {
+                        "type" : "integer"
+                      },
+                      "price" : {
+                        "type" : "number"
+                      },
+                      "usdPrice" : {
+                        "type" : "number"
+                      },
+                      "buyer" : {
+                        "type" : "string"
+                      },
+                      "seller" : {
+                        "type" : "string"
+                      },
+                      "tx" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-sales/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the top sales on the WAX blockchain in the last x days",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Metrics of sales that happened in the last x days on the WAX blockchain, ordered by price (descending).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "rank" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "assets" : {
+                        "type" : "array",
+                        "items" : {
+                          "$ref" : "#/components/schemas/stats_asset_v3"
+                        }
+                      },
+                      "days" : {
+                        "type" : "integer"
+                      },
+                      "price" : {
+                        "type" : "number"
+                      },
+                      "usdPrice" : {
+                        "type" : "number"
+                      },
+                      "buyer" : {
+                        "type" : "string"
+                      },
+                      "seller" : {
+                        "type" : "string"
+                      },
+                      "tx" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-sales/{days}/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the top sales from a specific author on the WAX blockchain in the last x days",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The sale's author to fetch data for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Metrics of sales by the given author that happened in the last x days on the WAX blockchain, ordered by price (descending).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "rank" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "assets" : {
+                        "type" : "array",
+                        "items" : {
+                          "$ref" : "#/components/schemas/stats_asset_v3"
+                        }
+                      },
+                      "days" : {
+                        "type" : "integer"
+                      },
+                      "price" : {
+                        "type" : "number"
+                      },
+                      "usdPrice" : {
+                        "type" : "number"
+                      },
+                      "buyer" : {
+                        "type" : "string"
+                      },
+                      "seller" : {
+                        "type" : "string"
+                      },
+                      "tx" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-collections/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get sales metrics for all collections for the last x days, including the trend data for the last seven days, filtered by type.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "sales", "drops", "primary" ]
+          },
+          "example" : "sales",
+          "description" : "The type to filter by"
+        }, {
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "alien",
+          "description" : "A term to filter by / search for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Sales metrics for the last x days, as well as trend data for the last seven days for each collection, filtered by type.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "rank" : {
+                        "type" : "integer"
+                      },
+                      "total" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "stats" : {
+                        "$ref" : "#/components/schemas/stats_v3"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/volume/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Returns the total sales volume (amount and price) on the WAX blockchain from the last x days.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The total sales volume (amount and price) on the WAX blockchain from the last x days.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "waxVolume" : {
+                      "type" : "number"
+                    },
+                    "volumeChange" : {
+                      "type" : "number"
+                    },
+                    "usdVolume" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/volume/{days}/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Returns the total sales volume (amount and price) on the WAX blockchain from the last x days for a given collection.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The total sales volume (amount and price) on the WAX blockchain from the last x days for a given collection.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "usdVolume" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/num-assets" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the total number of assets on the WAX blockchain.",
+        "responses" : {
+          "200" : {
+            "description" : "The total number of assets on the WAX blockchain.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "numberOfAssets" : {
+                      "type" : "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/num-assets/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the total number of assets from a given collection on the WAX blockchain.",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The total number of assets from a given collection on the WAX blockchain.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "numberOfAssets" : {
+                      "type" : "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/marketcap" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the total marketcap on the WAX blockchain.",
+        "responses" : {
+          "200" : {
+            "description" : "The total marketcap on the WAX blockchain.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "marketCap" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/marketcap/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the marketcap of a given collection on the WAX blockchain.",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The total marketcap of a given collection on the WAX blockchain.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "marketCap" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/change" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the change in volume in the last 24 hours.",
+        "responses" : {
+          "200" : {
+            "description" : "The change in volume in the last 24 hours.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "volumeChange" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/change/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the change in volume in the last 24 hours.",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The change in volume in the last 24 hours.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "volumeChange" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/sales-volume-graph" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get volume and sales data over time.",
+        "responses" : {
+          "200" : {
+            "description" : "The volume and sales data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "waxVolume" : {
+                        "type" : "number"
+                      },
+                      "sales" : {
+                        "type" : "integer"
+                      },
+                      "date" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/sales-volume-graph/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get volume and sales data over time.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The volume and sales data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "waxVolume" : {
+                        "type" : "number"
+                      },
+                      "sales" : {
+                        "type" : "integer"
+                      },
+                      "date" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/sales-volume-graph/{days}/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get volume and sales data over time.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 7,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The volume and sales data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "waxVolume" : {
+                        "type" : "number"
+                      },
+                      "sales" : {
+                        "type" : "integer"
+                      },
+                      "date" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/template-sales-volume-graph/{template_id}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get volume and sales data over time.",
+        "parameters" : [ {
+          "name" : "template_id",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 281664,
+          "description" : "The template_id to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The volume and sales data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "waxVolume" : {
+                        "type" : "number"
+                      },
+                      "sales" : {
+                        "type" : "integer"
+                      },
+                      "date" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/template-sales-volume-graph/{template_id}/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get volume and sales data over time.",
+        "parameters" : [ {
+          "name" : "template_id",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 281664,
+          "description" : "The template_id to fetch data for"
+        }, {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 7,
+          "description" : "The amount of days to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The volume and sales data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "waxVolume" : {
+                        "type" : "number"
+                      },
+                      "sales" : {
+                        "type" : "integer"
+                      },
+                      "date" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/collection-volume-graph" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get collection volume data over time.",
+        "responses" : {
+          "200" : {
+            "description" : "The collection volume data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "<identifier>" : {
+                      "type" : "object",
+                      "properties" : {
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "graph" : {
+                          "type" : "array",
+                          "items" : {
+                            "type" : "object",
+                            "properties" : {
+                              "waxVolume" : {
+                                "type" : "number"
+                              },
+                              "date" : {
+                                "type" : "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/collection-volume-graph/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get collection volume data over time.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 7,
+          "description" : "The amount of days to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The collection volume data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "<identifier>" : {
+                      "type" : "object",
+                      "properties" : {
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "graph" : {
+                          "type" : "array",
+                          "items" : {
+                            "type" : "object",
+                            "properties" : {
+                              "waxVolume" : {
+                                "type" : "number"
+                              },
+                              "date" : {
+                                "type" : "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/collection-volume-graph/{days}/{topx}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get collection volume data over time.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 7,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "topx",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 3,
+          "description" : "The amount of top collections to fetch data for, e.g. the \"top3\" collections"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The collection volume data over time.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "<identifier>" : {
+                      "type" : "object",
+                      "properties" : {
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "graph" : {
+                          "type" : "array",
+                          "items" : {
+                            "type" : "object",
+                            "properties" : {
+                              "waxVolume" : {
+                                "type" : "number"
+                              },
+                              "date" : {
+                                "type" : "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/collection-stats/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get general information about a collection",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Statistics about a collection.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "numUsers" : {
+                      "type" : "number"
+                    },
+                    "marketCap" : {
+                      "type" : "number"
+                    },
+                    "numAssets" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-templates/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get sales metrics for all templates for the last x days, including the trend data for the last seven days, filtered by type.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Sales metrics for the last x days, as well as trend data for the last seven days for each collection, filtered by type.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "template" : {
+                        "$ref" : "#/components/schemas/stats_template_v3"
+                      },
+                      "total" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "stats" : {
+                        "$ref" : "#/components/schemas/template_stats_v3"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-templates/{days}/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get sales metrics for the templates of a specified collection for the last x days, including the trend data for the last seven days, filtered by type.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The collection to fetch data for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Sales metrics for the last x days, as well as trend data for the last seven days for each collection, filtered by type.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "template" : {
+                        "$ref" : "#/components/schemas/stats_template_v3"
+                      },
+                      "total" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "stats" : {
+                        "$ref" : "#/components/schemas/template_stats_v3"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-drops/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get top sales metrics for all drops for the last x days.",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Sales metrics for the last x days, as well as trend data for the last seven days for each collection, filtered by type.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "templates" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "properties" : {
+                            "template_id" : {
+                              "type" : "integer"
+                            },
+                            "data" : {
+                              "$ref" : "#/components/schemas/stats_template_v3"
+                            }
+                          }
+                        }
+                      },
+                      "drop" : {
+                        "$ref" : "#/components/schemas/stats_drop_v3"
+                      },
+                      "total" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "stats" : {
+                        "$ref" : "#/components/schemas/drop_stats"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-template-sales/{template_id}/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get top sales data for a specified template for the last x days.",
+        "parameters" : [ {
+          "name" : "template_id",
+          "in" : "path",
+          "schema" : {
+            "type" : "number"
+          },
+          "required" : true,
+          "example" : 316058,
+          "description" : "The template to fetch data for"
+        }, {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "number"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : 0,
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : 20,
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Top sales data for a specified template for the last x days.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "rank" : {
+                        "type" : "integer"
+                      },
+                      "collection" : {
+                        "$ref" : "#/components/schemas/stats_collection_v3"
+                      },
+                      "assets" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "properties" : {
+                            "assetId" : {
+                              "type" : "integer"
+                            },
+                            "name" : {
+                              "type" : "string"
+                            },
+                            "mint" : {
+                              "type" : "integer"
+                            },
+                            "image" : {
+                              "type" : "string"
+                            },
+                            "templateId" : {
+                              "type" : "integer"
+                            }
+                          }
+                        }
+                      },
+                      "days" : {
+                        "type" : "string"
+                      },
+                      "price" : {
+                        "type" : "integer"
+                      },
+                      "usdPrice" : {
+                        "type" : "number"
+                      },
+                      "buyer" : {
+                        "type" : "string"
+                      },
+                      "seller" : {
+                        "type" : "string"
+                      },
+                      "tx" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-users/{days}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the top users on the WAX blockchain in the last x days",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "actor",
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "all", "seller", "buyer" ]
+          },
+          "example" : "",
+          "description" : "The role of the user."
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "all", "primary", "drops", "sales" ]
+          },
+          "example" : "",
+          "description" : "The type of transaction."
+        }, {
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "",
+          "description" : "The usersname to filter to."
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Metrics of sales that happened in the last x days on the WAX blockchain, ordered by price (descending).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "userName" : {
+                        "type" : "string"
+                      },
+                      "image" : {
+                        "type" : "string"
+                      },
+                      "total" : {
+                        "type" : "integer"
+                      },
+                      "stats" : {
+                        "$ref" : "#/components/schemas/user_stats"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/top-users/{days}/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the top sales from a specific author on the WAX blockchain in the last x days",
+        "parameters" : [ {
+          "name" : "days",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 1,
+          "description" : "The amount of days to fetch data for"
+        }, {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The collection to filter data for"
+        }, {
+          "name" : "actor",
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "all", "seller", "buyer" ]
+          },
+          "example" : "",
+          "description" : "The role of the user."
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "all", "primary", "drops", "sales" ]
+          },
+          "example" : "",
+          "description" : "The type of transaction."
+        }, {
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "",
+          "description" : "The usersname to filter to."
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "0",
+          "description" : "Set the result offset (skip the first x results)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "example" : "20",
+          "description" : "Set the maximum number of results"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Metrics of sales that happened in the last x days on the WAX blockchain, ordered by price (descending).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "userName" : {
+                        "type" : "string"
+                      },
+                      "image" : {
+                        "type" : "string"
+                      },
+                      "total" : {
+                        "type" : "integer"
+                      },
+                      "stats" : {
+                        "$ref" : "#/components/schemas/user_stats"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/attribute-analytics/{template_id}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the analytics for the specific attributes of the given template. the WAX blockchain.",
+        "parameters" : [ {
+          "name" : "template_id",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 568704,
+          "description" : "The id of the template to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The analytics for the specific attributes of the given template.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "template" : {
+                      "type" : "object",
+                      "properties" : {
+                        "img" : {
+                          "type" : "string"
+                        },
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "template_id" : {
+                          "type" : "number"
+                        },
+                        "schema" : {
+                          "type" : "string"
+                        },
+                        "<further_template_specific_attributes>" : {
+                          "type" : "string"
+                        }
+                      }
+                    },
+                    "attributes" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "object",
+                        "properties" : {
+                          "foo" : {
+                            "type" : "string"
+                          },
+                          "value" : {
+                            "type" : "string"
+                          },
+                          "total" : {
+                            "type" : "integer"
+                          },
+                          "waxFloor" : {
+                            "type" : "number"
+                          },
+                          "usdFloor" : {
+                            "type" : "number"
+                          }
+                        }
+                      }
+                    },
+                    "collection" : {
+                      "$ref" : "#/components/schemas/stats_collection_v3"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/floor/{template_id}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get the floor value of a given template on the WAX blockchain.",
+        "parameters" : [ {
+          "name" : "template_id",
+          "in" : "path",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : true,
+          "example" : 568704,
+          "description" : "The id of the template to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The analytics for the specific attributes of the given template.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "template" : {
+                      "type" : "object",
+                      "properties" : {
+                        "img" : {
+                          "type" : "string"
+                        },
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "template_id" : {
+                          "type" : "number"
+                        },
+                        "schema" : {
+                          "type" : "string"
+                        },
+                        "<further_template_specific_attributes>" : {
+                          "type" : "string"
+                        }
+                      }
+                    },
+                    "waxFloor" : {
+                      "type" : "number"
+                    },
+                    "usdFloor" : {
+                      "type" : "number"
+                    },
+                    "is1of1" : {
+                      "type" : "boolean"
+                    },
+                    "collection" : {
+                      "$ref" : "#/components/schemas/stats_collection_v3"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/similar-collections/{collection}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get collections that are similar to the given one.",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "metaforce",
+          "description" : "The name of the collection to fetch similar collections for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The change in volume in the last 24 hours.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "properties" : {
+                      "author" : {
+                        "type" : "string"
+                      },
+                      "name" : {
+                        "type" : "string"
+                      },
+                      "image" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/user-info/{user}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get general information about a user",
+        "parameters" : [ {
+          "name" : "user",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "scfay.wam",
+          "description" : "The name of the user to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Simple statistics about a user.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "name" : {
+                      "type" : "string"
+                    },
+                    "image" : {
+                      "type" : "string"
+                    },
+                    "value" : {
+                      "type" : "number"
+                    },
+                    "usdValue" : {
+                      "type" : "number"
+                    },
+                    "numAssets" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/v3/user-stats/{user}" : {
+      "get" : {
+        "tags" : [ "Analytics Data" ],
+        "description" : "Get general information about a user",
+        "parameters" : [ {
+          "name" : "user",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "scfay.wam",
+          "description" : "The name of the user to fetch data for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Statistics about a user.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "name" : {
+                      "type" : "string"
+                    },
+                    "image" : {
+                      "type" : "string"
+                    },
+                    "value" : {
+                      "type" : "number"
+                    },
+                    "usdValue" : {
+                      "type" : "number"
+                    },
+                    "numAssets" : {
+                      "type" : "number"
+                    },
+                    "volumeAllTime" : {
+                      "type" : "number"
+                    },
+                    "usdVolumeAllTime" : {
+                      "type" : "number"
+                    },
+                    "buyVolumeAllTime" : {
+                      "type" : "number"
+                    },
+                    "usdBuyVolumeAllTime" : {
+                      "type" : "number"
+                    },
+                    "sellVolumeAllTime" : {
+                      "type" : "number"
+                    },
+                    "usdSellVolumeAllTime" : {
+                      "type" : "number"
+                    },
+                    "purchasesAllTime" : {
+                      "type" : "number"
+                    },
+                    "salesAllTime" : {
+                      "type" : "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/collections/{collection}" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get general information about a Schema",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "alien.worlds",
+          "description" : "The name of the collection to fetch schemas for"
+        },{
+          "name" : "type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "Drops",
+          "description" : "Type of the collection search: inventory, drops, etc, to get relevant collections"
+        },{
+          "name" : "tag_id",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Tag of the collection (Nostalgia, Comics, Sci-Fi, etc)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "trending",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter by trending collections: Volume raised week over week, over a certain limit"
+        }, {
+          "name" : "market",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "nfthivedrops",
+          "description" : "Filter for collections listed on a certain market"
+        }, {
+          "name" : "owner",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "Filter for collections owned by a certain user"
+        }, {
+          "name" : "pfps_only",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter by PFP collections"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Collections",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type": "array",
+                  "items": {
+                    "type" : "object",
+                    "properties" : {
+                      "collection": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "authorized": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "image": {
+                        "type": "string"
+                      },
+                      "thumbnail": {
+                        "type": "string"
+                      },
+                      "verified": {
+                        "type": "boolean"
+                      },
+                      "blacklisted": {
+                        "type": "boolean"
+                      },
+                      "waxVolume24h": {
+                        "type": "number"
+                      },
+                      "usdVolume24h": {
+                        "type": "number"
+                      },
+                      "waxVolume48h": {
+                        "type": "number"
+                      },
+                      "usdVolume48h": {
+                        "type": "number"
+                      },
+                      "waxVolume7d": {
+                        "type": "number"
+                      },
+                      "usdVolume7d": {
+                        "type": "number"
+                      },
+                      "waxVolume14d": {
+                        "type": "number"
+                      },
+                      "usdVolume14d": {
+                        "type": "number"
+                      },
+                      "waxMarketCap": {
+                        "type": "number"
+                      },
+                      "usdMarketCap": {
+                        "type": "number"
+                      },
+                      "allTimeVolume": {
+                        "type": "number"
+                      },
+                      "allTimeUsdVolume":{
+                        "type": "number"
+                      },
+                      "growth24h": {
+                        "type": "number"
+                      },
+                      "growth7d": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/collections" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get general information about a Schema",
+        "parameters" : [{
+          "name" : "type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "Drops",
+          "description" : "Type of the collection search: inventory, drops, etc, to get relevant collections"
+        },{
+          "name" : "tag_id",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Tag of the collection (Nostalgia, Comics, Sci-Fi, etc)"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "trending",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter by trending collections: Volume raised week over week, over a certain limit"
+        }, {
+          "name" : "market",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "nfthivedrops",
+          "description" : "Filter for collections listed on a certain market"
+        }, {
+          "name" : "owner",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "Filter for collections owned by a certain user"
+        }, {
+          "name" : "pfps_only",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter by PFP collections"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Collections",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type": "array",
+                  "items": {
+                    "type" : "object",
+                    "properties" : {
+                      "collection": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "authorized": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "image": {
+                        "type": "string"
+                      },
+                      "thumbnail": {
+                        "type": "string"
+                      },
+                      "verified": {
+                        "type": "boolean"
+                      },
+                      "blacklisted": {
+                        "type": "boolean"
+                      },
+                      "waxVolume24h": {
+                        "type": "number"
+                      },
+                      "usdVolume24h": {
+                        "type": "number"
+                      },
+                      "waxVolume48h": {
+                        "type": "number"
+                      },
+                      "usdVolume48h": {
+                        "type": "number"
+                      },
+                      "waxVolume7d": {
+                        "type": "number"
+                      },
+                      "usdVolume7d": {
+                        "type": "number"
+                      },
+                      "waxVolume14d": {
+                        "type": "number"
+                      },
+                      "usdVolume14d": {
+                        "type": "number"
+                      },
+                      "waxMarketCap": {
+                        "type": "number"
+                      },
+                      "usdMarketCap": {
+                        "type": "number"
+                      },
+                      "allTimeVolume": {
+                        "type": "number"
+                      },
+                      "allTimeUsdVolume":{
+                        "type": "number"
+                      },
+                      "growth24h": {
+                        "type": "number"
+                      },
+                      "growth7d": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/schemas/{collection}" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get general information about a Schema",
+        "parameters" : [ {
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "alien.worlds",
+          "description" : "The name of the collection to fetch schemas for"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of Schema Data",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type": "array",
+                  "items": {
+                    "type" : "object",
+                    "properties" : {
+                      "schema": {
+                        "type" : "string"
+                      },
+                      "stats" : {
+                        "type" : "object",
+                        "properties": {
+                          "numTemplates": {
+                            "type" : "number"
+                          },
+                          "numAssets": {
+                            "type" : "number"
+                          },
+                          "numBurned": {
+                            "type" : "number"
+                          },
+                          "volumeWAX": {
+                            "type" : "number"
+                          },
+                          "volumeUSD": {
+                            "type" : "number"
+                          }
+                        }
+                      },
+                      "collection": {
+                        "$ref" : "#/components/schemas/collection"
+                      },
+                      "createdAt": {
+                        "type" : "object",
+                        "properties": {
+                          "date": {
+                            "type" : "string"
+                          },
+                          "block": {
+                            "type" : "number"
+                          },
+                          "globalSequence": {
+                            "type" : "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/templates" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get a list of templates",
+        "parameters" : [{
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "asd",
+          "description" : "A user entered search term"
+        }, {
+          "name" : "collection",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "alien.worlds",
+          "description" : "A collection to filter by"
+        }, {
+          "name" : "schema",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "tool.worlds",
+          "description" : "A schema to filter by"
+        }, {
+          "name" : "tags",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "1,2,3",
+          "description" : "A list of tags to filter by"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "recent",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "hour",
+          "description" : "Filter by templates recently sold within the last month, hour, week or day"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "favorites",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter favorited templates by user"
+        }, {
+          "name" : "user",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "User executing the query"
+        }, {
+          "name" : "order_by",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "date_desc",
+          "description" : "What to sort by and in which direction, like date_desc, template_id_asc"
+        }, {
+          "name" : "exact_search",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "When given a search term, search only exactly for the given term"
+        }, {
+          "name" : "search_type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "packs, pfps, rwax",
+          "description" : "Searching for templates that are packs, pfps or rwax compatible"
+        }, {
+          "name" : "attributes",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "rarity:Common,level:5",
+          "description" : "Filter for templates that have attributes like rarity Common and level 5"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Template Data",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items": {
+                    "$ref" : "#/components/schemas/template"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/assets" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get a list of templates",
+        "parameters" : [{
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "asd",
+          "description" : "A user entered search term"
+        }, {
+          "name" : "owner",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "An asset owner to filter by"
+        }, {
+          "name" : "collection",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "alien.worlds",
+          "description" : "A collection to filter by"
+        }, {
+          "name" : "schema",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "tool.worlds",
+          "description" : "A schema to filter by"
+        }, {
+          "name" : "tags",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "1,2,3",
+          "description" : "A list of tags to filter by"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "min_mint",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Minimum mint number of an asset to filter by"
+        }, {
+          "name" : "max_mint",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "10",
+          "description" : "Maximum mint number of an asset to filter by"
+        }, {
+          "name" : "min_average",
+          "in" : "query",
+          "schema" : {
+            "type" : "number"
+          },
+          "required" : false,
+          "example" : "100",
+          "description" : "Minimum average price of an asset to filter by"
+        }, {
+          "name" : "max_average",
+          "in" : "query",
+          "schema" : {
+            "type" : "number"
+          },
+          "required" : false,
+          "example" : "200",
+          "description" : "Maximum average price of an asset to filter by"
+        }, {
+          "name" : "recent",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "hour",
+          "description" : "Filter by templates recently sold within the last month, hour, week or day"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "favorites",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter favorited templates by user"
+        }, {
+          "name" : "backed",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter by backed assets"
+        }, {
+          "name" : "contract",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "atomicassets",
+          "description" : "Filter by asset contract, eg simpleassets or atomicassets"
+        }, {
+          "name" : "user",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "User executing the query"
+        }, {
+          "name" : "order_by",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "date_desc",
+          "description" : "What to sort by and in which direction, like date_desc, template_id_asc"
+        }, {
+          "name" : "exact_search",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "When given a search term, search only exactly for the given term"
+        }, {
+          "name" : "search_type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "assets, duplicates, lowest_mints",
+          "description" : "Define search type, assets (default), duplicates (req. owner), lowest_mints (req.owner)"
+        }, {
+          "name" : "attributes",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "rarity:Common,level:5",
+          "description" : "Filter for assets that have attributes like rarity Common and level 5"
+        }, {
+          "name" : "only",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "packs, pfps, rwax, staked",
+          "description" : "Filter for assets are packs, pfps, rwax supported assets or staked assets"
+        }, {
+          "name" : "rwax_symbol",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "RWAXT",
+          "description" : "Filter by rwax supported assets of a certain token symbol"
+        }, {
+          "name" : "rwax_contract",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "token.rwax",
+          "description" : "Filter by rwax supported assets of a certain token contract"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Template Data",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items": {
+                    "$ref" : "#/components/schemas/asset"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/listings" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get a list of listings",
+        "parameters" : [{
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "asd",
+          "description" : "A user entered search term"
+        }, {
+          "name" : "seller",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "A seller to filter by"
+        }, {
+          "name" : "market",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "atomicmarket",
+          "description" : "A market contract to filter by"
+        }, {
+          "name" : "collection",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "alien.worlds",
+          "description" : "A collection to filter by"
+        }, {
+          "name" : "schema",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "tool.worlds",
+          "description" : "A schema to filter by"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "min_mint",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Minimum mint number of a listed asset to filter by"
+        }, {
+          "name" : "max_mint",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "10",
+          "description" : "Maximum mint number of a listed asset to filter by"
+        }, {
+          "name" : "min_price",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Minimum price to filter by"
+        }, {
+          "name" : "max_price",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "10",
+          "description" : "Maximum price to filter by"
+        }, {
+          "name" : "recent",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "hour",
+          "description" : "Filter by templates recently sold within the last month, hour, week or day"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "favorites",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter favorited templates by user"
+        }, {
+          "name" : "contract",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "atomicassets",
+          "description" : "Filter by asset contract, eg simpleassets or atomicassets"
+        }, {
+          "name" : "user",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "User executing the query"
+        }, {
+          "name" : "order_by",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "date_desc",
+          "description" : "What to sort by and in which direction, like date_desc, price_asc"
+        }, {
+          "name" : "exact_search",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "When given a search term, search only exactly for the given term"
+        }, {
+          "name" : "search_type",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "listings, floor, missing, below_average, ...",
+          "description" : "Define search type, listings (default), floor (eq template floor price), missing (req. owner), below_average"
+        }, {
+          "name" : "attributes",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "rarity:Common,level:5",
+          "description" : "Filter for listings of assets that have attributes like rarity Common and level 5"
+        }, {
+          "name" : "only",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "pfps, rwax, backed",
+          "description" : "Filter for listings of pfps, rwax supported assets or backed assets"
+        }, {
+          "name" : "rwax_symbol",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "RWAXT",
+          "description" : "Filter by rwax supported assets of a certain token symbol"
+        }, {
+          "name" : "rwax_contract",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "token.rwax",
+          "description" : "Filter by rwax supported assets of a certain token contract"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Template Data",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "timestamp":  {
+                        "type": "number"
+                      },
+                      "price":  {
+                        "type": "number"
+                      },
+                      "usdWax":  {
+                        "type": "number"
+                      },
+                      "currency":  {
+                        "type": "string"
+                      },
+                      "market":  {
+                        "type": "string"
+                      },
+                      "maker":  {
+                        "type": "string"
+                      },
+                      "seller":  {
+                        "type": "string"
+                      },
+                      "listingId":  {
+                        "type": "number"
+                      },
+                      "uniqueSaleId":  {
+                        "type": "number"
+                      },
+                      "collection": {
+                        "$ref" : "#/components/schemas/collection"
+                      },
+                      "assets": {
+                        "type" : "array",
+                        "items": {
+                          "$ref" : "#/components/schemas/asset"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "collection": {
+        "type" : "object",
+        "properties" : {
+          "collectionName": {
+            "type" : "string"
+          },
+          "displayName": {
+            "type" : "string"
+          },
+          "collectionImage": {
+            "type" : "string"
+          },
+          "tags": {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "tagId" : {
+                  "type" : "number"
+                },
+                "name" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "badges": {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string"
+                },
+                "level" : {
+                  "type" : "number"
+                },
+                "value" : {
+                  "type" : "string"
+                },
+                "timestamp" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "verification": {
+            "type" : "boolean"
+          }
+        }
+      },
+      "template": {
+        "type" : "object",
+        "properties" : {
+          "templateId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "collection": {
+            "$ref" : "#/components/schemas/collection"
+          },
+          "immutableData": {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "key" : {
+                  "type" : "string"
+                },
+                "value" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          },
+          "createdAt": {
+            "type" : "object",
+            "properties": {
+              "date": {
+                "type" : "string"
+              },
+              "block": {
+                "type" : "number"
+              },
+              "globalSequence": {
+                "type" : "number"
+              }
+            }
+          },
+          "traits": {
+            "type": "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string"
+                },
+                "value" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "image": {
+            "type" : "string"
+          },
+          "stats": {
+            "$ref" : "#/components/schemas/template_stats"
+          }
+        }
+      },
+      "asset": {
+        "type" : "object",
+        "properties" : {
+          "assetId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "burned": {
+            "type": "boolean"
+          },
+          "mint": {
+            "type": "number"
+          },
+          "collection": {
+            "$ref" : "#/components/schemas/collection"
+          },
+          "transferable": {
+            "type": "boolean"
+          },
+          "burnable": {
+            "type": "boolean"
+          },
+          "mutableData": {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "key" : {
+                  "type" : "string"
+                },
+                "value" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          },
+          "immutableData": {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "key" : {
+                  "type" : "string"
+                },
+                "value" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          },
+          "createdAt": {
+            "type" : "object",
+            "properties": {
+              "date": {
+                "type" : "string"
+              },
+              "block": {
+                "type" : "number"
+              },
+              "globalSequence": {
+                "type" : "number"
+              }
+            }
+          },
+          "traits": {
+            "type": "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string"
+                },
+                "value" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "image": {
+            "type" : "string"
+          },
+          "template": {
+            "$ref" : "#/components/schemas/template"
+          }
+        }
+      },
+      "stats_collection_v3" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "image" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "stats_asset_v3" : {
+        "type" : "object",
+        "properties" : {
+          "assetId" : {
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "mint" : {
+            "type" : "integer"
+          },
+          "image" : {
+            "type" : "string"
+          },
+          "templateId" : {
+            "type" : "integer"
+          }
+        }
+      },
+      "stats_v3" : {
+        "type" : "object",
+        "properties" : {
+          "days" : {
+            "type" : "string"
+          },
+          "waxVolume" : {
+            "type" : "number"
+          },
+          "usdVolume" : {
+            "type" : "number"
+          },
+          "change" : {
+            "type" : "number"
+          },
+          "buyers" : {
+            "type" : "integer"
+          },
+          "sellers" : {
+            "type" : "integer"
+          },
+          "sales" : {
+            "type" : "integer"
+          },
+          "trend" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "usdVolume" : {
+                  "type" : "number"
+                },
+                "date" : {
+                  "type" : "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "stats_template_v3" : {
+        "type" : "object",
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "img" : {
+            "type" : "string"
+          },
+          "video" : {
+            "type" : "string"
+          },
+          "<further_template_specific_attributes>" : {
+            "type" : "string"
+          }
+        }
+      },
+      "template_stats_v3" : {
+        "type" : "object",
+        "properties" : {
+          "days" : {
+            "type" : "string"
+          },
+          "waxVolume" : {
+            "type" : "number"
+          },
+          "floor" : {
+            "type" : "number"
+          },
+          "change" : {
+            "type" : "number"
+          },
+          "buyers" : {
+            "type" : "integer"
+          },
+          "sellers" : {
+            "type" : "integer"
+          },
+          "sales" : {
+            "type" : "integer"
+          },
+          "rank" : {
+            "type" : "integer"
+          }
+        }
+      },
+      "template_stats": {
+        "type": "object",
+        "properties": {
+          "averageWaxPrice": {
+            "type": "number"
+          },
+          "averageUsd": {
+            "type": "number"
+          },
+          "lastSoldWax": {
+            "type": "number"
+          },
+          "lastSoldUsd": {
+            "type": "number"
+          },
+          "lastSold": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string"
+              },
+              "listingId": {
+                "type": "number"
+              },
+              "priceWax": {
+                "type": "number"
+              },
+              "priceUsd": {
+                "type": "number"
+              }
+            }
+          },
+          "volumeWax": {
+            "type": "number"
+          },
+          "volumeUsd": {
+            "type": "number"
+          },
+          "numSales": {
+            "type": "number"
+          },
+          "numBurned": {
+            "type": "number"
+          },
+          "numMinted": {
+            "type": "number"
+          },
+          "floorPrice": {
+            "type": "number"
+          }
+        }
+      },
+      "stats_drop_v3" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "dropId" : {
+            "type" : "integer"
+          },
+          "market" : {
+            "type" : "string"
+          }
+        }
+      },
+      "drop_stats" : {
+        "type" : "object",
+        "properties" : {
+          "days" : {
+            "type" : "string"
+          },
+          "waxVolume" : {
+            "type" : "number"
+          },
+          "usdVolume" : {
+            "type" : "number"
+          },
+          "buyers" : {
+            "type" : "integer"
+          },
+          "claims" : {
+            "type" : "integer"
+          },
+          "rank" : {
+            "type" : "integer"
+          }
+        }
+      },
+      "user_stats" : {
+        "type" : "object",
+        "properties" : {
+          "days" : {
+            "type" : "integer"
+          },
+          "waxVolume" : {
+            "type" : "number"
+          },
+          "usdVolume" : {
+            "type" : "number"
+          },
+          "buyVolume" : {
+            "type" : "number"
+          },
+          "usdBuyVolume" : {
+            "type" : "number"
+          },
+          "sellVolume" : {
+            "type" : "number"
+          },
+          "usdSellVolume" : {
+            "type" : "number"
+          },
+          "purchases" : {
+            "type" : "integer"
+          },
+          "sales" : {
+            "type" : "integer"
+          },
+          "rank" : {
+            "type" : "integer"
+          }
+        }
+      }
+    }
+  }
+}
