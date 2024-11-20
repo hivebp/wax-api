@@ -122,7 +122,7 @@ Run ```curl -L 0.0.0.0:5002/filler/start``` to start the filler and ```curl -L 0
 ### API Documentation
 
 Find the API Documentation here:
-
+https://hivebp.github.io/wax-api/
 
 ### Snapshots
 
