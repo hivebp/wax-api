@@ -1,9 +1,9 @@
 {
   "openapi" : "3.0.1",
   "info" : {
-    "title" : "WAX marketcap",
-    "description" : "General usage statistics of the WAX Blockchain. Provided with pride by Hive Digital UG",
-    "version" : "v2"
+    "title" : "WAX NFT API",
+    "description" : "NFT Data and Market API for the WAX Blockchain. Provided with pride by NFTHive",
+    "version" : "v3.0.0"
   },
   "servers" : [ {
     "url" : "https://wax-api.hivebp.io"
@@ -3080,6 +3080,618 @@
       "servers" : [ {
         "url" : "https://wax-api.hivebp.io"
       } ]
+    },
+    "/api/crafts" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get a list of crafting recipes",
+        "parameters" : [{
+          "name" : "craft_id",
+          "in" : "query",
+          "schema" : {
+            "type" : "number"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Filter by craft id"
+        }, {
+          "name" : "collection",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "alien.worlds",
+          "description" : "A collection to filter by"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "order_by",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "date_desc",
+          "description" : "What to sort by and in which direction, like date_desc"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Template Data",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "craftId": {
+                        "type": "number"
+                      },
+                      "outcomes": {
+                        "type": "object",
+                        "properties": {
+                          "outcomes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "templateId": {
+                                  "type": "number"
+                                },
+                                "odds": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          },
+                          "tokenOutcomes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "minAmount": {
+                                  "type": "string"
+                                },
+                                "maxAmount": {
+                                  "type": "string"
+                                },
+                                "odds": {
+                                  "type": "number"
+                                },
+                                "guaranteed": {
+                                  "type": "boolean"
+                                }
+                              }
+                            }
+                          },
+                          "minRandomOutcomes": {
+                            "type": "number"
+                          },
+                          "maxRandomOutcomes": {
+                            "type": "number"
+                          }
+                        }
+                      },
+                      "recipe": {
+                        "type": "object",
+                        "properties": {
+                          "ingredients": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "number"
+                                },
+                                "craftAction": {
+                                  "type": "number"
+                                },
+                                "receiver": {
+                                  "type": "string"
+                                },
+                                "collectionName": {
+                                  "type": "string"
+                                },
+                                "schemaName": {
+                                  "type": "string"
+                                },
+                                "templateId": {
+                                  "type": "number"
+                                },
+                                "attribute": {
+                                  "type": "object",
+                                  "properties": {
+                                    "values": {
+                                      "type": "array",
+                                      "items": {
+
+                                      }
+                                    }
+                                  }
+                                },
+                                "amount": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          },
+                          "tokenIngredients": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "unlockTime": {
+                        "type": "number"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "displayData": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "previewImg": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "collection": {
+                        "type": "object",
+                        "properties": {
+                          "collectionName": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "collectionImage": {
+                            "type": "string"
+                          },
+                          "verification": {
+                            "type": "boolean"
+                          }
+                        }
+                      },
+                      "numCrafted": {
+                        "type": "number"
+                      },
+                      "total": {
+                        "type": "number"
+                      },
+                      "outcomeTemplates": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/craft_template"
+                        }
+                      },
+                      "recipeTemplates": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/craft_template"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/drops" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get a list of drops",
+        "parameters" : [{
+          "name" : "drop_id",
+          "in" : "query",
+          "schema" : {
+            "type" : "number"
+          },
+          "required" : false,
+          "example" : "1",
+          "description" : "Filter by drop id"
+        }, {
+          "name" : "term",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "asd",
+          "description" : "A user entered search term"
+        }, {
+          "name" : "market",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "nfthivedrops",
+          "description" : "A market contract to filter by"
+        }, {
+          "name" : "collection",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "alien.worlds",
+          "description" : "A collection to filter by"
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "40",
+          "description" : "Limit of results"
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer"
+          },
+          "required" : false,
+          "example" : "0",
+          "description" : "Offset of results to start from"
+        }, {
+          "name" : "verified",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "verified",
+          "description" : "Filter by verification level: verified, unverified, all or blacklisted (excluded from all)"
+        }, {
+          "name" : "order_by",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "date_desc",
+          "description" : "What to sort by and in which direction, like date_desc, drop_id_asc"
+        }, {
+          "name" : "token",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "HONEY",
+          "description" : "Filter by main token of the drop"
+        }, {
+          "name" : "highlight",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Filter by highlighted rops"
+        }, {
+          "name" : "home",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Show a limit selection of drops, hide drops that keep being pushed to the top"
+        }, {
+          "name" : "upcoming",
+          "in" : "query",
+          "schema" : {
+            "type" : "boolean"
+          },
+          "required" : false,
+          "example" : "true",
+          "description" : "Show only drops with a start date in the future"
+        }, {
+          "name" : "user_name",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "t1.5c.wam",
+          "description" : "The user running the query, respects user filters"
+        }, {
+          "name" : "currency",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : false,
+          "example" : "HONEY",
+          "description" : "Drop includes the currency in their list of supported currencies"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Template Data",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dropId": {
+                        "type" : "number"
+                      },
+                      "price": {
+                        "type" : "number"
+                      },
+                      "currency": {
+                        "type" : "string"
+                      },
+                      "startTime": {
+                        "type" : "number"
+                      },
+                      "endTime": {
+                        "type" : "number"
+                      },
+                      "createdAt": {
+                        "type" : "number"
+                      },
+                      "accountLimit": {
+                        "type" : "number"
+                      },
+                      "accountLimitCooldown": {
+                        "type" : "number"
+                      },
+                      "maxClaimable": {
+                        "type" : "number"
+                      },
+                      "numClaimed": {
+                        "type" : "number"
+                      },
+                      "verified": {
+                        "type" : "boolean"
+                      },
+                      "displayData": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type" : "string"
+                          },
+                          "description": {
+                            "type" : "string"
+                          }
+                        }
+                      },
+                      "authRequired": {
+                        "type" : "boolean"
+                      },
+                      "collection": {
+                        "type": "object",
+                        "properties": {
+                          "collectionName": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "collectionImage": {
+                            "type": "string"
+                          },
+                          "verification": {
+                            "type": "boolean"
+                          }
+                        }
+                      },
+                      "templatesToMint": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "templateId": {
+                              "type" : "number"
+                            },
+                            "name": {
+                              "type" : "string"
+                            },
+                            "collection": {
+                              "type" : "string"
+                            },
+                            "schema": {
+                              "type" : "string"
+                            },
+                            "immutableData": {
+                              "type" : "string"
+                            },
+                            "image": {
+                              "type" : "string"
+                            },
+                            "numMinted": {
+                              "type" : "number"
+                            },
+                            "createdAt": {
+                              "type" : "string"
+                            },
+                            "blockNum": {
+                              "type" : "number"
+                            },
+                            "createdSeq": {
+                              "type" : "number"
+                            },
+                            "traits": {
+                              "type" : "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type" : "string"
+                                  },
+                                  "value": {
+                                    "type" : "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
+    },
+    "/api/tags/{collection}" : {
+      "get" : {
+        "tags" : [ "NFT Data" ],
+        "description" : "Get general information about a Schema",
+        "parameters" : [{
+          "name" : "collection",
+          "in" : "path",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true,
+          "example" : "alien.worlds",
+          "description" : "The name of the collection to fetch schemas for"
+        }],
+        "responses" : {
+          "200" : {
+            "description" : "List of Collections",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type": "array",
+                  "items": {
+                    "type" : "object",
+                    "properties" : {
+                      "collection": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "authorized": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "image": {
+                        "type": "string"
+                      },
+                      "thumbnail": {
+                        "type": "string"
+                      },
+                      "verified": {
+                        "type": "boolean"
+                      },
+                      "blacklisted": {
+                        "type": "boolean"
+                      },
+                      "waxVolume24h": {
+                        "type": "number"
+                      },
+                      "usdVolume24h": {
+                        "type": "number"
+                      },
+                      "waxVolume48h": {
+                        "type": "number"
+                      },
+                      "usdVolume48h": {
+                        "type": "number"
+                      },
+                      "waxVolume7d": {
+                        "type": "number"
+                      },
+                      "usdVolume7d": {
+                        "type": "number"
+                      },
+                      "waxVolume14d": {
+                        "type": "number"
+                      },
+                      "usdVolume14d": {
+                        "type": "number"
+                      },
+                      "waxMarketCap": {
+                        "type": "number"
+                      },
+                      "usdMarketCap": {
+                        "type": "number"
+                      },
+                      "allTimeVolume": {
+                        "type": "number"
+                      },
+                      "allTimeUsdVolume":{
+                        "type": "number"
+                      },
+                      "growth24h": {
+                        "type": "number"
+                      },
+                      "growth7d": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "servers" : [ {
+          "url" : "https://wax-api.hivebp.io"
+        } ]
+      },
+      "servers" : [ {
+        "url" : "https://wax-api.hivebp.io"
+      } ]
     }
   },
   "components" : {
@@ -3550,6 +4162,40 @@
           },
           "rank" : {
             "type" : "integer"
+          }
+        }
+      },
+      "craft_template": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "collection": {
+            "type": "object",
+            "properties": {
+              "collectionName": {
+                "type": "string"
+              },
+              "verification": {
+                "type": "boolean"
+              },
+              "collectionImage": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              }
+            }
+          },
+          "image": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
           }
         }
       }

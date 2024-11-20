@@ -2732,7 +2732,7 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             '       json_array_elements(c2.recipe->\'ingredients\')->>\'template_id\' AS bigint'
             '    ) AS recipe_template_id, '
             '    json_array_elements(outcomes->\'token_outcomes\') AS token_outcomes, '
-            '    json_array_elements(recipe->\'ingredients\')AS token_ingredients '
+            '    json_array_elements(recipe->\'ingredients\') AS token_ingredients '
             '    FROM ('
             '       SELECT craft_id, unlock_time, c.timestamp, display_data, collection '
             '       FROM crafts c '

@@ -14750,6 +14750,9 @@ CREATE INDEX wuffi_airdrops_seq_idx ON public.wuffi_airdrops USING btree (seq DE
 
 GRANT ALL ON SCHEMA public TO root;
 
+ALTER ROLE root WITH LOGIN;
+
+INSERT INTO handle_fork VALUES (false, 0);
 
 --
 -- PostgreSQL database dump complete

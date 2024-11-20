@@ -24,8 +24,11 @@ in your config.py.
 * Run ```source env/bin/activate```
 * Run ```pip install -r requirements.txt```
 * Run ```deactivate```
-* Switch to your postgres profile and create a database.
-* Import db_schema.sql with ```psql <your_database> < /path/to/wax-api/db_schema.sql```
+* Switch to your postgres profile and create a database:
+  * Run ```su - postgres``` 
+  * Run ```psql```
+  * Run ```CREATE DATABASE your_database```
+* If you're using a snapshot, import the snapshot with ```psql your_database < /path/to/the/snapshot.sql```, otherwise import db_schema.sql with ```psql your_database < /path/to/wax-api/db_schema.sql```
 * Install Chronicle from https://github.com/EOSChronicleProject/eos-chronicle 
 * Create a chronicle job like ```vi /etc/systemd/system/chronicle.service```
 * Add the following content:
@@ -102,11 +105,33 @@ Run ```curl -L 0.0.0.0:5002/filler/start``` to start the filler and ```curl -L 0
 * Run ```crontab -e```
 * Depending on your needs, add the following commands:
 ```
-*/10 * * * * curl -L 0.0.0.0:5002/filler/update-sales-summary
-*/10 * * * * curl -L 0.0.0.0:5002/filler/refresh-drops-views
-*/5 * * * * curl -L 0.0.0.0:5002/filler/refresh-recently-sold
-*/15 * * * * curl -L 0.0.0.0:5002/filler/update-template-stats
-0 */1 * * * curl -L 0.0.0.0:5002/filler/update-volumes
-*/10 * * * * curl -L 0.0.0.0:5002/filler/sync-new-collection-verifications
-*/30 * * * * curl -L 0.0.0.0:5002/filler/update-pfp-attributes
+*/10 * * * * curl -L 0.0.0.0:5002/loader/refresh-drops-views
+*/5 * * * * curl -L 0.0.0.0:5002/loader/refresh-recently-sold
+*/10 * * * * curl -L 0.0.0.0:5002/loader/update-floor-prices
+*/30 * * * * curl -L 0.0.0.0:5002/loader/update-estimated-wax-price
+*/15 * * * * curl -L 0.0.0.0:5002/loader/update-template-stats
+0 */6 * * * curl -L 0.0.0.0:5002/loader/update-big-volumes
+0 8 * * * curl -L 0.0.0.0:5002/loader/update-collection-user-stats
+*/5 * * * * curl -L 0.0.0.0:5002/loader/update-small-volumes
+*/15 * * * * curl -L 0.0.0.0:5002/loader/update-pfp-attributes
+*/1 * * * * curl -L 0.0.0.0:5002/loader/update-rwax-assets
+*/10 * * * * curl -L 0.0.0.0:5002/loader/sync-new-collection-verifications
+*/5 * * * * curl -L 0.0.0.0:5002/loader/update-template-stats
 ```
+
+### API Documentation
+
+Find the API Documentation here:
+
+
+### Snapshots
+
+Download the full snapshot here:
+
+[snapshot_wax_api_341065560](https://download.hivebp.io/snapshots/snapshot_wax_api_341065560.tar.gz)
+
+Import the snapshot with these commands:
+* ```tar -xvf snapshot_wax_api_341065560.tar.gz```
+* ```su - postgres```
+* ```psql your_database < /path/to/the/snapshot_wax_api_341065560.sql```
+
