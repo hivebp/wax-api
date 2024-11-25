@@ -1720,35 +1720,36 @@ def update_big_volumes():
     isUpdatingBigVolumes = True
 
     session = create_session()
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_from_2024_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_seller_from_2024_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_buyer_from_2024_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_from_2024_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW template_collection_sales_by_date_from_2024_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_all_time_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_365_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_180_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_90_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_60_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_30_days_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW volume_template_user_from_2024_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW monthly_collection_volume_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_sales_by_date_mv')
-    session.commit()
-    session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_collection_sales_by_date_mv')
-    session.commit()
 
     try:
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_from_2024_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_seller_from_2024_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_buyer_from_2024_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_from_2024_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW template_collection_sales_by_date_from_2024_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_all_time_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_365_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_180_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_90_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_60_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_30_days_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW volume_template_user_from_2024_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW monthly_collection_volume_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_sales_by_date_mv')
+        session.commit()
+        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_collection_sales_by_date_mv')
+        session.commit()
+
         for days in ['all_time', '365_days', '180_days', '90_days', '60_days', '30_days']:
             session.execute(
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_market_{days}_mv'.format(days=days)
@@ -1812,16 +1813,16 @@ def update_small_volumes():
 
     session = create_session()
 
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_15_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_14_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_7_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_3_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_2_days_mv')
-    session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_1_days_mv')
-    session.commit()
-
     try:
         funcs.update_sales_summary(session)
+
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_15_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_14_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_7_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_3_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_2_days_mv')
+        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_1_days_mv')
+        session.commit()
 
         session.execute(
             'REFRESH MATERIALIZED VIEW CONCURRENTLY sales_seven_day_chart_mv'
