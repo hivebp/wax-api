@@ -3080,7 +3080,7 @@ def _apply_simpleassets_update(session, asset):
             if 'mdata' in update.keys() and update['mdata']:
                 data.update(json.loads(update['mdata']))
         except Exception as err:
-            raise err
+            return
 
         new_asset = {}
 
