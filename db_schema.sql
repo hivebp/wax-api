@@ -1557,453 +1557,6 @@ CREATE MATERIALIZED VIEW public.collection_user_count_mv AS
 ALTER TABLE public.collection_user_count_mv OWNER TO postgres;
 
 --
--- Name: user_collection_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_14_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_14_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_14_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_14_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_14_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_15_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_15_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_15_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_15_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_15_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_180_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_180_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_180_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_180_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_180_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_1_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_1_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_1_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_1_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_1_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_2_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_2_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_2_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_2_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_2_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_30_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_30_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_30_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_30_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_30_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_365_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_365_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_365_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_365_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_365_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_3_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_3_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_3_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_3_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_3_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_60_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_60_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_60_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_60_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_60_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_7_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_7_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_7_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_7_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_7_mv OWNER TO postgres;
-
---
--- Name: user_collection_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_90_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.buyer,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval))
-  GROUP BY t.collection, t.buyer, t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_90_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_90_mv AS
- SELECT sum(t.wax_volume) AS wax_volume,
-    sum(t.wax_volume) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    sum(t.sales) AS sales,
-    t.collection,
-    t.type
-   FROM public.user_collection_volumes_90_mv t
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_90_mv OWNER TO postgres;
-
---
--- Name: collection_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.collection_volumes_from_2023_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
-  GROUP BY t.collection, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.collection_volumes_from_2023_mv OWNER TO postgres;
-
---
 -- Name: collection_volumes_s_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -3236,280 +2789,6 @@ CREATE TABLE public.market_actions (
 ALTER TABLE public.market_actions OWNER TO postgres;
 
 --
--- Name: market_collection_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_14_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_14_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_15_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_15_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_180_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_180_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_1_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_1_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_2_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_2_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_30_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_30_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_365_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_365_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_3_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_3_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_60_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_60_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_7_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_7_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_90_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval))
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_90_mv OWNER TO postgres;
-
---
--- Name: market_collection_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_collection_volumes_from_2023_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.collection,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
-  GROUP BY t.collection, t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_collection_volumes_from_2023_mv OWNER TO postgres;
-
---
 -- Name: market_myth_sales; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3547,290 +2826,6 @@ CREATE TABLE public.market_statuses (
 
 
 ALTER TABLE public.market_statuses OWNER TO postgres;
-
---
--- Name: market_volumes_14_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_14_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '14 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_14_mv OWNER TO postgres;
-
---
--- Name: market_volumes_15_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_15_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '15 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_15_mv OWNER TO postgres;
-
---
--- Name: market_volumes_180_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_180_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '180 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_180_mv OWNER TO postgres;
-
---
--- Name: market_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_1_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_1_mv OWNER TO postgres;
-
---
--- Name: market_volumes_2_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_2_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '2 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_2_mv OWNER TO postgres;
-
---
--- Name: market_volumes_30_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_30_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '30 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_30_mv OWNER TO postgres;
-
---
--- Name: market_volumes_365_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_365_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '365 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_365_mv OWNER TO postgres;
-
---
--- Name: market_volumes_3_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_3_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '3 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_3_mv OWNER TO postgres;
-
---
--- Name: market_volumes_4_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_4_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '4 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_4_mv OWNER TO postgres;
-
---
--- Name: market_volumes_60_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_60_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '60 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_60_mv OWNER TO postgres;
-
---
--- Name: market_volumes_7_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_7_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '7 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_7_mv OWNER TO postgres;
-
---
--- Name: market_volumes_90_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_90_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT t.buyer) AS buyers,
-    count(DISTINCT t.seller) AS sellers,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '90 days'::interval))
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_90_mv OWNER TO postgres;
-
---
--- Name: market_volumes_from_2023_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.market_volumes_from_2023_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.market,
-    t.maker,
-    t.taker,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > '2023-01-01 00:00:00'::timestamp without time zone)
-  GROUP BY t.market, t.maker, t.taker, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.market_volumes_from_2023_mv OWNER TO postgres;
 
 --
 -- Name: memos; Type: TABLE; Schema: public; Owner: postgres
@@ -5070,192 +4065,6 @@ CREATE TABLE public.secondary_market_purchases (
 ALTER TABLE public.secondary_market_purchases OWNER TO postgres;
 
 --
--- Name: seller_volumes_1_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.seller_volumes_1_mv AS
- SELECT sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales,
-    t.seller,
-    t.type
-   FROM public.sales_summary t
-  WHERE (t."timestamp" > ((now() AT TIME ZONE 'utc'::text) - '1 day'::interval))
-  GROUP BY t.seller, t.type
-  WITH NO DATA;
-
-
-ALTER TABLE public.seller_volumes_1_mv OWNER TO postgres;
-
---
--- Name: seller_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.seller_volumes_mv AS
- SELECT sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_1_day,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_1_day,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_2_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_2_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_3_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_3_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_7_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_7_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '14 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_14_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '14 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_14_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '30 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_30_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '30 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_30_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '60 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_60_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '60 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_60_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '90 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_90_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '90 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_90_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '180 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_180_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '180 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_180_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '365 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.wax_price
-            ELSE (0)::double precision
-        END) AS wax_volume_365_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '365 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.usd_price
-            ELSE (0)::double precision
-        END) AS usd_volume_365_days,
-    sum(sales_summary.wax_price) AS wax_volume_all_time,
-    sum(sales_summary.usd_price) AS usd_volume_all_time,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '1 day'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_1_day,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '2 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_2_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '3 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_3_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '7 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_7_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '14 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_14_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '30 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_30_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '60 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_60_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '90 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_90_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '180 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_180_days,
-    sum(
-        CASE
-            WHEN (sales_summary."timestamp" > ((now() - '365 days'::interval) AT TIME ZONE 'utc'::text)) THEN sales_summary.num_items
-            ELSE 0
-        END) AS purchases_365_days,
-    sum(sales_summary.num_items) AS purchases_all_time,
-    sales_summary.seller AS user_name,
-    sales_summary.type,
-    sales_summary.collection
-   FROM public.sales_summary
-  GROUP BY sales_summary.seller, sales_summary.type, sales_summary.collection
-  WITH NO DATA;
-
-
-ALTER TABLE public.seller_volumes_mv OWNER TO postgres;
-
---
 -- Name: tables_with_seq; Type: VIEW; Schema: public; Owner: postgres
 --
 
@@ -5706,13 +4515,13 @@ CREATE MATERIALIZED VIEW public.template_collection_sales_by_date_before_2024_mv
     t.schema,
     t.template_id,
     to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text) AS to_date,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT sales_summary.buyer) AS buyers,
-    count(DISTINCT sales_summary.seller) AS sellers,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    count(DISTINCT s.buyer) AS buyers,
+    count(DISTINCT s.seller) AS sellers,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
-     LEFT JOIN public.sales_summary USING (seq))
+     LEFT JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
   GROUP BY t.collection, t.schema, t.template_id, (to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text))
   WITH NO DATA;
@@ -5729,13 +4538,13 @@ CREATE MATERIALIZED VIEW public.template_collection_sales_by_date_from_2024_mv A
     t.schema,
     t.template_id,
     to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text) AS to_date,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(DISTINCT sales_summary.buyer) AS buyers,
-    count(DISTINCT sales_summary.seller) AS sellers,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    count(DISTINCT s.buyer) AS buyers,
+    count(DISTINCT s.seller) AS sellers,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
-     LEFT JOIN public.sales_summary USING (seq))
+     LEFT JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
   GROUP BY t.collection, t.schema, t.template_id, (to_date(to_char(t."timestamp", 'YYYY/MM/DD'::text), 'YYYY/MM/DD'::text))
   WITH NO DATA;
@@ -6069,132 +4878,6 @@ CREATE MATERIALIZED VIEW public.user_collection_volumes_from_2023_mv AS
 ALTER TABLE public.user_collection_volumes_from_2023_mv OWNER TO postgres;
 
 --
--- Name: user_collection_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_collection_volumes_mv AS
- SELECT sum(t.wax_volume_1_day) AS wax_volume_1_day,
-    sum(t.usd_volume_1_day) AS usd_volume_1_day,
-    sum(t.wax_volume_2_days) AS wax_volume_2_days,
-    sum(t.usd_volume_2_days) AS usd_volume_2_days,
-    sum(t.wax_volume_3_days) AS wax_volume_3_days,
-    sum(t.usd_volume_3_days) AS usd_volume_3_days,
-    sum(t.wax_volume_7_days) AS wax_volume_7_days,
-    sum(t.usd_volume_7_days) AS usd_volume_7_days,
-    sum(t.wax_volume_14_days) AS wax_volume_14_days,
-    sum(t.usd_volume_14_days) AS usd_volume_14_days,
-    sum(t.wax_volume_30_days) AS wax_volume_30_days,
-    sum(t.usd_volume_30_days) AS usd_volume_30_days,
-    sum(t.wax_volume_60_days) AS wax_volume_60_days,
-    sum(t.usd_volume_60_days) AS usd_volume_60_days,
-    sum(t.wax_volume_90_days) AS wax_volume_90_days,
-    sum(t.usd_volume_90_days) AS usd_volume_90_days,
-    sum(t.wax_volume_180_days) AS wax_volume_180_days,
-    sum(t.usd_volume_180_days) AS usd_volume_180_days,
-    sum(t.wax_volume_365_days) AS wax_volume_365_days,
-    sum(t.usd_volume_365_days) AS usd_volume_365_days,
-    sum(t.wax_volume_all_time) AS wax_volume_all_time,
-    sum(t.usd_volume_all_time) AS usd_volume_all_time,
-    sum(t.purchases_1_day) AS purchases_1_day,
-    sum(t.purchases_2_days) AS purchases_2_days,
-    sum(t.purchases_3_days) AS purchases_3_days,
-    sum(t.purchases_7_days) AS purchases_7_days,
-    sum(t.purchases_14_days) AS purchases_14_days,
-    sum(t.purchases_30_days) AS purchases_30_days,
-    sum(t.purchases_60_days) AS purchases_60_days,
-    sum(t.purchases_90_days) AS purchases_90_days,
-    sum(t.purchases_180_days) AS purchases_180_days,
-    sum(t.purchases_365_days) AS purchases_365_days,
-    sum(t.purchases_all_time) AS purchases_all_time,
-    t.user_name,
-    t.type,
-    t.actor,
-    t.collection
-   FROM ( SELECT buyer_volumes_mv.wax_volume_1_day,
-            buyer_volumes_mv.usd_volume_1_day,
-            buyer_volumes_mv.wax_volume_2_days,
-            buyer_volumes_mv.usd_volume_2_days,
-            buyer_volumes_mv.wax_volume_3_days,
-            buyer_volumes_mv.usd_volume_3_days,
-            buyer_volumes_mv.wax_volume_7_days,
-            buyer_volumes_mv.usd_volume_7_days,
-            buyer_volumes_mv.wax_volume_14_days,
-            buyer_volumes_mv.usd_volume_14_days,
-            buyer_volumes_mv.wax_volume_30_days,
-            buyer_volumes_mv.usd_volume_30_days,
-            buyer_volumes_mv.wax_volume_60_days,
-            buyer_volumes_mv.usd_volume_60_days,
-            buyer_volumes_mv.wax_volume_90_days,
-            buyer_volumes_mv.usd_volume_90_days,
-            buyer_volumes_mv.wax_volume_180_days,
-            buyer_volumes_mv.usd_volume_180_days,
-            buyer_volumes_mv.wax_volume_365_days,
-            buyer_volumes_mv.usd_volume_365_days,
-            buyer_volumes_mv.wax_volume_all_time,
-            buyer_volumes_mv.usd_volume_all_time,
-            buyer_volumes_mv.purchases_1_day,
-            buyer_volumes_mv.purchases_2_days,
-            buyer_volumes_mv.purchases_3_days,
-            buyer_volumes_mv.purchases_7_days,
-            buyer_volumes_mv.purchases_14_days,
-            buyer_volumes_mv.purchases_30_days,
-            buyer_volumes_mv.purchases_60_days,
-            buyer_volumes_mv.purchases_90_days,
-            buyer_volumes_mv.purchases_180_days,
-            buyer_volumes_mv.purchases_365_days,
-            buyer_volumes_mv.purchases_all_time,
-            buyer_volumes_mv.user_name,
-            buyer_volumes_mv.type,
-            buyer_volumes_mv.collection,
-            'buyer'::text AS actor
-           FROM public.buyer_volumes_mv
-        UNION
-         SELECT seller_volumes_mv.wax_volume_1_day,
-            seller_volumes_mv.usd_volume_1_day,
-            seller_volumes_mv.wax_volume_2_days,
-            seller_volumes_mv.usd_volume_2_days,
-            seller_volumes_mv.wax_volume_3_days,
-            seller_volumes_mv.usd_volume_3_days,
-            seller_volumes_mv.wax_volume_7_days,
-            seller_volumes_mv.usd_volume_7_days,
-            seller_volumes_mv.wax_volume_14_days,
-            seller_volumes_mv.usd_volume_14_days,
-            seller_volumes_mv.wax_volume_30_days,
-            seller_volumes_mv.usd_volume_30_days,
-            seller_volumes_mv.wax_volume_60_days,
-            seller_volumes_mv.usd_volume_60_days,
-            seller_volumes_mv.wax_volume_90_days,
-            seller_volumes_mv.usd_volume_90_days,
-            seller_volumes_mv.wax_volume_180_days,
-            seller_volumes_mv.usd_volume_180_days,
-            seller_volumes_mv.wax_volume_365_days,
-            seller_volumes_mv.usd_volume_365_days,
-            seller_volumes_mv.wax_volume_all_time,
-            seller_volumes_mv.usd_volume_all_time,
-            seller_volumes_mv.purchases_1_day,
-            seller_volumes_mv.purchases_2_days,
-            seller_volumes_mv.purchases_3_days,
-            seller_volumes_mv.purchases_7_days,
-            seller_volumes_mv.purchases_14_days,
-            seller_volumes_mv.purchases_30_days,
-            seller_volumes_mv.purchases_60_days,
-            seller_volumes_mv.purchases_90_days,
-            seller_volumes_mv.purchases_180_days,
-            seller_volumes_mv.purchases_365_days,
-            seller_volumes_mv.purchases_all_time,
-            seller_volumes_mv.user_name,
-            seller_volumes_mv.type,
-            seller_volumes_mv.collection,
-            'seller'::text AS actor
-           FROM public.seller_volumes_mv) t
-  GROUP BY t.user_name, t.type, t.actor, t.collection
-  ORDER BY (sum(t.wax_volume_1_day)) DESC
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_collection_volumes_mv OWNER TO postgres;
-
---
 -- Name: user_collection_volumes_s_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -6366,81 +5049,6 @@ CREATE MATERIALIZED VIEW public.user_pictures_mv AS
 ALTER TABLE public.user_pictures_mv OWNER TO postgres;
 
 --
--- Name: user_volumes_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_volumes_mv AS
- SELECT sum(t.wax_volume_1_day) AS wax_volume_1_day,
-    sum(t.usd_volume_1_day) AS usd_volume_1_day,
-    sum(t.wax_volume_2_days) AS wax_volume_2_days,
-    sum(t.usd_volume_2_days) AS usd_volume_2_days,
-    sum(t.wax_volume_3_days) AS wax_volume_3_days,
-    sum(t.usd_volume_3_days) AS usd_volume_3_days,
-    sum(t.wax_volume_7_days) AS wax_volume_7_days,
-    sum(t.usd_volume_7_days) AS usd_volume_7_days,
-    sum(t.wax_volume_14_days) AS wax_volume_14_days,
-    sum(t.usd_volume_14_days) AS usd_volume_14_days,
-    sum(t.wax_volume_30_days) AS wax_volume_30_days,
-    sum(t.usd_volume_30_days) AS usd_volume_30_days,
-    sum(t.wax_volume_60_days) AS wax_volume_60_days,
-    sum(t.usd_volume_60_days) AS usd_volume_60_days,
-    sum(t.wax_volume_90_days) AS wax_volume_90_days,
-    sum(t.usd_volume_90_days) AS usd_volume_90_days,
-    sum(t.wax_volume_180_days) AS wax_volume_180_days,
-    sum(t.usd_volume_180_days) AS usd_volume_180_days,
-    sum(t.wax_volume_365_days) AS wax_volume_365_days,
-    sum(t.usd_volume_365_days) AS usd_volume_365_days,
-    sum(t.wax_volume_all_time) AS wax_volume_all_time,
-    sum(t.usd_volume_all_time) AS usd_volume_all_time,
-    sum(t.purchases_1_day) AS purchases_1_day,
-    sum(t.purchases_2_days) AS purchases_2_days,
-    sum(t.purchases_3_days) AS purchases_3_days,
-    sum(t.purchases_7_days) AS purchases_7_days,
-    sum(t.purchases_14_days) AS purchases_14_days,
-    sum(t.purchases_30_days) AS purchases_30_days,
-    sum(t.purchases_60_days) AS purchases_60_days,
-    sum(t.purchases_90_days) AS purchases_90_days,
-    sum(t.purchases_180_days) AS purchases_180_days,
-    sum(t.purchases_365_days) AS purchases_365_days,
-    sum(t.purchases_all_time) AS purchases_all_time,
-    t.user_name,
-    t.type,
-    t.actor
-   FROM public.user_collection_volumes_mv t
-  GROUP BY t.user_name, t.type, t.actor
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_volumes_mv OWNER TO postgres;
-
---
--- Name: user_volumes_s_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.user_volumes_s_mv AS
- SELECT sum(t.wax_volume_1_day) AS wax_volume_1_day,
-    sum(t.usd_volume_1_day) AS usd_volume_1_day,
-    sum(t.wax_volume_2_days) AS wax_volume_2_days,
-    sum(t.usd_volume_2_days) AS usd_volume_2_days,
-    sum(t.wax_volume_3_days) AS wax_volume_3_days,
-    sum(t.usd_volume_3_days) AS usd_volume_3_days,
-    sum(t.wax_volume_7_days) AS wax_volume_7_days,
-    sum(t.usd_volume_7_days) AS usd_volume_7_days,
-    sum(t.purchases_1_day) AS purchases_1_day,
-    sum(t.purchases_2_days) AS purchases_2_days,
-    sum(t.purchases_3_days) AS purchases_3_days,
-    sum(t.purchases_7_days) AS purchases_7_days,
-    t.user_name,
-    t.type,
-    t.actor
-   FROM public.user_collection_volumes_s_mv t
-  GROUP BY t.user_name, t.type, t.actor
-  WITH NO DATA;
-
-
-ALTER TABLE public.user_volumes_s_mv OWNER TO postgres;
-
---
 -- Name: users_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
@@ -6508,7 +5116,7 @@ ALTER SEQUENCE public.videos_video_id_seq OWNED BY public.videos.video_id;
 
 
 --
--- Name: volume_collection_market_user_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_14_days_mv AS
@@ -6519,19 +5127,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_14_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '14 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_14_days_mv AS
@@ -6545,10 +5153,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_15_days_mv AS
@@ -6559,19 +5167,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_15_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '15 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_15_days_mv AS
@@ -6585,10 +5193,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_180_days_mv AS
@@ -6599,19 +5207,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_180_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '180 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_180_days_mv AS
@@ -6625,10 +5233,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_1_days_mv AS
@@ -6639,19 +5247,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_1_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '1 day'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_1_days_mv AS
@@ -6665,10 +5273,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_2_days_mv AS
@@ -6679,19 +5287,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_2_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '2 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_2_days_mv AS
@@ -6705,10 +5313,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_30_days_mv AS
@@ -6719,19 +5327,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_30_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '30 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_30_days_mv AS
@@ -6745,10 +5353,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_365_days_mv AS
@@ -6759,19 +5367,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_365_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '365 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_365_days_mv AS
@@ -6785,10 +5393,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_3_days_mv AS
@@ -6799,19 +5407,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_3_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '3 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_3_days_mv AS
@@ -6825,10 +5433,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_60_days_mv AS
@@ -6839,19 +5447,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_60_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '60 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_60_days_mv AS
@@ -6865,10 +5473,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_7_days_mv AS
@@ -6879,19 +5487,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_7_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '7 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_7_days_mv AS
@@ -6905,10 +5513,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_90_days_mv AS
@@ -6919,19 +5527,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_90_days_mv AS
     t.buyer,
     t.seller,
     t.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (t.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (t.num_items)::double precision)) AS usd_volume,
+    sum(t.num_items) AS sales
    FROM public.sales_summary t
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '90 days'::interval))
   GROUP BY t.collection, t.market, t.maker, t.taker, t.buyer, t.seller, t.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_90_days_mv AS
@@ -6945,10 +5553,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_before_2024_mv AS
@@ -6959,19 +5567,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_before_2024_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(s.wax_price) AS wax_volume,
-    sum(s.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((s.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((s.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM public.sales_summary s
   WHERE (s."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
   GROUP BY s.collection, s.market, s.maker, s.taker, s.buyer, s.seller, s.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_before_2024_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_before_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_before_2024_mv AS
@@ -6986,10 +5594,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_before_2024_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_before_2024_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_before_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_from_2024_mv AS
@@ -7000,19 +5608,19 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_from_2024_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(s.wax_price) AS wax_volume,
-    sum(s.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((s.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((s.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM public.sales_summary s
   WHERE (s."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
   GROUP BY s.collection, s.market, s.maker, s.taker, s.buyer, s.seller, s.type
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_from_2024_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_from_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_from_2024_mv AS
@@ -7027,10 +5635,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_from_2024_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_from_2024_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_from_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_all_time_mv AS
@@ -7059,10 +5667,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_buyer_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_buyer_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_buyer_all_time_mv AS
@@ -7076,10 +5684,10 @@ CREATE MATERIALIZED VIEW public.volume_buyer_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_buyer_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_buyer_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_14_days_mv AS
@@ -7095,10 +5703,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_15_days_mv AS
@@ -7114,10 +5722,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_180_days_mv AS
@@ -7133,10 +5741,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_1_days_mv AS
@@ -7152,10 +5760,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_2_days_mv AS
@@ -7171,10 +5779,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_30_days_mv AS
@@ -7190,10 +5798,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_365_days_mv AS
@@ -7209,10 +5817,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_3_days_mv AS
@@ -7228,10 +5836,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_60_days_mv AS
@@ -7247,10 +5855,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_7_days_mv AS
@@ -7266,10 +5874,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_90_days_mv AS
@@ -7285,10 +5893,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_user_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_user_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_user_all_time_mv AS
@@ -7329,10 +5937,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_user_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_user_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_user_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_all_time_mv AS
@@ -7348,10 +5956,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_collection_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_14_days_mv AS
@@ -7366,10 +5974,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_15_days_mv AS
@@ -7384,10 +5992,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_180_days_mv AS
@@ -7402,10 +6010,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_1_days_mv AS
@@ -7420,10 +6028,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_2_days_mv AS
@@ -7438,10 +6046,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_30_days_mv AS
@@ -7456,10 +6064,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_365_days_mv AS
@@ -7474,10 +6082,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_3_days_mv AS
@@ -7492,10 +6100,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_60_days_mv AS
@@ -7510,10 +6118,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_7_days_mv AS
@@ -7528,10 +6136,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_buyer_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_buyer_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_buyer_90_days_mv AS
@@ -7546,10 +6154,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_buyer_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_buyer_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_buyer_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_14_days_mv AS
@@ -7558,8 +6166,8 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_14_days_mv AS
     t.maker,
     t.taker,
     t.type,
-    sum(t.wax_volume) AS wax_volume,
-    sum(t.usd_volume) AS usd_volume,
+    sum((t.wax_volume * (t.sales)::double precision)) AS wax_volume,
+    sum((t.usd_volume * (t.sales)::double precision)) AS usd_volume,
     sum(t.sales) AS sales,
     count(DISTINCT t.seller) AS sellers,
     count(DISTINCT t.buyer) AS buyers
@@ -7568,10 +6176,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_15_days_mv AS
@@ -7590,10 +6198,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_180_days_mv AS
@@ -7612,10 +6220,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_1_days_mv AS
@@ -7634,10 +6242,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_2_days_mv AS
@@ -7656,10 +6264,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_30_days_mv AS
@@ -7678,10 +6286,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_365_days_mv AS
@@ -7700,10 +6308,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_3_days_mv AS
@@ -7722,10 +6330,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_60_days_mv AS
@@ -7744,10 +6352,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_7_days_mv AS
@@ -7766,10 +6374,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_90_days_mv AS
@@ -7788,10 +6396,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_market_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_market_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_market_all_time_mv AS
@@ -7810,10 +6418,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_market_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_market_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_collection_market_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_14_days_mv AS
@@ -7828,10 +6436,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_15_days_mv AS
@@ -7846,10 +6454,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_180_days_mv AS
@@ -7864,10 +6472,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_1_days_mv AS
@@ -7882,10 +6490,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_2_days_mv AS
@@ -7900,10 +6508,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_30_days_mv AS
@@ -7918,10 +6526,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_365_days_mv AS
@@ -7936,10 +6544,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_3_days_mv AS
@@ -7954,10 +6562,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_60_days_mv AS
@@ -7972,10 +6580,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_7_days_mv AS
@@ -7990,10 +6598,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_90_days_mv AS
@@ -8008,10 +6616,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_before_2024_mv AS
@@ -8026,10 +6634,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_before_2024_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_before_2024_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_before_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_from_2024_mv AS
@@ -8044,10 +6652,10 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_from_2024_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_from_2024_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_from_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_collection_seller_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_collection_seller_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_collection_seller_all_time_mv AS
@@ -8076,7 +6684,7 @@ CREATE MATERIALIZED VIEW public.volume_collection_seller_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_collection_seller_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_collection_seller_all_time_mv OWNER TO postgres;
 
 --
 -- Name: volume_drop_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -8086,8 +6694,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_14_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8106,8 +6714,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_15_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8126,8 +6734,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_180_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8146,8 +6754,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_1_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8166,8 +6774,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_2_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8186,8 +6794,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_30_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8206,8 +6814,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_365_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8226,8 +6834,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_3_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8246,8 +6854,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_60_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8266,8 +6874,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_7_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8286,8 +6894,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_90_days_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8306,8 +6914,8 @@ CREATE MATERIALIZED VIEW public.volume_drop_all_time_mv AS
  SELECT sales_summary.collection,
     sales_summary.listing_id AS drop_id,
     sales_summary.market,
-    sum(sales_summary.wax_price) AS wax_volume,
-    sum(sales_summary.usd_price) AS usd_volume,
+    sum((sales_summary.wax_price * (sales_summary.num_items)::double precision)) AS wax_volume,
+    sum((sales_summary.usd_price * (sales_summary.num_items)::double precision)) AS usd_volume,
     sum(sales_summary.num_items) AS sales,
     count(DISTINCT sales_summary.buyer) AS buyers
    FROM public.sales_summary
@@ -8319,7 +6927,7 @@ CREATE MATERIALIZED VIEW public.volume_drop_all_time_mv AS
 ALTER TABLE public.volume_drop_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_market_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_14_days_mv AS
@@ -8337,10 +6945,10 @@ CREATE MATERIALIZED VIEW public.volume_market_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_15_days_mv AS
@@ -8358,10 +6966,10 @@ CREATE MATERIALIZED VIEW public.volume_market_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_180_days_mv AS
@@ -8379,10 +6987,10 @@ CREATE MATERIALIZED VIEW public.volume_market_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_1_days_mv AS
@@ -8400,10 +7008,10 @@ CREATE MATERIALIZED VIEW public.volume_market_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_2_days_mv AS
@@ -8421,10 +7029,10 @@ CREATE MATERIALIZED VIEW public.volume_market_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_30_days_mv AS
@@ -8442,10 +7050,10 @@ CREATE MATERIALIZED VIEW public.volume_market_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_365_days_mv AS
@@ -8463,10 +7071,10 @@ CREATE MATERIALIZED VIEW public.volume_market_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_3_days_mv AS
@@ -8484,10 +7092,10 @@ CREATE MATERIALIZED VIEW public.volume_market_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_60_days_mv AS
@@ -8505,10 +7113,10 @@ CREATE MATERIALIZED VIEW public.volume_market_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_7_days_mv AS
@@ -8526,10 +7134,10 @@ CREATE MATERIALIZED VIEW public.volume_market_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_90_days_mv AS
@@ -8547,10 +7155,10 @@ CREATE MATERIALIZED VIEW public.volume_market_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_market_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_market_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_market_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_market_all_time_mv AS
@@ -8568,10 +7176,10 @@ CREATE MATERIALIZED VIEW public.volume_market_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_market_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_market_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_14_days_mv AS
@@ -8585,10 +7193,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_15_days_mv AS
@@ -8602,10 +7210,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_180_days_mv AS
@@ -8619,10 +7227,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_1_days_mv AS
@@ -8636,10 +7244,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_2_days_mv AS
@@ -8653,10 +7261,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_30_days_mv AS
@@ -8670,10 +7278,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_365_days_mv AS
@@ -8687,10 +7295,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_3_days_mv AS
@@ -8704,10 +7312,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_60_days_mv AS
@@ -8721,10 +7329,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_7_days_mv AS
@@ -8738,10 +7346,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_90_days_mv AS
@@ -8755,10 +7363,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_seller_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_seller_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_seller_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_seller_all_time_mv AS
@@ -8772,10 +7380,10 @@ CREATE MATERIALIZED VIEW public.volume_seller_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_seller_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_seller_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_14_days_mv AS
@@ -8785,9 +7393,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_14_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '14 days'::interval))
@@ -8795,10 +7403,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_14_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_14_days_mv AS
@@ -8816,10 +7424,10 @@ CREATE MATERIALIZED VIEW public.volume_template_14_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_14_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_14_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_15_days_mv AS
@@ -8829,9 +7437,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_15_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '15 days'::interval))
@@ -8839,10 +7447,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_15_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_15_days_mv AS
@@ -8860,10 +7468,10 @@ CREATE MATERIALIZED VIEW public.volume_template_15_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_15_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_15_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_180_days_mv AS
@@ -8873,9 +7481,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_180_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '180 days'::interval))
@@ -8883,10 +7491,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_180_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_180_days_mv AS
@@ -8904,10 +7512,10 @@ CREATE MATERIALIZED VIEW public.volume_template_180_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_180_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_180_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_1_days_mv AS
@@ -8917,9 +7525,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_1_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '1 day'::interval))
@@ -8927,10 +7535,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_1_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_1_days_mv AS
@@ -8948,10 +7556,10 @@ CREATE MATERIALIZED VIEW public.volume_template_1_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_1_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_1_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_2_days_mv AS
@@ -8961,9 +7569,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_2_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '2 days'::interval))
@@ -8971,10 +7579,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_2_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_2_days_mv AS
@@ -8992,10 +7600,10 @@ CREATE MATERIALIZED VIEW public.volume_template_2_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_2_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_2_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_30_days_mv AS
@@ -9005,9 +7613,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_30_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '30 days'::interval))
@@ -9015,10 +7623,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_30_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_30_days_mv AS
@@ -9036,10 +7644,10 @@ CREATE MATERIALIZED VIEW public.volume_template_30_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_30_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_30_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_365_days_mv AS
@@ -9049,9 +7657,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_365_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '365 days'::interval))
@@ -9059,10 +7667,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_365_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_365_days_mv AS
@@ -9080,10 +7688,10 @@ CREATE MATERIALIZED VIEW public.volume_template_365_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_365_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_365_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_3_days_mv AS
@@ -9093,9 +7701,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_3_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '3 days'::interval))
@@ -9103,10 +7711,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_3_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_3_days_mv AS
@@ -9124,10 +7732,10 @@ CREATE MATERIALIZED VIEW public.volume_template_3_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_3_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_3_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_60_days_mv AS
@@ -9137,9 +7745,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_60_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '60 days'::interval))
@@ -9147,10 +7755,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_60_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_60_days_mv AS
@@ -9168,10 +7776,10 @@ CREATE MATERIALIZED VIEW public.volume_template_60_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_60_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_60_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_7_days_mv AS
@@ -9181,9 +7789,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_7_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '7 days'::interval))
@@ -9191,10 +7799,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_7_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_7_days_mv AS
@@ -9212,10 +7820,10 @@ CREATE MATERIALIZED VIEW public.volume_template_7_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_7_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_7_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_90_days_mv AS
@@ -9225,9 +7833,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_90_days_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(t.wax_price) AS wax_volume,
-    sum(t.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((t.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((t.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      JOIN public.sales_summary s USING (seq))
   WHERE (t."timestamp" > ((now() AT TIME ZONE 'UTC'::text) - '90 days'::interval))
@@ -9235,10 +7843,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_90_days_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_90_days_mv AS
@@ -9256,10 +7864,10 @@ CREATE MATERIALIZED VIEW public.volume_template_90_days_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_90_days_mv OWNER TO root;
+ALTER TABLE public.volume_template_90_days_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_before_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_before_2024_mv AS
@@ -9269,9 +7877,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_before_2024_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(s.wax_price) AS wax_volume,
-    sum(s.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((s.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((s.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      LEFT JOIN public.sales_summary s USING (seq))
   WHERE (s."timestamp" < '2024-01-01 00:00:00'::timestamp without time zone)
@@ -9279,10 +7887,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_before_2024_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_before_2024_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_before_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_from_2024_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_from_2024_mv AS
@@ -9292,9 +7900,9 @@ CREATE MATERIALIZED VIEW public.volume_template_user_from_2024_mv AS
     s.buyer,
     s.seller,
     s.type,
-    sum(s.wax_price) AS wax_volume,
-    sum(s.usd_price) AS usd_volume,
-    count(1) AS sales
+    sum((s.wax_price * (s.num_items)::double precision)) AS wax_volume,
+    sum((s.usd_price * (s.num_items)::double precision)) AS usd_volume,
+    sum(s.num_items) AS sales
    FROM (public.template_sales t
      LEFT JOIN public.sales_summary s USING (seq))
   WHERE (s."timestamp" >= '2024-01-01 00:00:00'::timestamp without time zone)
@@ -9302,10 +7910,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_from_2024_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_from_2024_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_from_2024_mv OWNER TO postgres;
 
 --
--- Name: volume_template_user_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_user_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_user_all_time_mv AS
@@ -9343,10 +7951,10 @@ CREATE MATERIALIZED VIEW public.volume_template_user_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_user_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_template_user_all_time_mv OWNER TO postgres;
 
 --
--- Name: volume_template_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: root
+-- Name: volume_template_all_time_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.volume_template_all_time_mv AS
@@ -9364,7 +7972,7 @@ CREATE MATERIALIZED VIEW public.volume_template_all_time_mv AS
   WITH NO DATA;
 
 
-ALTER TABLE public.volume_template_all_time_mv OWNER TO root;
+ALTER TABLE public.volume_template_all_time_mv OWNER TO postgres;
 
 --
 -- Name: whitelist_overwrite; Type: TABLE; Schema: public; Owner: postgres
@@ -10793,91 +9401,7 @@ CREATE UNIQUE INDEX collection_user_count_mv_collection_idx ON public.collection
 -- Name: collection_users_mv_owner_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX collection_users_mv_owner_collection_idx ON public.collection_users_mv USING btree (owner, collection);
-
-
---
--- Name: collection_volumes_14_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_14_mv_collection_type_idx ON public.collection_volumes_14_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_15_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_15_mv_collection_type_idx ON public.collection_volumes_15_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_180_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_180_mv_collection_type_idx ON public.collection_volumes_180_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_1_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_1_mv_collection_type_idx ON public.collection_volumes_1_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_2_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_2_mv_collection_type_idx ON public.collection_volumes_2_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_30_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_30_mv_collection_type_idx ON public.collection_volumes_30_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_365_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_365_mv_collection_type_idx ON public.collection_volumes_365_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_3_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_3_mv_collection_type_idx ON public.collection_volumes_3_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_60_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_60_mv_collection_type_idx ON public.collection_volumes_60_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_7_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_7_mv_collection_type_idx ON public.collection_volumes_7_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_90_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_90_mv_collection_type_idx ON public.collection_volumes_90_mv USING btree (collection, type);
-
-
---
--- Name: collection_volumes_from_2023_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX collection_volumes_from_2023_mv_collection_type_idx ON public.collection_volumes_from_2023_mv USING btree (collection, type);
+CREATE UNIQUE INDEX collection_users_mv_owner_collection_idx ON public.collection_users_mv USING btree (owner, collection);
 
 
 --
@@ -11490,6 +10014,13 @@ CREATE INDEX favorites_user_name_template_id_idx ON public.favorites USING btree
 
 
 --
+-- Name: floor_price_change_24h_mv_template_id_collection_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX floor_price_change_24h_mv_template_id_collection_idx ON public.floor_price_change_24h_mv USING btree (template_id, collection);
+
+
+--
 -- Name: floor_prices_by_date_template_id_floor_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -11770,90 +10301,6 @@ CREATE INDEX market_actions_seq_idx ON public.market_actions USING btree (seq DE
 
 
 --
--- Name: market_collection_volumes_14__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_14__collection_market_taker_maker_idx ON public.market_collection_volumes_14_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_15__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_15__collection_market_taker_maker_idx ON public.market_collection_volumes_15_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_180_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_180_collection_market_taker_maker_idx ON public.market_collection_volumes_180_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_1_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_1_m_collection_market_taker_maker_idx ON public.market_collection_volumes_1_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_2_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_2_m_collection_market_taker_maker_idx ON public.market_collection_volumes_2_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_30__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_30__collection_market_taker_maker_idx ON public.market_collection_volumes_30_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_365_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_365_collection_market_taker_maker_idx ON public.market_collection_volumes_365_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_3_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_3_m_collection_market_taker_maker_idx ON public.market_collection_volumes_3_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_60__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_60__collection_market_taker_maker_idx ON public.market_collection_volumes_60_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_7_m_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_7_m_collection_market_taker_maker_idx ON public.market_collection_volumes_7_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_90__collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_90__collection_market_taker_maker_idx ON public.market_collection_volumes_90_mv USING btree (collection, market, taker, maker, type);
-
-
---
--- Name: market_collection_volumes_fro_collection_market_taker_maker_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_collection_volumes_fro_collection_market_taker_maker_idx ON public.market_collection_volumes_from_2023_mv USING btree (collection, market, taker, maker, type);
-
-
---
 -- Name: market_statuses_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -11872,90 +10319,6 @@ CREATE UNIQUE INDEX market_statuses_market_list_name_collection_idx ON public.ma
 --
 
 CREATE INDEX market_statuses_seq_idx ON public.market_statuses USING btree (seq DESC);
-
-
---
--- Name: market_volumes_14_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_14_mv_market_taker_maker_type_idx ON public.market_volumes_14_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_15_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_15_mv_market_taker_maker_type_idx ON public.market_volumes_15_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_180_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_180_mv_market_taker_maker_type_idx ON public.market_volumes_180_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_1_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_1_mv_market_taker_maker_type_idx ON public.market_volumes_1_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_2_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_2_mv_market_taker_maker_type_idx ON public.market_volumes_2_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_30_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_30_mv_market_taker_maker_type_idx ON public.market_volumes_30_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_365_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_365_mv_market_taker_maker_type_idx ON public.market_volumes_365_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_3_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_3_mv_market_taker_maker_type_idx ON public.market_volumes_3_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_60_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_60_mv_market_taker_maker_type_idx ON public.market_volumes_60_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_7_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_7_mv_market_taker_maker_type_idx ON public.market_volumes_7_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_90_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_90_mv_market_taker_maker_type_idx ON public.market_volumes_90_mv USING btree (market, taker, maker, type);
-
-
---
--- Name: market_volumes_from_2023_mv_market_taker_maker_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX market_volumes_from_2023_mv_market_taker_maker_type_idx ON public.market_volumes_from_2023_mv USING btree (market, taker, maker, type);
 
 
 --
@@ -12813,13 +11176,6 @@ CREATE INDEX secondary_market_sales_seq_idx ON public.market_myth_sales USING bt
 
 
 --
--- Name: seller_volumes_mv_user_name_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX seller_volumes_mv_user_name_collection_type_idx ON public.seller_volumes_mv USING btree (user_name, collection, type);
-
-
---
 -- Name: simpleassets_burns_asset_ids_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -13394,167 +11750,6 @@ CREATE INDEX usd_prices_timestamp_idx1 ON public.usd_prices USING btree ("timest
 
 
 --
--- Name: user_collection_volumes_14_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_14_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_14_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_14_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_14_mv_collection_idx ON public.user_collection_volumes_14_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_15_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_15_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_15_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_15_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_15_mv_collection_idx ON public.user_collection_volumes_15_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_180_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_180_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_180_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_180_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_180_mv_collection_idx ON public.user_collection_volumes_180_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_1_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_1_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_1_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_1_mv_collection_buyer_seller_type_idx1; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_1_mv_collection_buyer_seller_type_idx1 ON public.user_collection_volumes_1_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_1_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_1_mv_collection_idx ON public.user_collection_volumes_1_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_2_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_2_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_2_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_2_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_2_mv_collection_idx ON public.user_collection_volumes_2_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_30_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_30_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_30_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_30_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_30_mv_collection_idx ON public.user_collection_volumes_30_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_365_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_365_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_365_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_365_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_365_mv_collection_idx ON public.user_collection_volumes_365_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_3_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_3_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_3_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_3_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_3_mv_collection_idx ON public.user_collection_volumes_3_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_60_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_60_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_60_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_60_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_60_mv_collection_idx ON public.user_collection_volumes_60_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_7_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_7_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_7_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_7_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_7_mv_collection_idx ON public.user_collection_volumes_7_mv USING btree (collection);
-
-
---
--- Name: user_collection_volumes_90_mv_collection_buyer_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_90_mv_collection_buyer_seller_type_idx ON public.user_collection_volumes_90_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_90_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX user_collection_volumes_90_mv_collection_idx ON public.user_collection_volumes_90_mv USING btree (collection);
-
-
---
 -- Name: user_collection_volumes_from_2023_mv_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -13566,13 +11761,6 @@ CREATE INDEX user_collection_volumes_from_2023_mv_collection_idx ON public.user_
 --
 
 CREATE UNIQUE INDEX user_collection_volumes_from_2_collection_buyer_seller_type_idx ON public.user_collection_volumes_from_2023_mv USING btree (collection, buyer, seller, type);
-
-
---
--- Name: user_collection_volumes_mv_user_name_collection_type_actor_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_collection_volumes_mv_user_name_collection_type_actor_idx ON public.user_collection_volumes_mv USING btree (user_name, collection, type, actor);
 
 
 --
@@ -13611,20 +11799,6 @@ CREATE UNIQUE INDEX user_pictures_mv_user_name_idx ON public.user_pictures_mv US
 
 
 --
--- Name: user_volumes_mv_user_name_type_actor_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_volumes_mv_user_name_type_actor_idx ON public.user_volumes_mv USING btree (user_name, type, actor);
-
-
---
--- Name: user_volumes_s_mv_user_name_actor_type_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX user_volumes_s_mv_user_name_actor_type_idx ON public.user_volumes_s_mv USING btree (user_name, actor, type);
-
-
---
 -- Name: users_mv_owner_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -13653,553 +11827,553 @@ CREATE UNIQUE INDEX videos_video_idx ON public.videos USING btree (video);
 
 
 --
--- Name: volume_buyer_14_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_14_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_14_days_mv_buyer_type_idx ON public.volume_buyer_14_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_15_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_15_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_15_days_mv_buyer_type_idx ON public.volume_buyer_15_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_180_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_180_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_180_days_mv_buyer_type_idx ON public.volume_buyer_180_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_1_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_1_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_1_days_mv_buyer_type_idx ON public.volume_buyer_1_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_2_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_2_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_2_days_mv_buyer_type_idx ON public.volume_buyer_2_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_30_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_30_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_30_days_mv_buyer_type_idx ON public.volume_buyer_30_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_365_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_365_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_365_days_mv_buyer_type_idx ON public.volume_buyer_365_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_3_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_3_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_3_days_mv_buyer_type_idx ON public.volume_buyer_3_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_60_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_60_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_60_days_mv_buyer_type_idx ON public.volume_buyer_60_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_7_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_7_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_7_days_mv_buyer_type_idx ON public.volume_buyer_7_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_90_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_90_days_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_90_days_mv_buyer_type_idx ON public.volume_buyer_90_days_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_buyer_all_time_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_buyer_all_time_mv_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_buyer_all_time_mv_buyer_type_idx ON public.volume_buyer_all_time_mv USING btree (buyer, type);
 
 
 --
--- Name: volume_collection_14_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_14_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_14_days_mv_collection_type_idx ON public.volume_collection_14_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_15_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_15_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_15_days_mv_collection_type_idx ON public.volume_collection_15_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_180_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_180_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_180_days_mv_collection_type_idx ON public.volume_collection_180_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_1_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_1_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_1_days_mv_collection_type_idx ON public.volume_collection_1_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_2_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_2_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_2_days_mv_collection_type_idx ON public.volume_collection_2_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_30_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_30_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_30_days_mv_collection_type_idx ON public.volume_collection_30_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_365_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_365_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_365_days_mv_collection_type_idx ON public.volume_collection_365_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_3_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_3_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_3_days_mv_collection_type_idx ON public.volume_collection_3_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_60_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_60_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_60_days_mv_collection_type_idx ON public.volume_collection_60_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_7_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_7_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_7_days_mv_collection_type_idx ON public.volume_collection_7_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_90_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_90_days_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_90_days_mv_collection_type_idx ON public.volume_collection_90_days_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_all_time_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_all_time_mv_collection_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_all_time_mv_collection_type_idx ON public.volume_collection_all_time_mv USING btree (collection, type);
 
 
 --
--- Name: volume_collection_buyer_14_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_14_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_14_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_14_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_15_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_15_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_15_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_15_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_180_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_180_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_180_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_180_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_1_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_1_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_1_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_1_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_2_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_2_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_2_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_2_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_30_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_30_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_30_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_30_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_365_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_365_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_365_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_365_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_3_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_3_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_3_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_3_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_60_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_60_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_60_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_60_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_7_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_7_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_7_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_7_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_90_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_90_days_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_90_days_mv_collection_buyer_type_idx ON public.volume_collection_buyer_90_days_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_all_time_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_all_time_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_all_time_mv_collection_buyer_type_idx ON public.volume_collection_buyer_all_time_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_before_2024_m_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_before_2024_m_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_before_2024_m_collection_buyer_type_idx ON public.volume_collection_buyer_before_2024_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_buyer_from_2024_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_buyer_from_2024_mv_collection_buyer_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_buyer_from_2024_mv_collection_buyer_type_idx ON public.volume_collection_buyer_from_2024_mv USING btree (collection, buyer, type);
 
 
 --
--- Name: volume_collection_market_14_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_14_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_14_d_collection_market_maker_taker_idx ON public.volume_collection_market_14_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_15_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_15_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_15_d_collection_market_maker_taker_idx ON public.volume_collection_market_15_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_180__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_180__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_180__collection_market_maker_taker_idx ON public.volume_collection_market_180_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_1_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_1_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_1_da_collection_market_maker_taker_idx ON public.volume_collection_market_1_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_2_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_2_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_2_da_collection_market_maker_taker_idx ON public.volume_collection_market_2_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_30_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_30_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_30_d_collection_market_maker_taker_idx ON public.volume_collection_market_30_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_365__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_365__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_365__collection_market_maker_taker_idx ON public.volume_collection_market_365_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_3_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_3_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_3_da_collection_market_maker_taker_idx ON public.volume_collection_market_3_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_60_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_60_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_60_d_collection_market_maker_taker_idx ON public.volume_collection_market_60_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_7_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_7_da_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_7_da_collection_market_maker_taker_idx ON public.volume_collection_market_7_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_90_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_90_d_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_90_d_collection_market_maker_taker_idx ON public.volume_collection_market_90_days_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_all__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_all__collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_all__collection_market_maker_taker_idx ON public.volume_collection_market_all_time_mv USING btree (collection, market, maker, taker, type);
 
 
 --
--- Name: volume_collection_market_use_collection_market_maker_take_idx10; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_use_collection_market_maker_take_idx10; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx10 ON public.volume_collection_market_user_7_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_use_collection_market_maker_take_idx11; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_use_collection_market_maker_take_idx11; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx11 ON public.volume_collection_market_user_3_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_use_collection_market_maker_take_idx12; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_use_collection_market_maker_take_idx12; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx12 ON public.volume_collection_market_user_2_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_use_collection_market_maker_take_idx13; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_use_collection_market_maker_take_idx13; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_use_collection_market_maker_take_idx13 ON public.volume_collection_market_user_1_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_all_time_mv_collection_market_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_all_time_mv_collection_market_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX volume_collection_market_user_all_time_mv_collection_market_idx ON public.volume_collection_market_user_all_time_mv USING btree (collection, market);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx1; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx1; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx1 ON public.volume_collection_market_user_from_2024_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx2; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx2; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx2 ON public.volume_collection_market_user_all_time_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx3; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx3; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx3 ON public.volume_collection_market_user_365_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx4; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx4; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx4 ON public.volume_collection_market_user_180_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx5; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx5; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx5 ON public.volume_collection_market_user_90_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx6; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx6; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx6 ON public.volume_collection_market_user_60_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx7; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx7; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx7 ON public.volume_collection_market_user_30_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx8; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx8; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx8 ON public.volume_collection_market_user_15_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_take_idx9; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_take_idx9; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_take_idx9 ON public.volume_collection_market_user_14_days_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_market_user_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_market_user_collection_market_maker_taker_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_market_user_collection_market_maker_taker_idx ON public.volume_collection_market_user_before_2024_mv USING btree (collection, market, maker, taker, buyer, seller, type);
 
 
 --
--- Name: volume_collection_seller_14_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_14_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_14_days_mv_collection_seller_type_idx ON public.volume_collection_seller_14_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_15_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_15_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_15_days_mv_collection_seller_type_idx ON public.volume_collection_seller_15_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_180_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_180_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_180_days_mv_collection_seller_type_idx ON public.volume_collection_seller_180_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_1_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_1_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_1_days_mv_collection_seller_type_idx ON public.volume_collection_seller_1_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_2_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_2_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_2_days_mv_collection_seller_type_idx ON public.volume_collection_seller_2_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_30_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_30_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_30_days_mv_collection_seller_type_idx ON public.volume_collection_seller_30_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_365_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_365_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_365_days_mv_collection_seller_type_idx ON public.volume_collection_seller_365_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_3_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_3_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_3_days_mv_collection_seller_type_idx ON public.volume_collection_seller_3_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_60_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_60_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_60_days_mv_collection_seller_type_idx ON public.volume_collection_seller_60_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_7_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_7_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_7_days_mv_collection_seller_type_idx ON public.volume_collection_seller_7_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_90_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_90_days_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_90_days_mv_collection_seller_type_idx ON public.volume_collection_seller_90_days_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_all_time_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_all_time_mv_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_all_time_mv_collection_seller_type_idx ON public.volume_collection_seller_all_time_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_before_2024_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_before_2024_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_before_2024_collection_seller_type_idx ON public.volume_collection_seller_before_2024_mv USING btree (collection, seller, type);
 
 
 --
--- Name: volume_collection_seller_from_2024_m_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_collection_seller_from_2024_m_collection_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_collection_seller_from_2024_m_collection_seller_type_idx ON public.volume_collection_seller_from_2024_mv USING btree (collection, seller, type);
@@ -14290,350 +12464,350 @@ CREATE UNIQUE INDEX volume_drop_all_time_mv_collection_drop_id_market_idx ON pub
 
 
 --
--- Name: volume_market_14_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_14_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_14_days_mv_market_maker_taker_type_idx ON public.volume_market_14_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_15_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_15_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_15_days_mv_market_maker_taker_type_idx ON public.volume_market_15_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_180_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_180_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_180_days_mv_market_maker_taker_type_idx ON public.volume_market_180_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_1_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_1_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_1_days_mv_market_maker_taker_type_idx ON public.volume_market_1_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_2_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_2_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_2_days_mv_market_maker_taker_type_idx ON public.volume_market_2_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_30_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_30_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_30_days_mv_market_maker_taker_type_idx ON public.volume_market_30_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_365_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_365_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_365_days_mv_market_maker_taker_type_idx ON public.volume_market_365_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_3_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_3_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_3_days_mv_market_maker_taker_type_idx ON public.volume_market_3_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_60_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_60_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_60_days_mv_market_maker_taker_type_idx ON public.volume_market_60_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_7_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_7_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_7_days_mv_market_maker_taker_type_idx ON public.volume_market_7_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_90_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_90_days_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_90_days_mv_market_maker_taker_type_idx ON public.volume_market_90_days_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_market_all_time_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_market_all_time_mv_market_maker_taker_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_market_all_time_mv_market_maker_taker_type_idx ON public.volume_market_all_time_mv USING btree (market, maker, taker, type);
 
 
 --
--- Name: volume_seller_14_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_14_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_14_days_mv_seller_type_idx ON public.volume_seller_14_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_15_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_15_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_15_days_mv_seller_type_idx ON public.volume_seller_15_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_180_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_180_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_180_days_mv_seller_type_idx ON public.volume_seller_180_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_1_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_1_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_1_days_mv_seller_type_idx ON public.volume_seller_1_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_2_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_2_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_2_days_mv_seller_type_idx ON public.volume_seller_2_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_30_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_30_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_30_days_mv_seller_type_idx ON public.volume_seller_30_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_365_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_365_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_365_days_mv_seller_type_idx ON public.volume_seller_365_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_3_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_3_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_3_days_mv_seller_type_idx ON public.volume_seller_3_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_60_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_60_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_60_days_mv_seller_type_idx ON public.volume_seller_60_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_7_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_7_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_7_days_mv_seller_type_idx ON public.volume_seller_7_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_90_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_90_days_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_90_days_mv_seller_type_idx ON public.volume_seller_90_days_mv USING btree (seller, type);
 
 
 --
--- Name: volume_seller_all_time_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_seller_all_time_mv_seller_type_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_seller_all_time_mv_seller_type_idx ON public.volume_seller_all_time_mv USING btree (seller, type);
 
 
 --
--- Name: volume_template_14_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_14_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_14_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_14_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_15_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_15_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_15_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_15_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_180_days_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_180_days_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_180_days_mv_template_id_schema_collection_t_idx ON public.volume_template_180_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_1_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_1_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_1_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_1_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_2_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_2_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_2_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_2_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_30_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_30_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_30_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_30_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_365_days_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_365_days_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_365_days_mv_template_id_schema_collection_t_idx ON public.volume_template_365_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_3_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_3_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_3_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_3_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_60_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_60_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_60_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_60_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_7_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_7_days_mv_template_id_schema_collection_typ_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_7_days_mv_template_id_schema_collection_typ_idx ON public.volume_template_7_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_90_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_90_days_mv_template_id_schema_collection_ty_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_90_days_mv_template_id_schema_collection_ty_idx ON public.volume_template_90_days_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_all_time_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_all_time_mv_template_id_schema_collection_t_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_all_time_mv_template_id_schema_collection_t_idx ON public.volume_template_all_time_mv USING btree (template_id, schema, collection, type);
 
 
 --
--- Name: volume_template_user_14_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_14_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_14_days__template_id_schema_collection_idx ON public.volume_template_user_14_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_15_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_15_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_15_days__template_id_schema_collection_idx ON public.volume_template_user_15_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_180_days_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_180_days_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_180_days_template_id_schema_collection_idx ON public.volume_template_user_180_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_1_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_1_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_1_days_m_template_id_schema_collection_idx ON public.volume_template_user_1_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_2_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_2_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_2_days_m_template_id_schema_collection_idx ON public.volume_template_user_2_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_30_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_30_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_30_days__template_id_schema_collection_idx ON public.volume_template_user_30_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_365_days_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_365_days_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_365_days_template_id_schema_collection_idx ON public.volume_template_user_365_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_3_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_3_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_3_days_m_template_id_schema_collection_idx ON public.volume_template_user_3_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_60_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_60_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_60_days__template_id_schema_collection_idx ON public.volume_template_user_60_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_7_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_7_days_m_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_7_days_m_template_id_schema_collection_idx ON public.volume_template_user_7_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_90_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_90_days__template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_90_days__template_id_schema_collection_idx ON public.volume_template_user_90_days_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_all_time_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_all_time_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_all_time_template_id_schema_collection_idx ON public.volume_template_user_all_time_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_before_2_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_before_2_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_before_2_template_id_schema_collection_idx ON public.volume_template_user_before_2024_mv USING btree (template_id, schema, collection, buyer, seller, type);
 
 
 --
--- Name: volume_template_user_from_202_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: root
+-- Name: volume_template_user_from_202_template_id_schema_collection_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX volume_template_user_from_202_template_id_schema_collection_idx ON public.volume_template_user_from_2024_mv USING btree (template_id, schema, collection, buyer, seller, type);
@@ -14750,9 +12924,6 @@ CREATE INDEX wuffi_airdrops_seq_idx ON public.wuffi_airdrops USING btree (seq DE
 
 GRANT ALL ON SCHEMA public TO root;
 
-ALTER ROLE root WITH LOGIN;
-
-INSERT INTO handle_fork VALUES (false, 0);
 
 --
 -- PostgreSQL database dump complete

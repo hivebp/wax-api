@@ -994,7 +994,8 @@ def load_claim_drop(session, transfer, contract):
         '   drop_id, contract, claimer, country, referrer, amount, seq, block_num, timestamp'
         ') '
         'SELECT :drop_id, :contract, :claimer, :country, :referrer, :amount, :seq, :block_num, :timestamp '
-        'WHERE NOT EXISTS (SELECT seq FROM drop_claims WHERE seq = :seq)',
+        'WHERE NOT EXISTS (SELECT seq '
+        'FROM drop_claims WHERE seq = :seq)',
         new_transfer
     )
 
@@ -2984,7 +2985,7 @@ def load_offer(session, offer):
             session_execute_logged(
                 session,
                 'INSERT INTO sales '
-                'SELECT l.asset_ids, a.collection, seller, :newowner, '
+                'SELECT l.asset_ids, l.collection, seller, :newowner, '
                 'CASE WHEN currency = \'WAX\' THEN price ELSE price / ('
                 '   SELECT usd FROM usd_prices WHERE timestamp < l.timestamp ORDER BY timestamp DESC LIMIT 1'
                 ') END, CASE WHEN currency = \'USD\' THEN price ELSE price * ('
