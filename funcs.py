@@ -2087,7 +2087,7 @@ def update_sales_summary(session):
     session_execute_logged(
         session,
         'INSERT INTO sales_summary SELECT collection, \'sales\', wax_price, usd_price, 1, buyer, seller, market, '
-        'taker, maker, listing_id, timestamp, seq, block_num FROM sales WHERE seq > (SELECT MAX(seq) '
+        'taker, maker, listing_id, timestamp, seq, block_num FROM sales WHERE seq > (SELECT COALESCE(MAX(seq), 0) '
         'FROM sales_summary WHERE type = \'sales\')'
     )
 
@@ -2121,7 +2121,7 @@ def update_sales_summary(session):
         '      FROM drop_price_updates'
         '      WHERE contract = dc.contract AND drop_id = dc.drop_id AND seq > dc.seq'
         '    ) '
-        '   WHERE dc.seq > (SELECT MAX(seq) FROM sales_summary WHERE type = \'drops\')'
+        '   WHERE dc.seq > (SELECT COALESCE(MAX(seq), 0) FROM sales_summary WHERE type = \'drops\')'
         ') dt'
     )
 
