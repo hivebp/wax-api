@@ -1876,7 +1876,7 @@ def get_newest_sales():
                 }
             }
             if sale.name:
-                dict['asset']['name'] = sale.name.replace('\"', '\'')
+                dict['asset']['name'] = sale.name.replace('\"', '\'').replace('\'', '\\\'')
             if sale.image and 'video:' in sale.image:
                 dict['asset']['video'] = sale.image.replace('video:', '')
             elif sale.image:

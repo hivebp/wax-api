@@ -429,8 +429,8 @@ def _format_asset(asset):
                 'tokenLogo': asset['rwax_token_logo'],
                 'tokenLogoLarge': asset['rwax_token_logo_lg'],
                 'templateMaxAssets': asset['rwax_max_assets'],
-                'traitFactors': asset['trait_factors'],
-                'templatesSupply': asset['templates_supply'],
+                'traitFactors': _format_object(asset['trait_factors']),
+                'templatesSupply': _format_object(asset['templates_supply']),
                 'totalSupply': asset['rwax_supply']
             }
         if asset['video']:

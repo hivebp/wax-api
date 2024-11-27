@@ -3296,7 +3296,7 @@ def load_market_myth_buy(session, action):
         'INSERT INTO market_myth_sales '
         'SELECT :asset_ids, :seller, :buyer, :price, :currency, :asset_id, :market, NULL, :referral, '
         ':seq, :block_num, :timestamp '
-        'WHERE NOT EXISTS (SELECT seq FROM secondary_market_sales WHERE seq = :seq) ',
+        'WHERE NOT EXISTS (SELECT seq FROM market_myth_sales WHERE seq = :seq) ',
         buy
     )
     session.commit()
