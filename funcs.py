@@ -4890,6 +4890,7 @@ def load_tag_filter(session, action):
         'WHERE NOT EXISTS (SELECT seq FROM tag_filter_actions WHERE seq = :seq) ', new_filter
     )
 
+
 @catch_and_log()
 def load_log_tokenize(session, tokenize):
     data = _get_data(tokenize)

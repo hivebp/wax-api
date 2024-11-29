@@ -91,7 +91,7 @@ def _format_object(item):
                     obj = _format_object(e)
                     if obj:
                         new_item[to_lower_camel_case(key)].append(obj)
-            elif val:
+            elif val or val == 0:
                 new_item[to_lower_camel_case(key)] = _format_object(val)
     elif hasattr(item, "__len__") and not isinstance(item, str):
         new_item = []
@@ -168,6 +168,15 @@ def _get_attributes_object():
         'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
         'LEFT JOIN attribute_stats USING(attribute_id) '
         'WHERE asset_id = a.asset_id) '
+    )
+
+
+def _get_listings_object():
+    return (
+        '(SELECT array_agg(json_build_object(\'listing_id\', listing_id, \'market\', market, ' 
+        '\'asset_ids\', asset_ids, \'price\', price, \'currency\', currency, \'seller\', seller)) '
+        'FROM listings l '
+        'WHERE l.collection = a.collection AND seller = owner AND a.asset_id = ANY(asset_ids) ) '
     )
 
 
@@ -396,6 +405,7 @@ def _format_asset(asset):
             'owner': asset['owner'],
             'burned': asset['burned'],
             'mint': asset['mint'],
+            'contract': asset['contract'],
             'collection': asset['collection'],
             'transferable': asset['transferable'],
             'burnable': asset['burnable'],
@@ -429,6 +439,7 @@ def _format_asset(asset):
                 'tokenLogo': asset['rwax_token_logo'],
                 'tokenLogoLarge': asset['rwax_token_logo_lg'],
                 'templateMaxAssets': asset['rwax_max_assets'],
+                'redeemAmount': asset['rwax_amount'],
                 'traitFactors': _format_object(asset['trait_factors']),
                 'templatesSupply': _format_object(asset['templates_supply']),
                 'totalSupply': asset['rwax_supply']
@@ -466,9 +477,11 @@ def _format_asset(asset):
                 stats_obj['floorPrice'] = asset['floor_price']
             asset_obj['template'] = {
                 'templateId': asset['template_id'],
-                'immutableData': json.loads(asset['template_immutable_data']) if asset['template_immutable_data'] else '{}',
+                'immutableData': json.loads(asset['template_immutable_data']) if asset[
+                    'template_immutable_data'] else '{}',
                 'stats': stats_obj,
             }
+            asset_obj['listings'] = _format_object(asset['listings'])
         return asset_obj
     except Exception as e:
         print(e)
@@ -1268,18 +1281,20 @@ def assets(
             'assets a '
         )
         columns_clause = (
-            'a.asset_id, a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, a.owner, a.burned, '
-            'm.data AS mutable_data, i.data AS immutable_data, td.data AS template_immutable_data, tm.num_burned, '
-            'a.mint, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, '
-            'ts.last_sold_timestamp AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
+            'a.asset_id, a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, a.owner, a.contract, '
+            'a.burned, m.data AS mutable_data, i.data AS immutable_data, td.data AS template_immutable_data, a.mint, '
+            'tm.num_burned, ts.avg_wax_price, ts.avg_usd_price, ts.last_sold_wax, ts.last_sold_usd, '
+            'last_sold_listing_id, ts.last_sold_timestamp AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
             'ts.volume_usd, ts.num_sales, tm.num_minted AS num_minted, img.image, vid.video, '
             'cn.name AS display_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
             'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
             'r.symbol AS rwax_symbol, r.contract AS rwax_contract, r.max_assets AS rwax_max_assets, rt.trait_factors, '
             'rt.templates_supply, rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, '
             'rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, a.transferable, a.burnable, '
-            'rt.token_logo_lg AS rwax_token_logo_lg, {badges_object}, {tags_obj}, {attributes_obj} AS traits'.format(
-                badges_object=_get_badges_object(), tags_obj=_get_tags_object(), attributes_obj=_get_attributes_object()
+            'rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, '
+            '{badges_object}, {tags_obj}, {attributes_obj} AS traits, {listings_obj} AS listings'.format(
+                badges_object=_get_badges_object(), tags_obj=_get_tags_object(),
+                attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object()
             )
         )
         if only == 'packs':
@@ -1457,6 +1472,7 @@ def assets(
             'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
             'LEFT JOIN rwax_templates r ON (a.template_id = r.template_id) '
             'LEFT JOIN rwax_tokens rt ON (r.contract = rt.contract AND r.symbol = rt.symbol) '
+            'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
             'LEFT JOIN names cn ON (col.name_id = cn.name_id) '

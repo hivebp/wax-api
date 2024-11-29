@@ -512,8 +512,12 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
                         'removed_waxplorercom_listings', 'listings').replace(
                         'removed_', ''
                     ),
-                    query=tables['query'],
-                    removed_table_name=tables['table_name']
+                    query=tables['query']
+                ), {'block_num': block_num}
+            )
+            session.execute(
+                'DELETE FROM {table_name} WHERE removed_block_num >= :block_num'.format(
+                    table_name=tables['table_name'],
                 ), {'block_num': block_num}
             )
 
