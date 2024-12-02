@@ -4937,9 +4937,9 @@ def load_log_tokenize(session, tokenize):
     session_execute_logged(
         session,
         'INSERT INTO rwax_redeemables ('
-        '   asset_id, redeemer, contract, symbol, amount, timestamp, seq, block_num'
+        '   asset_id, tokenizer, contract, symbol, amount, timestamp, seq, block_num'
         ') '
-        'SELECT :asset_id, :redeemer, :contract, :symbol, :amount, :timestamp, :seq, :block_num '
+        'SELECT :asset_id, :tokenizer, :contract, :symbol, :amount, :timestamp, :seq, :block_num '
         'WHERE NOT EXISTS (SELECT seq FROM rwax_redemptions WHERE seq = :seq)',
         new_token
    )
