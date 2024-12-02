@@ -124,10 +124,10 @@ def _get_templates_object():
 def _get_assets_object():
     return (
         'array_agg(json_build_object(\'asset_id\', a.asset_id, \'name\', n.name, \'collection\', a.collection, '
-        '\'verified\', col.verified, \'collection_image\', ci.image, \'display_name\', cn.name, '
-        '\'schema\', a.schema, \'mutable_data\', m.data, \'immutable_data\', i.data, \'template_immutable_data\', '
-        'td.data, \'num_burned\', tm.num_burned, \'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', '
-        'ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
+        '\'contract\', a.contract, \'verified\', col.verified, \'collection_image\', ci.image, '
+        '\'display_name\', cn.name, \'schema\', a.schema, \'mutable_data\', m.data, \'immutable_data\', i.data, '
+        '\'template_immutable_data\', td.data, \'num_burned\', tm.num_burned, \'avg_wax_price\', ts.avg_wax_price, '
+        '\'avg_usd_price\', ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd,'
         '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
         '\'owner\', a.owner, \'burned\', burned, \'floor_price\', fp.floor_price, \'rwax_symbol\', r.symbol, '
         '\'rwax_contract\', r.contract, \'rwax_max_assets\', r.max_assets, \'trait_factors\', rt.trait_factors, '
@@ -138,7 +138,8 @@ def _get_assets_object():
         '\'template_id\', t.template_id, \'image\', img.image, \'video\', vid.video, \'mint\', a.mint, '
         '\'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, \'mint_seq\', a.seq, '
         '\'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, \'burnable\', a.burnable, '
-        '\'transferable\', a.transferable, \'traits\', {attributes_obj})) AS assets '.format(
+        '\'transferable\', a.transferable, \'rwax_amount\', rtt.amount, '
+        '\'traits\', {attributes_obj})) AS assets '.format(
             attributes_obj=_get_attributes_object()
         )
     )
@@ -481,7 +482,8 @@ def _format_asset(asset):
                     'template_immutable_data'] else '{}',
                 'stats': stats_obj,
             }
-            asset_obj['listings'] = _format_object(asset['listings'])
+            if 'listings' in asset.keys():
+                asset_obj['listings'] = _format_object(asset['listings'])
         return asset_obj
     except Exception as e:
         print(e)
@@ -1614,6 +1616,7 @@ def listings(
             'LEFT JOIN pfp_assets p USING(asset_id) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN rwax_templates rt ON (a.template_id = rt.template_id) '
+            'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
             'LEFT JOIN collections col ON (col.collection = l.collection) '
@@ -1637,6 +1640,7 @@ def listings(
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             'LEFT JOIN rwax_templates r ON (a.template_id = r.template_id) '
             'LEFT JOIN rwax_tokens rt ON (r.contract = rt.contract AND r.symbol = rt.symbol) '
+            'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
@@ -1762,6 +1766,7 @@ def listings(
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
                     'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
                     'LEFT JOIN rwax_templates rt ON (a.template_id = rt.template_id) '
+                    'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1809,6 +1814,7 @@ def listings(
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
                     'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
+                    'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
                     'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '

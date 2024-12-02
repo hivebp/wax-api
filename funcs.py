@@ -4864,8 +4864,31 @@ def load_rwax_erasetoken(session, erase):
 
     session_execute_logged(
         session,
+        'INSERT INTO removed_rwax_templates '
+        'SELECT r.*, :seq, :block_num FROM rwax_templates r '
+        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        erased_token
+    )
+
+    session_execute_logged(
+        session,
         'DELETE FROM rwax_templates '
         'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        erased_token
+    )
+
+    session_execute_logged(
+        session,
+        'INSERT INTO removed_rwax_redeemables '
+        'SELECT r.*, :seq, :block_num FROM rwax_redeemables r '
+        'WHERE contract = :contract AND symbol = :symbol',
+        erased_token
+    )
+
+    session_execute_logged(
+        session,
+        'DELETE FROM rwax_redeemables '
+        'WHERE contract = :contract AND symbol = :symbol ',
         erased_token
     )
 
@@ -4910,6 +4933,16 @@ def load_log_tokenize(session, tokenize):
         'WHERE NOT EXISTS (SELECT seq FROM rwax_tokenizations WHERE seq = :seq)',
         new_token
     )
+
+    session_execute_logged(
+        session,
+        'INSERT INTO rwax_redeemables ('
+        '   asset_id, redeemer, contract, symbol, amount, timestamp, seq, block_num'
+        ') '
+        'SELECT :asset_id, :redeemer, :contract, :symbol, :amount, :timestamp, :seq, :block_num '
+        'WHERE NOT EXISTS (SELECT seq FROM rwax_redemptions WHERE seq = :seq)',
+        new_token
+   )
 
 
 @catch_and_log()
@@ -4961,15 +4994,15 @@ def load_rwax_redeem(session, redeem):
 
     session_execute_logged(
         session,
-        'INSERT INTO removed_rwax_tokenizations '
+        'INSERT INTO removed_rwax_redeemables '
         'SELECT r.*, :seq, :block_num '
-        'FROM rwax_tokenizations r WHERE asset_id = :asset_id',
+        'FROM rwax_redeemables r WHERE asset_id = :asset_id',
         new_token
     )
 
     session_execute_logged(
         session,
-        'DELETE FROM rwax_tokenizations '
+        'DELETE FROM rwax_redeemables '
         'WHERE asset_id = :asset_id',
         new_token
     )

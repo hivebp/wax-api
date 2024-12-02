@@ -1933,7 +1933,7 @@ def get_delphi_oracle_actions():
 
             return json.loads(response.content)
         except Exception as err:
-            log_error('load_atomic_market_buy: {}'.format(err))
+            log_error('get_delphi_oracle_actions: {}'.format(err))
             continue
 
     return {'rows': []}
