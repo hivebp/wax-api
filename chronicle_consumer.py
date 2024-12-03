@@ -783,6 +783,7 @@ def handle_transaction(action, block_num, timestamp, session):
                         'WHERE NOT EXISTS (SELECT seq FROM chronicle_transactions WHERE seq = :seq)'
                         , trace
                     )
+                    session.commit()
             except SQLAlchemyError as err:
                 session.rollback()
                 session.remove()
