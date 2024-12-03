@@ -2128,6 +2128,82 @@ def update_sales_summary(session):
     session.commit()
 
 
+def apply_atomic_updates(session):
+    try:
+        updates = session_execute_logged(
+            session,
+            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, new_mdata_id '
+            'FROM atomicassets_updates u '
+            'INNER JOIN assets a USING(asset_id) '
+            'LEFT JOIN data d1 ON (new_mdata_id = d1.data_id) '
+            'LEFT JOIN data d2 ON (a.immutable_data_id = d2.data_id) '
+            'WHERE NOT applied AND u.timestamp < NOW() AT time zone \'UTC\' - INTERVAL \'3 minutes\' '
+            'ORDER BY u.seq ASC '
+            'LIMIT 100 '
+        )
+
+        for update in updates:
+            forked = session.execute('SELECT * FROM handle_fork').first()
+            if forked['forked'] and forked['block_num'] <= update['block_num']:
+                raise RuntimeError('Fork')
+            try:
+                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] else {}
+                if 'mdata' in update.keys() and update['mdata']:
+                    data.update(json.loads(update['mdata']))
+            except Exception as err:
+                continue
+
+            new_asset = {}
+
+            new_asset['name'] = data['name'].strip()[0:255] if 'name' in data.keys() else None
+            new_asset['image'] = str(data['img']).strip()[0:255] if 'img' in data.keys() else None
+            new_asset['video'] = str(data['video']).strip()[0:255] if 'video' in data.keys() else None
+            new_asset['seq'] = update['seq']
+            new_asset['new_mdata_id'] = update['new_mdata_id']
+            new_asset['asset_id'] = update['asset_id']
+
+            new_asset['attribute_ids'] = parse_simple_attributes(session, update['collection'], update['schema'], data)
+
+            with_clause = construct_with_clause(new_asset)
+
+            session_execute_logged(
+                session,
+                '{with_clause} '
+                'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :new_mdata_id '
+                '{name_clause} {image_clause} {video_clause} '
+                'WHERE asset_id = :asset_id' .format(
+                    with_clause=with_clause,
+                    name_clause=(
+                        ', name_id = (SELECT name_id FROM names WHERE name = :name '
+                        'UNION SELECT name_id FROM name_insert_result)'
+                    ) if new_asset['name'] else ', name_id = NULL',
+                    image_clause=(
+                        ', image_id = (SELECT image_id FROM images WHERE image = :image '
+                        'UNION SELECT image_id FROM image_insert_result)'
+                    ) if new_asset['image'] else ', image_id = NULL',
+                    video_clause=(
+                        ', video_id = (SELECT video_id FROM videos WHERE video = :video '
+                        'UNION SELECT video_id FROM video_insert_result)'
+                    ) if new_asset['video'] else ', video_id = NULL',
+                ), new_asset)
+            session_execute_logged(
+                session,
+                'UPDATE atomicassets_updates SET applied = TRUE WHERE seq = :seq',
+                new_asset
+            )
+        session.commit()
+    except SQLAlchemyError as err:
+        log_error('apply_simple_updates: {}'.format(err))
+        raise err
+    except RuntimeError as err:
+        time.sleep(30)
+        log_error('apply_simple_updates: {}'.format(err))
+        raise err
+    except Exception as err:
+        log_error('apply_simple_updates: {}'.format(err))
+        raise err
+
+
 def apply_simple_updates(session):
     try:
         updates = session_execute_logged(
@@ -2174,16 +2250,23 @@ def apply_simple_updates(session):
                 'WHERE asset_id = :asset_id' .format(
                     with_clause=with_clause,
                     name_clause=(
-                        ', name_id = (SELECT name_id FROM names WHERE name = :name UNION SELECT name_id FROM name_insert_result)'
+                        ', name_id = (SELECT name_id FROM names WHERE name = :name '
+                        'UNION SELECT name_id FROM name_insert_result)'
                     ) if new_asset['name'] else ', name_id = NULL',
                     image_clause=(
-                        ', image_id = (SELECT image_id FROM images WHERE image = :image UNION SELECT image_id FROM image_insert_result)'
+                        ', image_id = (SELECT image_id FROM images WHERE image = :image '
+                        'UNION SELECT image_id FROM image_insert_result)'
                     ) if new_asset['image'] else ', image_id = NULL',
                     video_clause=(
-                        ', video_id = (SELECT video_id FROM videos WHERE video = :video UNION SELECT video_id FROM video_insert_result)'
+                        ', video_id = (SELECT video_id FROM videos WHERE video = :video '
+                        'UNION SELECT video_id FROM video_insert_result)'
                     ) if new_asset['video'] else ', video_id = NULL',
                 ), new_asset)
-            session_execute_logged(session, 'UPDATE simpleassets_updates SET applied = TRUE WHERE asset_id = :asset_id', new_asset)
+            session_execute_logged(
+                session,
+                'UPDATE simpleassets_updates SET applied = TRUE WHERE seq = :seq',
+                new_asset
+            )
         session.commit()
     except SQLAlchemyError as err:
         log_error('apply_simple_updates: {}'.format(err))
@@ -2199,7 +2282,45 @@ def apply_simple_updates(session):
 
 @catch_and_log()
 def calc_atomic_mints(session):
+    forked = session.execute('SELECT * FROM handle_fork').first()
+    if forked['forked'] and forked['block_num']:
+        raise RuntimeError('Fork')
+
     res = session_execute_logged(
+        session,
+        'SELECT * FROM atomicassets_updates WHERE NOT applied ORDER BY seq ASC'
+    )
+
+    session.commit()
+
+    forked = session.execute('SELECT * FROM handle_fork').first()
+    if forked['forked'] and forked['block_num']:
+        raise RuntimeError('Fork')
+
+    res = session_execute_logged(
+        session,
+        'UPDATE assets a SET mint = am.mint '
+        'FROM ('
+        '   SELECT asset_id, m.mint '
+        '   FROM asset_mints m '
+        '   INNER JOIN assets a2 USING(asset_id) '
+        '   WHERE a2.mint IS NULL LIMIT 10000'
+        ') am '
+        'WHERE a.asset_id = am.asset_id'
+    )
+
+    session.commit()
+
+    return res.rowcount
+
+
+@catch_and_log()
+def calc_atomic_mints(session):
+    forked = session.execute('SELECT * FROM handle_fork').first()
+    if forked['forked'] and forked['block_num']:
+        raise RuntimeError('Fork')
+
+    session_execute_logged(
         session,
         'INSERT INTO asset_mints '
         'SELECT asset_id, template_id, '
@@ -2330,8 +2451,6 @@ def load_atomic_update(session, asset_update):
         ), asset
     )
     session.commit()
-
-    _apply_atomic_update(session, asset)
 
 
 @catch_and_log()

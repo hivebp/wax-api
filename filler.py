@@ -36,6 +36,7 @@ isLoadingChronicleTx = False
 isLoadingUSD = False
 isVacuuming = False
 isUpdatingAtomicAssets = False
+isUpdatingAssetsData = False
 isLoadingPFPAttributes = False
 isUpdatingRWAXAssets = False
 isUpdatingRecentlySold = False
@@ -2150,6 +2151,33 @@ def load_usd_rate():
     return flaskify(oto_response.Response('USD prices loaded'))
 
 
+def keep_updating_assets():
+    global isStopped
+    global isUpdatingAssetsData
+    isStopped = False
+    try:
+        isUpdatingAssetsData = True
+        while not isStopped:
+            session = create_session()
+            try:
+                funcs.apply_atomic_updates(session)
+                funcs.apply_simple_updates(session)
+            except SQLAlchemyError as err:
+                log_error('keep_updating_assets: {}'.format(err))
+                session.rollback()
+            except RuntimeError as err:
+                log_error('keep_updating_assets: {}'.format(err))
+                session.rollback()
+                time.sleep(30)
+            finally:
+                session.remove()
+    except Exception as err:
+        log_error('keep_updating_assets: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        isUpdatingAssetsData = False
+
+
 @app.route('/loader/update-atomic-mints')
 def keep_updating_atomic_mints():
     global isStopped
@@ -2164,15 +2192,16 @@ def keep_updating_atomic_mints():
                 if rowcnt < 1:
                     time.sleep(5)
             except SQLAlchemyError as err:
-                log_error('keep_updating_atomic_assets: {}'.format(err))
+                log_error('keep_updating_atomic_mints: {}'.format(err))
                 session.rollback()
             except RuntimeError as err:
-                log_error('keep_updating_atomic_assets: {}'.format(err))
+                log_error('keep_updating_atomic_mints: {}'.format(err))
                 session.rollback()
+                time.sleep(30)
             finally:
                 session.remove()
     except Exception as err:
-        log_error('keep_updating_atomic_assets: {}'.format(err))
+        log_error('keep_updating_atomic_mints: {}'.format(err))
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
         isUpdatingAtomicAssets = False
@@ -2191,6 +2220,7 @@ def start():
         _thread.start_new_thread(load_chronicle_transactions, ())
         _thread.start_new_thread(keep_updating_atomic_mints, ())
         _thread.start_new_thread(load_usd_rate_till_stopped, ())
+        _thread.start_new_thread(keep_updating_assets, ())
         return flaskify(oto_response.Response({'Started'}))
     except Exception as err:
         log_error('start: {}'.format(err))
