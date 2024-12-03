@@ -788,6 +788,14 @@ def sync_new_collection_verifications():
         if collection['collection'] not in blacklist:
             unblacklist.append(collection['collection'])
 
+    blacklist_overwrite = session.execute(
+        'SELECT collection FROM blacklist_overwrite'
+    )
+
+    for collection in blacklist_overwrite:
+        if collection['collection'] in unblacklist:
+            unblacklist.remove(collection['collection'])
+
     verify_accounts(session, verified)
     verify_accounts(session, whitelist)
     unverify_accounts(session, unverified)
