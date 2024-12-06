@@ -781,8 +781,8 @@ def handle_transaction(action, block_num, timestamp, session):
                     session.execute(
                         'INSERT INTO chronicle_transactions SELECT :transaction_id, :seq, :timestamp, :block_num, '
                         ':account, :name, :data, FALSE, :actor '
-                        'WHERE NOT EXISTS (SELECT seq FROM chronicle_transactions WHERE seq = :seq)'
-                        , trace
+                        'WHERE NOT EXISTS (SELECT seq FROM chronicle_transactions WHERE seq = :seq)',
+                        trace
                     )
 
                     action = {
@@ -793,8 +793,9 @@ def handle_transaction(action, block_num, timestamp, session):
                             'authorization': [{'actor': trace['actor']}]
                         },
                         'trx_id': trace['transaction_id'],
-                        'global_sequence': trace['seq'],
-                        'block_num': trace['block_num'],
+                        'global_sequence': int(trace['seq']) if isinstance(trace['seq'], str) else trace['seq'],
+                        'block_num': int(trace['block_num']) if isinstance(
+                            trace['block_num'], str) else trace['block_num'],
                         'timestamp': trace['timestamp']
                     }
 
