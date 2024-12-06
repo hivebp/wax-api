@@ -3829,7 +3829,7 @@ def addassets(session, action, contract):
             'INSERT INTO pool_assets '
             'SELECT * FROM (SELECT :pool_id AS pool_id, :contract AS contract, '
             'CAST(UNNEST(:asset_ids) AS bigint) AS a_id, :seq AS seq, :block_num AS block_num, '
-            ':timestamp AS timestamp) a '
+            'CAST(:timestamp AS timestamp) AS timestamp) a '
             'WHERE (pool_id, contract, a_id) NOT IN ('
             '   SELECT pool_id, contract, asset_id FROM pool_assets WHERE asset_id = a_id'
             ') ',
