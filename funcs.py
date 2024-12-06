@@ -1801,8 +1801,13 @@ def insert_atomic_asset(session, action):
 
     log_error('{}: {}'.format('new_asset', new_asset))
     log_error('{}: {}'.format('asset', asset))
-    
-    asset_id = asset['asset_id']
+
+    try:
+        asset_id = asset['asset_id']
+    except Exception as err:
+        log_error('asset_id: {}'.format(err))
+        log_exception(err)
+        raise err
     new_asset['contract'] = 'atomicassets'
     new_asset['template_id'] = asset['template_id'] if 'template_id' in asset.keys() else None
     new_asset['burnable'] = True
