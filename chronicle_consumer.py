@@ -14,6 +14,7 @@ from eventemitter import EventEmitter
 import funcs
 import config
 from config import PostgresConsumerConfig
+from filler import parse_action
 
 logging.basicConfig(filename='consumer.err', level=logging.ERROR)
 
@@ -783,6 +784,8 @@ def handle_transaction(action, block_num, timestamp, session):
                         'WHERE NOT EXISTS (SELECT seq FROM chronicle_transactions WHERE seq = :seq)'
                         , trace
                     )
+
+                    parse_action(session, trace)
                     session.commit()
             except SQLAlchemyError as err:
                 session.rollback()

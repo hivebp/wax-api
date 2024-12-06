@@ -2225,7 +2225,7 @@ def start():
         return flaskify(oto_response.Response('Already processing request', status=102))
     try:
         isStopped = False
-        _thread.start_new_thread(load_chronicle_transactions, ())
+        #_thread.start_new_thread(load_chronicle_transactions, ())
         _thread.start_new_thread(keep_updating_atomic_mints, ())
         _thread.start_new_thread(load_usd_rate_till_stopped, ())
         _thread.start_new_thread(keep_updating_assets, ())
