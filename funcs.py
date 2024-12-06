@@ -321,7 +321,7 @@ def _parse_idata(asset):
 
 def _get_data(trx):
     act = trx['act']
-    return act['data']
+    return json.loads(act['data']) if isinstance(act['data'], str) else act['data']
 
 
 def _get_name(asset):
@@ -1799,15 +1799,7 @@ def insert_atomic_asset(session, action):
     asset = _get_data(action)
     new_asset = load_transaction_basics(action)
 
-    log_error('{}: {}'.format('new_asset', new_asset))
-    log_error('{}: {}'.format('asset', asset))
-
-    try:
-        asset_id = asset['asset_id']
-    except Exception as err:
-        log_error('asset_id: {}'.format(err))
-        log_exception(err)
-        raise err
+    asset_id = asset['asset_id']
     new_asset['contract'] = 'atomicassets'
     new_asset['template_id'] = asset['template_id'] if 'template_id' in asset.keys() else None
     new_asset['burnable'] = True
