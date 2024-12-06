@@ -798,7 +798,7 @@ def handle_transaction(action, block_num, timestamp, session):
                         'timestamp': trace['timestamp']
                     }
 
-                    parse_action(session, trace)
+                    parse_action(session, action)
                     session.commit()
             except SQLAlchemyError as err:
                 session.rollback()
