@@ -1169,10 +1169,7 @@ def load_remint_pfp(session, mint):
 
 @catch_and_log()
 def load_logprices(session, update, contract):
-    act = update['act']
-    data = act['data']
-    if 'data' in data:
-        data = data['data']
+    data = _get_data(update)
 
     drop = load_transaction_basics(update)
 
@@ -5016,10 +5013,10 @@ def load_rwax_erasetoken(session, erase):
 @catch_and_log()
 def load_tag_filter(session, action):
     act = action['act']
-    data = act['data']
+
+    data = _get_data(action)
+
     action_name = act['name']
-    if 'data' in data:
-        data = data['data']
 
     new_filter = load_transaction_basics(action)
     new_filter['tag_id'] = data['tag_id']
