@@ -785,6 +785,19 @@ def handle_transaction(action, block_num, timestamp, session):
                         , trace
                     )
 
+                    action = {
+                        'act': {
+                            'account': trace['account'],
+                            'name': trace['name'],
+                            'data': trace['data'],
+                            'authorization': [{'actor': trace['actor']}]
+                        },
+                        'trx_id': trace['transaction_id'],
+                        'global_sequence': trace['seq'],
+                        'block_num': trace['block_num'],
+                        'timestamp': trace['timestamp']
+                    }
+
                     parse_action(session, trace)
                     session.commit()
             except SQLAlchemyError as err:
