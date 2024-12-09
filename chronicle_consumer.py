@@ -67,10 +67,10 @@ def handle_atomicassets_updates_reversed(session, block_num):
             try:
                 data = funcs.parse_data(
                     json.loads(update['tdata'])
-                ) if 'tdata' in update.keys() and update['tdata'] else {}
-                if 'idata' in update.keys() and update['idata']:
+                ) if update['tdata'] else {}
+                if update['idata']:
                     data.update(funcs.parse_data(json.loads(update['idata'])))
-                if 'mdata' in update.keys() and update['mdata']:
+                if update['mdata']:
                     data.update(funcs.parse_data(json.loads(update['mdata'])))
 
                 new_asset = {}
