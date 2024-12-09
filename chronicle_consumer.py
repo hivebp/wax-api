@@ -800,6 +800,10 @@ def handle_transaction(action, block_num, timestamp, session):
                     }
 
                     parse_action(session, action)
+                    session.execute(
+                        'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
+                        trace
+                    )
                     session.commit()
             except SQLAlchemyError as err:
                 session.rollback()
