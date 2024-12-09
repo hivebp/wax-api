@@ -2026,6 +2026,7 @@ def load_chronicle_transactions():
             txs = session.execute(
                 'SELECT * FROM chronicle_transactions '
                 'WHERE NOT ingested AND NOT EXISTS (SELECT * FROM handle_fork WHERE forked) '
+                'AND block_num < 344542604 '
                 'ORDER BY seq ASC LIMIT 10000 '
             )
 
