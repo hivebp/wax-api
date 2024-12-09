@@ -983,6 +983,7 @@ def load_claim_drop(session, transfer, contract):
     new_transfer['contract'] = contract
     new_transfer['country'] = data['country'][0:11] if 'country' in data else None
     new_transfer['referrer'] = data['referrer'][0:11] if 'referrer' in data else None
+    new_transfer['currency'] = data['currency'][0:11] if 'currency' in data else None
 
     new_transfer['benefit_id'] = data['benefit_id'] if 'benefit_id' in data else None
     new_transfer['reward_id'] = data['reward_id'] if 'reward_id' in data else None
@@ -991,11 +992,10 @@ def load_claim_drop(session, transfer, contract):
     session_execute_logged(
         session,
         'INSERT INTO drop_claims ('
-        '   drop_id, contract, claimer, country, referrer, amount, seq, block_num, timestamp'
+        '   drop_id, contract, claimer, country, referrer, amount, currency, seq, block_num, timestamp'
         ') '
-        'SELECT :drop_id, :contract, :claimer, :country, :referrer, :amount, :seq, :block_num, :timestamp '
-        'WHERE NOT EXISTS (SELECT seq '
-        'FROM drop_claims WHERE seq = :seq)',
+        'SELECT :drop_id, :contract, :claimer, :country, :referrer, :amount, :currency, :seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM drop_claims WHERE seq = :seq)',
         new_transfer
     )
 

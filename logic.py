@@ -3042,3 +3042,122 @@ def get_drops(
         raise e
     finally:
         session.remove()
+
+
+def get_drop_claims(
+    drop_id, collection, contract, referrals, limit, offset, order_by, verified, referrer
+):
+    session = create_session()
+    try:
+        order_dir = 'DESC'
+        if '_asc' in order_by:
+            order_dir = 'ASC'
+            order_by = order_by.replace('_asc', '')
+        elif '_desc' in order_by:
+            order_dir = 'DESC'
+            order_by = order_by.replace('_desc', '')
+
+        search_dict = {'limit': limit, 'offset': offset, 'order_dir': order_dir}
+
+        search_clause = ''
+        if contract:
+            search_clause += ' AND contract = :contract '
+            search_dict['contract'] = contract
+
+        if collection and collection != '*':
+            search_clause += ' AND dc.collection = :collection '
+            search_dict['collection'] = collection
+
+        if referrals:
+            search_clause += ' AND referrer IS NOT NULL AND referrer != \'nft.hive\' AND referrer != \'Neftyblocks\' '
+
+        if referrer:
+            search_clause += ' AND referrer = :referrer '
+            search_dict['referrer'] = referrer
+
+        order_clause = ''
+
+        if order_by == 'drop_id':
+            order_clause = 'ORDER BY drop_id {}'.format(order_dir)
+        elif order_by == 'date':
+            order_clause = (
+                'ORDER BY dc.seq {dir}'.format(
+                    dir=order_dir
+                )
+            )
+
+        search_clause = ''
+
+        if verified == 'verified':
+            search_clause += ' AND c.verified '
+        elif verified == 'unverified':
+            search_clause += (
+                ' AND NOT c.verified AND NOT c.blacklisted '
+            )
+        elif verified == 'all':
+            search_clause += ' AND NOT c.blacklisted '
+
+        if drop_id:
+            search_dict['drop_id'] = drop_id
+            search_clause += ' AND drop_id = :drop_id '
+
+        sql = (
+            'SELECT c.collection, wax_price, usd_price, num_items, dc.claimer, dc.country, dc.referrer, dc.drop_id, '
+            'dc.timestamp, cn.name AS display_name, ci.image AS collection_image, c.verified, d.display_data, '
+            'd.price, d.currency, ct.transaction_id '
+            'FROM drop_claims dc '
+            'LEFT JOIN chronicle_transactions ct USING(seq) '
+            'LEFT JOIN sales_summary USING(seq) '
+            'LEFT JOIN collections c USING (collection) '
+            'LEFT JOIN names cn USING (name_id) '
+            'LEFT JOIN images ci USING (image_id) '
+            'LEFT JOIN drops d USING(drop_id, contract) '
+            'WHERE TRUE {search_clause} '
+            '{order_clause} LIMIT :limit OFFSET :offset'.format(
+                order_clause=order_clause,
+                search_clause=search_clause
+            )
+        )
+
+        res = session.execute(
+            sql,
+            search_dict)
+
+        drops = []
+
+        for drop in res:
+            try:
+                display_data = _format_object(json.loads(drop['display_data']))
+            except Exception as e:
+                display_data = drop['display_data']
+            drop_item = {
+                'drop': {
+                    'dropId': drop['drop_id'],
+                    'dropPrice': drop['price'],
+                    'currency': drop['currency'],
+                    'name': display_data['name'] if isinstance(
+                        display_data, dict) and 'name' in display_data.keys() else '',
+                    'collection': {
+                        'collectionName': drop['collection'],
+                        'displayName': drop['display_name'],
+                        'collectionImage': drop['collection_image'],
+                        'verification': drop['verified'],
+                    }
+                },
+                'waxPrice': drop['wax_price'],
+                'usdPrice': drop['usd_price'],
+                'numItems': drop['num_items'],
+                'claimer': drop['claimer'],
+                'referrer': drop['referrer'],
+                'timestamp': datetime.datetime.timestamp(drop['timestamp']),
+                'transactionId': drop['transaction_id']
+            }
+            drops.append(drop_item)
+
+        return drops
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()

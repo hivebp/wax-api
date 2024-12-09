@@ -475,6 +475,41 @@ def get_crafts():
     return flaskify(oto_response.Response(search_res))
 
 
+@app.route('/api/drop-claims')
+@catch_and_respond()
+def get_drop_claims():
+    drop_id = request.args.get('drop_id')
+    contract = request.args.get('contract')
+    referrals = request.args.get('referrals_only')
+    collection = request.args.get('collection')
+    offset = request.args.get('offset', 0)
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'drop_id_desc'
+    verified = request.args.get('verified')
+    referrer = request.args.get('referrer')
+    if offset and (isinstance(offset, int) or (isinstance(offset, str) and offset.isnumeric())):
+        offset = int(offset)
+    else:
+        offset = 0
+    limit = request.args.get('limit', 40)
+
+    if collection:
+        collection = _format_collection(collection)
+
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 40
+    else:
+        limit = 40
+
+    search_res = logic.get_drop_claims(
+        drop_id, collection, contract, referrals, limit, offset, order_by, verified, referrer
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/drops')
 @catch_and_respond()
 def get_drops():
