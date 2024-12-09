@@ -972,44 +972,53 @@ def load_drop_times_update(session, update, contract):
 
 @catch_and_log()
 def load_claim_drop(session, transfer, contract):
-    data = _get_data(transfer)
-    if 'drop_id' not in data:
-        return
-    new_transfer = load_transaction_basics(transfer)
-    new_transfer['claimer'] = data['claimer']
-    new_transfer['drop_id'] = data['drop_id']
-    new_transfer['amount'] = data['claim_amount'] if 'claim_amount' in data else data['amount'] if 'amount' in data else 1
-    new_transfer['wax_usd'] = int(data['intended_delphi_median']) * 0.0001 if 'intended_delphi_median' in data else 0
-    new_transfer['contract'] = contract
-    new_transfer['country'] = data['country'][0:11] if 'country' in data else None
-    new_transfer['referrer'] = data['referrer'][0:11] if 'referrer' in data else None
-    new_transfer['currency'] = data['currency'][0:11] if 'currency' in data and data['currency'] else None
+    try:
+        data = _get_data(transfer)
+        if 'drop_id' not in data:
+            return
+        new_transfer = load_transaction_basics(transfer)
+        new_transfer['claimer'] = data['claimer']
+        new_transfer['drop_id'] = data['drop_id']
+        new_transfer['amount'] = data['claim_amount'] if 'claim_amount' in data else data['amount'] if 'amount' in data else 1
+        new_transfer['wax_usd'] = int(data['intended_delphi_median']) * 0.0001 if 'intended_delphi_median' in data else 0
+        new_transfer['contract'] = contract
+        new_transfer['country'] = data['country'][0:11] if 'country' in data else None
+        new_transfer['referrer'] = data['referrer'][0:11] if 'referrer' in data else None
+        new_transfer['currency'] = data['currency'][0:11].replace("\x00", "") if 'currency' in data and data['currency'] else None
 
-    new_transfer['benefit_id'] = data['benefit_id'] if 'benefit_id' in data else None
-    new_transfer['reward_id'] = data['reward_id'] if 'reward_id' in data else None
-    new_transfer['reward_string'] = data['reward_string'] if 'reward_string' in data else None
+        new_transfer['benefit_id'] = data['benefit_id'] if 'benefit_id' in data else None
+        new_transfer['reward_id'] = data['reward_id'] if 'reward_id' in data else None
+        new_transfer['reward_string'] = data['reward_string'] if 'reward_string' in data else None
 
-    session_execute_logged(
-        session,
-        'INSERT INTO drop_claims ('
-        '   drop_id, contract, claimer, country, referrer, amount, currency, seq, block_num, timestamp'
-        ') '
-        'SELECT :drop_id, :contract, :claimer, :country, :referrer, :amount, :currency, :seq, :block_num, :timestamp '
-        'WHERE NOT EXISTS (SELECT seq FROM drop_claims WHERE seq = :seq)',
-        new_transfer
-    )
-
-    if new_transfer['benefit_id']:
         session_execute_logged(
             session,
-            'INSERT INTO twitch_claims ('
-            '   seq, timestamp, block_num, drop_id, claimer, contract, benefit_id, reward_id, reward_string'
+            'INSERT INTO drop_claims ('
+            '   drop_id, contract, claimer, country, referrer, amount, currency, seq, block_num, timestamp'
             ') '
-            'SELECT :seq, :timestamp, :block_num, :drop_id, :claimer, :contract, :benefit_id, '
-            ':reward_id, :reward_string '
-            'WHERE NOT EXISTS (SELECT seq FROM twitch_claims WHERE seq = :seq)',
+            'SELECT :drop_id, :contract, :claimer, :country, :referrer, :amount, :currency, :seq, :block_num, :timestamp '
+            'WHERE NOT EXISTS (SELECT seq FROM drop_claims WHERE seq = :seq)',
             new_transfer
         )
+
+        if new_transfer['benefit_id']:
+            session_execute_logged(
+                session,
+                'INSERT INTO twitch_claims ('
+                '   seq, timestamp, block_num, drop_id, claimer, contract, benefit_id, reward_id, reward_string'
+                ') '
+                'SELECT :seq, :timestamp, :block_num, :drop_id, :claimer, :contract, :benefit_id, '
+                ':reward_id, :reward_string '
+                'WHERE NOT EXISTS (SELECT seq FROM twitch_claims WHERE seq = :seq)',
+                new_transfer
+            )
+    except SQLAlchemyError as err:
+        log_error('{}'.format(err))
+        log_exception(err)
+        raise err
+    except Exception as err:
+        log_error('{}'.format(err))
+        log_exception(err)
+        raise err
 
 
 @catch_and_log()
