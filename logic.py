@@ -3086,8 +3086,6 @@ def get_drop_claims(
                 )
             )
 
-        search_clause = ''
-
         if verified == 'verified':
             search_clause += ' AND c.verified '
         elif verified == 'unverified':
@@ -3104,7 +3102,7 @@ def get_drop_claims(
         sql = (
             'SELECT c.collection, wax_price, usd_price, num_items, dc.claimer, dc.country, dc.referrer, dc.drop_id, '
             'dc.timestamp, cn.name AS display_name, ci.image AS collection_image, c.verified, d.display_data, '
-            'd.price, d.currency, ct.transaction_id '
+            'd.price, d.currency, dc.currency AS claim_currency, ct.transaction_id '
             'FROM drop_claims dc '
             'LEFT JOIN chronicle_transactions ct USING(seq) '
             'LEFT JOIN sales_summary USING(seq) '
@@ -3147,6 +3145,7 @@ def get_drop_claims(
                 'waxPrice': drop['wax_price'],
                 'usdPrice': drop['usd_price'],
                 'numItems': drop['num_items'],
+                'claimCurrency': drop['claim_currency'],
                 'claimer': drop['claimer'],
                 'referrer': drop['referrer'],
                 'timestamp': datetime.datetime.timestamp(drop['timestamp']),

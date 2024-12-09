@@ -483,7 +483,7 @@ def get_drop_claims():
     referrals = request.args.get('referrals_only')
     collection = request.args.get('collection')
     offset = request.args.get('offset', 0)
-    order_by = request.args.get('order_by') if request.args.get('order_by') else 'drop_id_desc'
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
     verified = request.args.get('verified')
     referrer = request.args.get('referrer')
     if offset and (isinstance(offset, int) or (isinstance(offset, str) and offset.isnumeric())):
