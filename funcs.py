@@ -2130,7 +2130,8 @@ def apply_atomic_updates(session):
     try:
         updates = session_execute_logged(
             session,
-            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, new_mdata_id '
+            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, new_mdata_id, '
+            'u.block_num '
             'FROM atomicassets_updates u '
             'INNER JOIN assets a USING(asset_id) '
             'LEFT JOIN data d1 ON (new_mdata_id = d1.data_id) '
@@ -2206,7 +2207,8 @@ def apply_simple_updates(session):
     try:
         updates = session_execute_logged(
             session,
-            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, new_mdata_id '
+            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, new_mdata_id, '
+            'u.block_num '
             'FROM simpleassets_updates u '
             'INNER JOIN assets a USING(asset_id) '
             'LEFT JOIN data d1 ON (new_mdata_id = d1.data_id) '
