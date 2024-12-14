@@ -488,9 +488,9 @@ def _insert_transfer(session, transaction):
                     'INSERT INTO sales '
                     'SELECT l.asset_ids, a.collection, seller, :receiver, '
                     'CASE WHEN currency = \'WAX\' THEN price ELSE price / ('
-                    '   SELECT usd FROM usd_prices WHERE timestamp < l.timestamp ORDER BY timestamp DESC LIMIT 1'
+                    '   SELECT usd FROM usd_prices WHERE timestamp < :timestamp ORDER BY timestamp DESC LIMIT 1'
                     ') END, CASE WHEN currency = \'USD\' THEN price ELSE price * ('
-                    '   SELECT usd FROM usd_prices WHERE timestamp < l.timestamp ORDER BY timestamp DESC LIMIT 1'
+                    '   SELECT usd FROM usd_prices WHERE timestamp < :timestamp ORDER BY timestamp DESC LIMIT 1'
                     ') END, currency, :asset_id, l.market, NULL, NULL, :seq, :block_num, :timestamp '
                     'FROM listings l LEFT JOIN assets a ON asset_id = asset_ids[1] '
                     'WHERE market = \'simplemarket\' AND :asset_id = l.listing_id ',

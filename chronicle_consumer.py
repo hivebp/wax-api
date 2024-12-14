@@ -774,6 +774,8 @@ def handle_transaction(action, block_num, timestamp, session):
                     'lognewdrop', 'addclaimers', 'delairdrop', 'claim', 'setready'
                 ]) or (account == 'rwax' and name in [
                     'createtoken', 'logtokenize', 'redeem', 'erasetoken'
+                ]) or (account == 'waxdaobacker' and name in [
+                    'logbackasset'
                 ])
 
                 if insert_transaction:
