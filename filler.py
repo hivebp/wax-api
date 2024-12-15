@@ -464,7 +464,7 @@ def update_rwax_assets():
             'INSERT INTO rwax_assets '
             'SELECT asset_id, collection, schema, template_id '
             'FROM rwax_templates '
-            'INNER JOIN assets a USING (collection, template_id) '
+            'INNER JOIN assets a USING (template_id) '
             'WHERE NOT EXISTS ('
             '   SELECT asset_id FROM rwax_assets WHERE asset_id = a.asset_id'
             ')'
