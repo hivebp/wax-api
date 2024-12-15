@@ -480,7 +480,7 @@ def get_crafts():
 def get_drop_claims():
     drop_id = request.args.get('drop_id')
     contract = request.args.get('contract')
-    referrals = request.args.get('referrals_only')
+    referrals = request.args.get('referrals_only') == 'true'
     collection = request.args.get('collection')
     offset = request.args.get('offset', 0)
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
