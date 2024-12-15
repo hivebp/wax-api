@@ -748,13 +748,13 @@ def get_attribute_asset_analytics_schema(asset_id, collection, schema):
         res = session.execute(
             'SELECT asu.total, asu.total_schema, af.*, att.*, t.idata, c.name AS display_name, a.rank, a.rarity_score, '
             'c.image AS collection_image, t.template_id, t.category '
-            'FROM attribute_assets a '
+            'FROM pfp_assets a '
             'LEFT JOIN templates t USING (template_id) '
-            'LEFT JOIN collections c ON t.author = c.collection_name '
+            'LEFT JOIN collections c ON t.collection = c.collection '
             'INNER JOIN attribute_summaries asu ON attribute_id = ANY(a.attribute_ids) '
             'LEFT JOIN attribute_floors_mv af USING(attribute_id) '
             'LEFT JOIN attributes att USING(attribute_id) '
-            'WHERE a.author = :collection AND a.schema = :schema {asset_clause}'.format(
+            'WHERE a.collection = :collection AND a.schema = :schema {asset_clause}'.format(
                 asset_clause=' AND a.asset_id = :asset_id' if asset_id else ' AND a.asset_id = (SELECT asset_id FROM attribute_assets WHERE author = :collection AND schema = :schema AND rank = 1 LIMIT 1) '
             ), {'collection': collection, 'schema': schema, 'asset_id': asset_id}
         )

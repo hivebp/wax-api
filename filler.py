@@ -1150,6 +1150,8 @@ def parse_action(session, action):
                 funcs.load_rwax_redeem(session, action)
             elif name == 'erasetoken':
                 funcs.load_rwax_erasetoken(session, action)
+            elif name == 'setfactors':
+                funcs.load_set_factors(session, action)
         elif account == 'waxtokenbase':
             if name == 'addtoken':
                 funcs.load_addtoken(session, action)

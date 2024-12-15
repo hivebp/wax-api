@@ -423,6 +423,60 @@ def handle_transfers_reversed(session, block_num):
         )
 
 
+def handle_pack_time_updates_reversed(session, block_num):
+    reverse_trxs = session.execute(
+        'SELECT * FROM pack_time_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        session.execute(
+            'UPDATE packs SET unlock_time = :old_unlock_time '
+            'WHERE pack_id = :pack_id AND contract = :contract',
+            {
+                'pack_id': trx['pack_id'],
+                'contract': trx['contract'],
+                'old_unlock_time': trx['old_unlock_time']
+            }
+        )
+
+
+def handle_pack_display_updates_reversed(session, block_num):
+    reverse_trxs = session.execute(
+        'SELECT * FROM pack_display_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        session.execute(
+            'UPDATE packs SET display_data = :old_display_data '
+            'WHERE pack_id = :pack_id AND contract = :contract',
+            {
+                'pack_id': trx['pack_id'],
+                'contract': trx['contract'],
+                'old_display_data': trx['old_display_data']
+            }
+        )
+
+
+def handle_pack_template_updates_reversed(session, block_num):
+    reverse_trxs = session.execute(
+        'SELECT * FROM pack_template_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        session.execute(
+            'UPDATE packs SET template_id = :old_template_id '
+            'WHERE pack_id = :pack_id AND contract = :contract',
+            {
+                'pack_id': trx['pack_id'],
+                'contract': trx['contract'],
+                'old_template_id': trx['old_template_id']
+            }
+        )
+
+
 def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
     try:
         fork = {
@@ -491,6 +545,10 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         handle_simpleassets_burns_reversed(session, block_num)
         handle_simpleassets_updates_reversed(session, block_num)
         handle_transfers_reversed(session, block_num)
+        handle_pack_time_updates_reversed(session, block_num)
+        handle_pack_display_updates_reversed(session, block_num)
+        handle_pack_template_updates_reversed(session, block_num)
+        handle_rwax_updates_reversed(session, block_num)
 
         session.commit()
 
@@ -773,7 +831,7 @@ def handle_transaction(action, block_num, timestamp, session):
                 ]) or (account == 'wufclaimtool' and name in [
                     'lognewdrop', 'addclaimers', 'delairdrop', 'claim', 'setready'
                 ]) or (account == 'rwax' and name in [
-                    'createtoken', 'logtokenize', 'redeem', 'erasetoken'
+                    'createtoken', 'logtokenize', 'redeem', 'erasetoken', 'setfactors'
                 ]) or (account == 'waxdaobacker' and name in [
                     'logbackasset'
                 ])

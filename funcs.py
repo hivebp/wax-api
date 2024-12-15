@@ -4947,6 +4947,39 @@ def load_create_token(session, token):
 
 
 @catch_and_log()
+def load_set_factors(session, token):
+    data = _get_data(token)
+    new_token = load_transaction_basics(token)
+    new_token['authorized_account'] = data['authorized_account']
+    new_token['collection'] = data['collection_name']
+    new_token['symbol'] = data['maximum_supply'].split(' ')[1]
+    new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
+    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1])
+    new_token['contract'] = data['contract']
+    new_token['trait_factors'] = json.dumps(data['trait_factors'])
+
+    session_execute_logged(
+        session,
+        'INSERT INTO rwax_traitfactor_updates ('
+        '   collection, symbol, contract, decimals, maximum_supply, new_trait_factors, '
+        '   old_trait_factors, timestamp, seq, block_num'
+        ') '
+        'SELECT :collection, :symbol, :contract, :decimals, :maximum_supply, '
+        ':trait_factors, (SELECT trait_factors FROM rwax_tokens WHERE contract = :contract AND symbol = :symbol), '
+        ':timestamp, :seq, :block_num '
+        'WHERE NOT EXISTS (SELECT seq FROM rwax_traitfactor_updates WHERE seq = :seq)',
+        new_token
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE rwax_tokens SET trait_factors = :trait_factors '
+        'WHERE contract = :contract AND symbol = :symbol ',
+        new_token
+    )
+
+
+@catch_and_log()
 def load_rwax_erasetoken(session, erase):
     data = _get_data(erase)
     erased_token = load_transaction_basics(erase)
