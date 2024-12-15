@@ -477,6 +477,24 @@ def handle_pack_template_updates_reversed(session, block_num):
         )
 
 
+def handle_rwax_trait_factor_updates_reversed(session, block_num):
+    reverse_trxs = session.execute(
+        'SELECT * FROM rwax_traitfactor_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        session.execute(
+            'UPDATE rwax_tokens SET trait_factors = :old_trait_factors '
+            'WHERE symbol = :symbol AND contract = :contract',
+            {
+                'symbol': trx['symbol'],
+                'contract': trx['contract'],
+                'old_trait_factors': trx['old_trait_factors']
+            }
+        )
+
+
 def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
     try:
         fork = {
@@ -548,7 +566,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         handle_pack_time_updates_reversed(session, block_num)
         handle_pack_display_updates_reversed(session, block_num)
         handle_pack_template_updates_reversed(session, block_num)
-        handle_rwax_updates_reversed(session, block_num)
+        handle_rwax_trait_factor_updates_reversed(session, block_num)
 
         session.commit()
 
