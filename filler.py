@@ -449,6 +449,79 @@ def add_sets():
     return flaskify(oto_response.Response('Added {} Sets'.format(cnt)))
 
 
+@app.route('/loader/handle_reverse_updates')
+def handle_atomicassets_updates_reversed():
+    session = create_session()
+
+    block_num = 345597868
+
+    reverse_trxs = session.execute(
+        'SELECT * FROM atomicassets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        try:
+            update = session.execute(
+                'SELECT a.collection, a.schema, a.asset_id, d1.data AS mdata, d2.data AS idata, d3.data AS tdata, '
+                'u.seq, old_mdata_id '
+                'FROM atomicassets_updates_reversed u '
+                'INNER JOIN assets a USING(asset_id) '
+                'LEFT JOIN templates t USING (template_id) '
+                'LEFT JOIN data d1 ON (old_mdata_id = d1.data_id) '
+                'LEFT JOIN data d2 ON (a.immutable_data_id = d2.data_id) '
+                'LEFT JOIN data d3 ON (t.immutable_data_id = d3.data_id) '
+                'WHERE u.seq = :seq '
+                'ORDER BY u.asset_id ASC ', {'seq': trx['seq']}
+            ).first()
+
+            try:
+                data = funcs.parse_data(
+                    json.loads(update['tdata'])
+                ) if update['tdata'] else {}
+                if update['idata']:
+                    data.update(funcs.parse_data(json.loads(update['idata'])))
+                if update['mdata']:
+                    data.update(funcs.parse_data(json.loads(update['mdata'])))
+
+                new_asset = {}
+
+                new_asset['name'] = data['name'].strip()[0:255] if 'name' in data.keys() else None
+                new_asset['image'] = str(data['img']).strip()[0:255] if 'img' in data.keys() else None
+                new_asset['video'] = str(data['video']).strip()[0:255] if 'video' in data.keys() else None
+                new_asset['seq'] = update['seq']
+                new_asset['old_mdata_id'] = update['old_mdata_id']
+                new_asset['asset_id'] = update['asset_id']
+
+                new_asset['attribute_ids'] = funcs.parse_attributes(
+                    session, update['collection'], update['schema'], data)
+
+                session.execute(
+                   'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
+                   '{name_clause} {image_clause} {video_clause} '
+                   'WHERE asset_id = :asset_id '.format(
+                       name_clause=(
+                           ', name_id = (SELECT name_id FROM names WHERE name = :name)'
+                       ) if new_asset['name'] else ', name_id = NULL',
+                       image_clause=(
+                           ', image_id = (SELECT image_id FROM images WHERE image = :image)'
+                       ) if new_asset['image'] else ', image_id = NULL',
+                       video_clause=(
+                           ', video_id = (SELECT video_id FROM videos WHERE video = :video)'
+                       ) if new_asset['video'] else ', video_id = NULL',
+                   ), new_asset
+                )
+            except Exception as err:
+                log_error('handle_atomicassets_updates_reversed: {}'.format(err))
+                raise err
+        except SQLAlchemyError as err:
+            log_error('handle_atomicassets_updates_reversed: {}'.format(err))
+            raise err
+        except Exception as err:
+            log_error('handle_atomicassets_updates_reversed: {}'.format(err))
+            raise err
+
+
 @app.route('/loader/update-rwax-assets')
 def update_rwax_assets():
     global isUpdatingRWAXAssets

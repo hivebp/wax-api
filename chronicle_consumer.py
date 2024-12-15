@@ -49,6 +49,8 @@ def handle_atomicassets_updates_reversed(session, block_num):
         {'block_num': block_num}
     )
 
+    data = ''
+
     for trx in reverse_trxs:
         try:
             update = session.execute(
@@ -101,13 +103,13 @@ def handle_atomicassets_updates_reversed(session, block_num):
                    ), new_asset
                 )
             except Exception as err:
-                log_error('handle_atomicassets_updates_reversed: {}'.format(err))
+                log_error('handle_atomicassets_updates_reversed: {} {}'.format(err, data))
                 raise err
         except SQLAlchemyError as err:
-            log_error('handle_atomicassets_updates_reversed: {}'.format(err))
+            log_error('handle_atomicassets_updates_reversed: {} {}'.format(err, data))
             raise err
         except Exception as err:
-            log_error('handle_atomicassets_updates_reversed: {}'.format(err))
+            log_error('handle_atomicassets_updates_reversed: {} {}'.format(err, data))
             raise err
 
 
