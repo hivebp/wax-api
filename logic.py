@@ -337,6 +337,7 @@ def _format_template(template):
                 'block': template['created_block_num'],
                 'globalSequence': template['created_seq'],
             },
+            'maxSupply': template['max_supply'],
             'traits': _format_traits(template['traits']) if template['traits'] else [],
         }
         if 'display_name' in template.keys():
@@ -852,34 +853,27 @@ def filter_attributes(collection, schema=None, templates=None):
         search_dict['schema'] = schema
 
     if templates:
+        schema_clause += ' AND t.template_id IN :templates '
         search_dict['templates'] = tuple(templates.split(','))
-        res = session.execute(
-            'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
-            'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
-            'FROM assets a '
-            'INNER JOIN attributes att ON attribute_id = ANY(attribute_ids) '
-            'WHERE a.collection = :collection '
-            '{schema_clause} '
-            'AND template_id IN :templates '
-            'GROUP BY 1, 2, 7 '
-            'ORDER BY attribute_name ASC, string_value ASC'.format(
-                schema_clause=schema_clause
-            ),
-            search_dict
-        )
-    else:
-        res = session.execute(
-            'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
-            'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
-            'FROM attributes a '
-            'WHERE collection = :collection '
-            '{schema_clause} '
-            'GROUP BY 1, 2, 7 '
-            'ORDER BY attribute_name ASC, string_value ASC'.format(
-                schema_clause=schema_clause
-            ),
-            search_dict
-        )
+
+    res = session.execute(
+        'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
+        'MAX(int_value) AS max_int_value, MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value,'
+        'SUM(int_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE SUM(max_supply) END) '
+        'AS avg_int_value, SUM(float_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE '
+        'SUM(max_supply) END) AS avg_float_value, SUM(max_supply) AS max_supply, SUM(num_minted) AS num_minted '
+        'FROM attributes a '
+        'LEFT JOIN templates t ON a.collection = t.collection AND a.schema = t.schema '
+        'AND attribute_id = ANY(attribute_ids)'
+        'LEFT JOIN templates_minted_mv USING(template_id) '
+        'WHERE a.collection = :collection '
+        '{schema_clause} '
+        'GROUP BY 1, 2, 3 '
+        'ORDER BY attribute_name ASC, string_value ASC'.format(
+            schema_clause=schema_clause
+        ),
+        search_dict
+    )
 
     attributes = {}
 
@@ -889,17 +883,20 @@ def filter_attributes(collection, schema=None, templates=None):
         attribute_type = None
         min_value = 0
         max_value = 0
+        avg_value = 0
 
         if value:
             attribute_type = 'string'
         else:
             min_value = attribute['min_int_value']
             max_value = attribute['max_int_value']
+            avg_value = attribute['avg_int_value']
             if min_value or max_value or max_value == 0:
                 attribute_type = 'integer'
             else:
                 min_value = attribute['min_float_value']
                 max_value = attribute['max_float_value']
+                avg_value = attribute['avg_float_value']
                 if min_value or max_value or max_value == 0.0:
                     attribute_type = 'float'
         if not attribute_type:
@@ -907,17 +904,30 @@ def filter_attributes(collection, schema=None, templates=None):
             attribute_type = 'boolean'
 
         if value and attribute_type in ['string', 'boolean']:
+            num_minted = attribute['num_minted']
+            max_supply = attribute['max_supply']
             if attribute['attribute_name'] in attributes.keys():
-                attributes[attribute['attribute_name']]['values'].append(value)
+                attributes[attribute['attribute_name']]['values'].append(
+                    {
+                        'value': value,
+                        'maxSupply': int(max_supply) if max_supply else 0,
+                        'numMinted': int(num_minted) if num_minted else 0
+                    }
+                )
             else:
                 attributes[attribute['attribute_name']] = {
-                    'values': [value],
+                    'values': [{
+                        'value': value,
+                        'maxSupply': int(max_supply) if max_supply else 0,
+                        'numMinted': int(num_minted) if num_minted else 0
+                    }],
                     'type': attribute_type
                 }
         elif attribute_type in ['float', 'integer']:
             attributes[attribute['attribute_name']] = {
-                'minValue': min_value,
-                'maxValue': max_value,
+                'minValue': float(min_value) if min_value else 0,
+                'maxValue': float(max_value) if max_value else 0,
+                'avgValue': float(avg_value) if avg_value else 0,
                 'type': attribute_type
             }
 
@@ -1056,7 +1066,7 @@ def templates(
             'a.template_id, n.name, a.schema, f.user_name IS NOT NULL AS favorited, '
             'td.data AS template_immutable_data, tm.num_burned, ts.avg_wax_price, ts.avg_usd_price, '
             'ts.last_sold_wax, ts.last_sold_usd, last_sold_listing_id, ts.last_sold_timestamp AS last_sold_timestamp, '
-            'fp.floor_price, ts.volume_wax, ts.volume_usd, ts.num_sales, tm.num_minted AS num_minted, '
+            'fp.floor_price, ts.volume_wax, ts.volume_usd, ts.num_sales, tm.num_minted AS num_minted, a.max_supply, '
             'img.image, vid.video, cn.name AS display_name, a.collection, ci.image as collection_image, '
             'a.timestamp AS created_timestamp, a.block_num AS created_block_num, a.seq AS created_seq, '
             'ra.symbol AS rwax_symbol, ra.contract AS rwax_contract, ra.max_assets AS rwax_max_assets, '
@@ -2261,7 +2271,7 @@ def _format_rwax_templates(templates, templates_supply):
     for template in templates:
         for supply in supply_dict:
             if supply['template_id'] == template['template_id']:
-                template['maxAssets'] = supply['max_assets']
+                template['max_assets'] = supply['max_assets']
         template_list.append(template)
 
     return template_list
