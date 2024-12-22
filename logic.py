@@ -856,22 +856,28 @@ def filter_attributes(collection, schema=None, templates=None):
         schema_clause += ' AND t.template_id IN :templates '
         search_dict['templates'] = tuple(templates.split(','))
 
-    res = session.execute(
+    sql = (
         'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
         'MAX(int_value) AS max_int_value, MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value,'
         'SUM(int_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE SUM(max_supply) END) '
         'AS avg_int_value, SUM(float_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE '
         'SUM(max_supply) END) AS avg_float_value, SUM(max_supply) AS max_supply, SUM(num_minted) AS num_minted '
         'FROM attributes a '
+        'LEFT JOIN template_attributes_mapping ta ON a.collection = ta.collection AND a.schema = ta.schema '
+        'AND a.template_id = ta.template_id '
         'LEFT JOIN templates t ON a.collection = t.collection AND a.schema = t.schema '
-        'AND attribute_id = ANY(attribute_ids)'
-        'LEFT JOIN templates_minted_mv USING(template_id) '
+        'AND attribute_id = a.attribute_id '
+        'LEFT JOIN templates_minted_mv tm ON tm.template_id = t.template_id '
         'WHERE a.collection = :collection '
         '{schema_clause} '
         'GROUP BY 1, 2, 3 '
         'ORDER BY attribute_name ASC, string_value ASC'.format(
             schema_clause=schema_clause
-        ),
+        )
+    )
+
+    res = session.execute(
+        sql,
         search_dict
     )
 

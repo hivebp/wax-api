@@ -2667,6 +2667,14 @@ def insert_atomic_template(session, action):
         new_template
     )
     session.commit()
+    session_execute_logged(
+        session,
+        'INSERT INTO template_attributes_mapping VALUES ('
+        '   SELECT :collection, :schema, :template_id, unnest(:attribute_ids), :seq, :block_num'
+        ') '
+        'WHERE NOT EXISTS (SELECT seq FROM template_attributes_mapping WHERE seq = :seq)',
+        new_template
+    )
 
 
 @catch_and_log()
