@@ -219,14 +219,18 @@ def construct_category_clause(
                 'collection': collection
             }
 
-            if ',' in schema:
+            if schema and ',' in schema:
                 attr_dict['schemas'] = tuple(schema.split(','))
                 attr_sql += ' AND schema IN :schemas'
-            else:
+            elif schema:
                 attr_dict['schema'] = schema
                 attr_sql += ' AND schema = :schema'
 
             attr_dict['attribute_name'] = key
+
+            use_range = False
+            val1 = value
+            val2 = value
 
             if isinstance(value, bool) or value in ['f', 't']:
                 column = 'bool_value'
@@ -239,17 +243,46 @@ def construct_category_clause(
             elif isinstance(value, float) or isfloat(value):
                 column = 'float_value'
                 value = float(value)
+            elif '-' in value and value.split('-')[0].isnumeric() and value.split('-')[1].isnumeric():
+                column = 'int_value'
+                use_range = True
+                val1 = int(value.split('-')[0])
+                val2 = int(value.split('-')[1])
+            elif '-' in value and isfloat(value.split('-')[0].isnumeric()) and isfloat(value.split('-')[1].isnumeric()):
+                column = 'float_value'
+                use_range = True
+                val1 = float(value.split('-')[0])
+                val2 = float(value.split('-')[1])
             else:
                 column = 'string_value'
 
-            attr_sql += ' AND attribute_name = :attribute_name AND {column} = :value '.format(column=column)
-
-            attr_dict['value'] = value
+            if use_range:
+                attr_sql += ' AND attribute_name = :attribute_name AND {column} BETWEEN :val1 AND :val2 '.format(
+                    column=column
+                )
+                attr_dict['val1'] = val1
+                attr_dict['val2'] = val2
+            else:
+                attr_sql += ' AND attribute_name = :attribute_name AND {column} = :value '.format(column=column)
+                attr_dict['value'] = value
 
             res = session.execute(attr_sql, attr_dict)
 
-            for attribute in res:
-                attribute_ids.append(attribute['attribute_id'])
+            if use_range and res.rowcount > 1:
+                range_attribute_ids = []
+                for attribute in res:
+                    range_attribute_ids.append(attribute['attribute_id'])
+
+                if len(range_attribute_ids) > 1:
+                    category_clause += ' AND :range_attribute_ids_{} && {}attribute_ids '.format(
+                        key, prefix
+                    )
+                    format_dict['range_attribute_ids_{}'.format(key)] = range_attribute_ids
+                elif len(range_attribute_ids) == 1:
+                    attribute_ids.append(range_attribute_ids[0])
+            else:
+                for attribute in res:
+                    attribute_ids.append(attribute['attribute_id'])
 
     if len(attribute_ids) > 1:
         category_clause += ' AND :attribute_ids <@ {}attribute_ids '.format(
@@ -261,7 +294,7 @@ def construct_category_clause(
             prefix
         )
         format_dict['attribute_id'] = attribute_ids[0]
-    elif attributes and len(attribute_ids) == 0:
+    elif attributes and len(attribute_ids) == 0 and not use_range:
         category_clause += ' AND FALSE '
 
     return category_clause
@@ -866,7 +899,7 @@ def filter_attributes(collection, schema=None, templates=None):
         'LEFT JOIN template_attributes_mapping ta ON a.collection = ta.collection AND a.schema = ta.schema '
         'AND a.attribute_id = ta.attribute_id '
         'LEFT JOIN templates t ON a.collection = t.collection AND a.schema = t.schema '
-        'AND t.template_id = ta.attribute_id '
+        'AND t.template_id = ta.template_id '
         'LEFT JOIN templates_minted_mv tm ON tm.template_id = t.template_id '
         'WHERE a.collection = :collection '
         '{schema_clause} '
@@ -1038,9 +1071,9 @@ def templates(
             if schema:
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
-                search_category_clause += construct_category_clause(
-                    session, format_dict, collection, schema, attributes, 'a.'
-                )
+            search_category_clause += construct_category_clause(
+                session, format_dict, collection, schema, attributes, 'a.'
+            )
             search_clause += search_category_clause
 
         if name:
@@ -1268,9 +1301,9 @@ def assets(
             if schema:
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
-                search_category_clause += construct_category_clause(
-                    session, format_dict, collection, schema, attributes, 'a.'
-                )
+            search_category_clause += construct_category_clause(
+                session, format_dict, collection, schema, attributes, 'a.'
+            )
             search_clause += search_category_clause
 
         if name:
@@ -1595,9 +1628,10 @@ def listings(
             if schema:
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
-                search_category_clause += construct_category_clause(
-                    session, format_dict, collection, schema, attributes, 'a.'
-                )
+
+            search_category_clause += construct_category_clause(
+                session, format_dict, collection, schema, attributes, 'a.'
+            )
             search_clause += search_category_clause
 
         if name:
