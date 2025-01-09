@@ -240,7 +240,7 @@ def templates():
     limit = int(request.args.get('limit', 40))
     offset = int(request.args.get('offset', 0))
     recently_sold = request.args.get('recent')
-    verified = request.args.get('verified', 'verified')
+    verified = request.args.get('verified', 'all')
     favorites = request.args.get('favorites', 'false') == 'true'
     user = request.args.get('user', '')
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
