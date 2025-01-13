@@ -4898,6 +4898,52 @@ def load_remint_mirror(session, mint):
 
 
 @catch_and_log()
+def load_create_token2(session, token):
+    data = _get_data(token)
+    new_token = load_transaction_basics(token)
+    new_token['authorized_account'] = data['authorized_account']
+    new_token['collection'] = data['collection_name']
+    new_token['symbol'] = data['maximum_supply'].split(' ')[1]
+    new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
+    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1])
+    new_token['contract'] = data['contract']
+    new_token['max_assets_to_tokenize'] = data['max_assets_to_tokenize']
+
+    new_token['trait_factors'] = json.dumps(data['trait_factors'])
+    new_token['token_name'] = data['token_name']
+    new_token['token_logo'] = data['token_logo']
+    new_token['token_logo_lg'] = data['token_logo_lg']
+
+    if 'templates' in data:
+        new_token['template_id'] = data['templates'][0]['template_id']
+        session_execute_logged(
+            session,
+            'INSERT INTO rwax_tokens ('
+            '   collection, schema, symbol, contract, decimals, maximum_supply, trait_factors, '
+            '   token_name, token_logo, token_logo_lg, timestamp, seq, block_num'
+            ') '
+            'SELECT :collection, (SELECT schema FROM templates WHERE template_id = :template_id), :symbol, :contract, '
+            ':decimals, :maximum_supply, :trait_factors, :token_name, :token_logo, :token_logo_lg, '
+            ':timestamp, :seq, :block_num '
+            'WHERE NOT EXISTS (SELECT seq FROM rwax_tokens WHERE seq = :seq)',
+            new_token
+        )
+    else:
+        new_token['schema_name'] = data['schema_name']
+        session_execute_logged(
+            session,
+            'INSERT INTO rwax_tokens ('
+            '   collection, schema_name, symbol, contract, decimals, maximum_supply, trait_factors, '
+            '   token_name, token_logo, token_logo_lg, timestamp, seq, block_num'
+            ') '
+            'SELECT :collection, :schema_name, :symbol, :contract, :decimals, :maximum_supply, '
+            ':trait_factors, :token_name, :token_logo, :token_logo_lg, :timestamp, :seq, :block_num '
+            'WHERE NOT EXISTS (SELECT seq FROM rwax_tokens WHERE seq = :seq)',
+            new_token
+        )
+
+
+@catch_and_log()
 def load_create_token(session, token):
     data = _get_data(token)
     new_token = load_transaction_basics(token)

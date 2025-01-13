@@ -129,16 +129,15 @@ def _get_assets_object():
         '\'template_immutable_data\', td.data, \'num_burned\', tm.num_burned, \'avg_wax_price\', ts.avg_wax_price, '
         '\'avg_usd_price\', ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd,'
         '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
-        '\'owner\', a.owner, \'burned\', burned, \'floor_price\', fp.floor_price, \'rwax_symbol\', r.symbol, '
-        '\'rwax_contract\', r.contract, \'rwax_max_assets\', r.max_assets, \'trait_factors\', rt.trait_factors, '
-        '\'templates_supply\', rt.templates_supply, \'rwax_supply\', rt.maximum_supply, '
-        '\'rwax_decimals\', rt.decimals, \'rwax_token_name\', rt.token_name, \'rwax_token_logo\', rt.token_logo, '
-        '\'rwax_token_logo_lg\', rt.token_logo_lg, \'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, '
-        '\'num_sales\', ts.num_sales, \'num_minted\', tm.num_minted, \'favorited\', f.user_name IS NOT NULL, '
-        '\'template_id\', t.template_id, \'image\', img.image, \'video\', vid.video, \'mint\', a.mint, '
-        '\'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, \'mint_seq\', a.seq, '
-        '\'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, \'burnable\', a.burnable, '
-        '\'transferable\', a.transferable, \'rwax_amount\', rtt.amount, '
+        '\'owner\', a.owner, \'burned\', burned, \'floor_price\', fp.floor_price, \'rwax_symbol\', rt.symbol, '
+        '\'rwax_contract\', rt.contract, \'rwax_max_assets\', rt.max_assets, \'trait_factors\', rt.trait_factors, '
+        '\'templates_supply\', rt.maximum_supply, \'rwax_decimals\', rt.decimals, \'rwax_token_name\', rt.token_name, '
+        '\'rwax_token_logo\', rt.token_logo, \'rwax_token_logo_lg\', rt.token_logo_lg, \'volume_wax\', ts.volume_wax, '
+        '\'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, \'num_minted\', tm.num_minted, '
+        '\'favorited\', f.user_name IS NOT NULL, \'template_id\', t.template_id, \'image\', img.image, '
+        '\'video\', vid.video, \'mint\', a.mint, \'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, '
+        '\'mint_seq\', a.seq, \'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, '
+        '\'burnable\', a.burnable, \'transferable\', a.transferable, \'rwax_amount\', rtt.amount, '
         '\'traits\', {attributes_obj})) AS assets '.format(
             attributes_obj=_get_attributes_object()
         )
@@ -391,8 +390,7 @@ def _format_template(template):
                 'tokenLogoLarge': template['rwax_token_logo_lg'],
                 'templateMaxAssets': template['rwax_max_assets'],
                 'traitFactors': template['trait_factors'],
-                'templatesSupply': template['templates_supply'],
-                'totalSupply': template['rwax_supply']
+                'templatesSupply': template['templates_supply']
             }
         if template['video']:
             template_obj['video'] = template['video']
@@ -476,8 +474,7 @@ def _format_asset(asset):
                 'templateMaxAssets': asset['rwax_max_assets'],
                 'redeemAmount': asset['rwax_amount'],
                 'traitFactors': _format_object(asset['trait_factors']),
-                'templatesSupply': _format_object(asset['templates_supply']),
-                'totalSupply': asset['rwax_supply']
+                'templatesSupply': _format_object(asset['templates_supply'])
             }
         if asset['video']:
             asset_obj['video'] = asset['video']
@@ -1126,7 +1123,7 @@ def templates(
             )
         if search_type == 'rwax':
             search_clause += (
-                ' AND ra.template_id IS NOT NULL '
+                ' AND rt.schema IS NOT NULL '
             )
 
         if verified == 'verified':
@@ -1201,8 +1198,7 @@ def templates(
             'FROM {source_clause} '
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_schemas p USING(schema) '
-            'LEFT JOIN rwax_templates ra USING(template_id) '
-            'LEFT JOIN rwax_tokens rt ON (ra.contract = rt.contract AND ra.symbol = rt.symbol) '
+            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN template_stats_mv ts USING(template_id) '
             'LEFT JOIN templates_minted_mv tm USING(template_id) '
             'LEFT JOIN template_floor_prices_mv fp USING(template_id) '
@@ -1339,8 +1335,8 @@ def assets(
             'ts.volume_usd, ts.num_sales, tm.num_minted AS num_minted, img.image, vid.video, '
             'cn.name AS display_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
             'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
-            'r.symbol AS rwax_symbol, r.contract AS rwax_contract, r.max_assets AS rwax_max_assets, rt.trait_factors, '
-            'rt.templates_supply, rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, '
+            'rt.symbol AS rwax_symbol, rt.contract AS rwax_contract, r.max_assets AS rwax_max_assets, '
+            'rt.trait_factors, rt.templates_supply, rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, '
             'rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, a.transferable, a.burnable, '
             'rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, '
             '{badges_object}, {tags_obj}, {attributes_obj} AS traits, {listings_obj} AS listings'.format(
@@ -1521,8 +1517,7 @@ def assets(
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
             'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
-            'LEFT JOIN rwax_templates r ON (a.template_id = r.template_id) '
-            'LEFT JOIN rwax_tokens rt ON (r.contract = rt.contract AND r.symbol = rt.symbol) '
+            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
@@ -1665,7 +1660,7 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
-            'LEFT JOIN rwax_templates rt ON (a.template_id = rt.template_id) '
+            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.collection) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
@@ -1687,9 +1682,8 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
-            'LEFT JOIN backed_assets ba USING (asset_id) ' 
-            'LEFT JOIN rwax_templates r ON (a.template_id = r.template_id) '
-            'LEFT JOIN rwax_tokens rt ON (r.contract = rt.contract AND r.symbol = rt.symbol) '
+            'LEFT JOIN backed_assets ba USING (asset_id) '
+            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1815,7 +1809,7 @@ def listings(
                     '{join_clause} '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
                     'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
-                    'LEFT JOIN rwax_templates rt ON (a.template_id = rt.template_id) '
+                    'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '

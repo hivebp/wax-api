@@ -535,18 +535,15 @@ def update_rwax_assets():
     try:
         session.execute(
             'INSERT INTO rwax_assets '
-            'SELECT asset_id, t.collection, schema, template_id '
-            'FROM rwax_templates t '
-            'INNER JOIN assets a USING (template_id) '
-            'WHERE NOT EXISTS ('
-            '   SELECT asset_id FROM rwax_assets WHERE asset_id = a.asset_id'
-            ')'
+            'SELECT asset_id, a.collection, schema, template_id '
+            'FROM assets a WHERE (collection, schema) IN (SELECT collection, schema FROM rwax_tokens2) '
+            'AND NOT EXISTS (SELECT asset_id FROM rwax_assets WHERE asset_id = a.asset_id)'
         )
 
         session.execute(
             'DELETE FROM rwax_assets '
             'WHERE asset_id IN (SELECT asset_id FROM rwax_assets ra LEFT JOIN assets a USING (asset_id) '
-            'WHERE a.template_id NOT IN (SELECT template_id FROM rwax_templates WHERE template_id = a.template_id))'
+            'WHERE a.schema NOT IN (SELECT schma FROM rwax_tokens2 WHERE template_id = a.template_id))'
         )
 
         session.commit()
@@ -1217,6 +1214,8 @@ def parse_action(session, action):
         elif account == 'rwax':
             if name == 'createtoken':
                 funcs.load_create_token(session, action)
+            elif name == 'createtoken2':
+                funcs.load_create_token2(session, action)
             elif name == 'logtokenize':
                 funcs.load_log_tokenize(session, action)
             elif name == 'redeem':
