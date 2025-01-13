@@ -1122,9 +1122,9 @@ def templates(
                 ' AND p.schema IS NOT NULL '
             )
         if search_type == 'rwax':
-            search_clause += (
-                ' AND rt.schema IS NOT NULL '
-            )
+            rwax_join_clause = 'INNER JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+        else:
+            rwax_join_clause = 'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
 
         if verified == 'verified':
             search_clause += ' AND col.verified '
@@ -1198,7 +1198,7 @@ def templates(
             'FROM {source_clause} '
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_schemas p USING(schema) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            '{rwax_join_clause} '
             'LEFT JOIN template_stats_mv ts USING(template_id) '
             'LEFT JOIN templates_minted_mv tm USING(template_id) '
             'LEFT JOIN template_floor_prices_mv fp USING(template_id) '
@@ -1218,6 +1218,7 @@ def templates(
                     order_clause=order_clause,
                     columns_clause=columns_clause
                 ),
+                rwax_join_clause=rwax_join_clause,
                 columns_clause=columns_clause,
                 source_clause=source_clause,
                 search_clause=search_clause,
@@ -1344,6 +1345,7 @@ def assets(
                 attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object()
             )
         )
+        rwax_join_clause = 'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
         if only == 'packs':
             filter_join_clause += 'INNER JOIN packs USING (template_id) '
         elif only == 'pfps':
@@ -1351,7 +1353,7 @@ def assets(
                 ' AND p.asset_id IS NOT NULL '
             )
         elif only == 'rwax':
-            filter_join_clause += 'INNER JOIN rwax_assets ra2 ON (a.asset_id = ra2.asset_id) '
+            rwax_join_clause = 'INNER JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             if rwax_symbol:
                 search_clause += 'AND rt.symbol = :rwax_symbol '
                 format_dict['rwax_symbol'] = rwax_symbol
@@ -1516,8 +1518,7 @@ def assets(
             'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) ' 
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
-            'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            '{rwax_join_clause} '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
@@ -1538,6 +1539,7 @@ def assets(
                     order_clause=order_clause,
                     columns_clause=columns_clause
                 ),
+                rwax_join_clause=rwax_join_clause,
                 filter_join_clause=filter_join_clause,
                 columns_clause=columns_clause,
                 source_clause=source_clause,
@@ -1659,8 +1661,7 @@ def listings(
             'LEFT JOIN listings_helper_mv h USING (sale_id) '
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
-            'LEFT JOIN rwax_assets ra USING (asset_id) '
-            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.collection) '
+            '{rwax_join_clause} '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
@@ -1683,7 +1684,7 @@ def listings(
             'LEFT JOIN pfp_assets p USING (asset_id) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            '{rwax_join_clause} '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1741,13 +1742,15 @@ def listings(
         search_clause += _get_mint_filter(min_mint, max_mint, format_dict)
         search_clause += _get_recently_sold_filter(recently_sold)
 
+        rwax_join_clause = 'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
         if only == 'pfps':
             search_clause += (
                 'AND p.asset_id IS NOT NULL '
             )
         elif only == 'rwax':
+            rwax_join_clause = 'INNER JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             search_clause += (
-                'AND ra.asset_id IS NOT NULL '
+                'AND rt.schema IS NOT NULL '
             )
             if rwax_symbol:
                 search_clause += 'AND rt.symbol = :rwax_symbol '
@@ -1757,6 +1760,8 @@ def listings(
                 format_dict['rwax_contract'] = rwax_contract
         elif only == 'backed':
             search_clause += ' AND ba.amount IS NOT NULL '
+
+        source_clause = source_clause.format(rwax_join_clause=rwax_join_clause)
 
         if contract:
             format_dict['contract'] = contract
@@ -1808,8 +1813,7 @@ def listings(
                     'LEFT JOIN my_assets ma USING (template_id) '
                     '{join_clause} '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
-                    'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
-                    'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+                    '{rwax_join_clause} '
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
@@ -1856,7 +1860,6 @@ def listings(
                     'LEFT JOIN my_assets ma USING (template_id) '
                     '{join_clause} '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
-                    'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
@@ -1925,7 +1928,8 @@ def listings(
             order_clause=order_clause,
             columns_clause=columns_clause,
             group_clause=group_clause,
-            join_clause=join_clause
+            join_clause=join_clause,
+            rwax_join_clause=rwax_join_clause
         )
 
         sql = (

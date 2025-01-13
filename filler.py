@@ -543,7 +543,7 @@ def update_rwax_assets():
         session.execute(
             'DELETE FROM rwax_assets '
             'WHERE asset_id IN (SELECT asset_id FROM rwax_assets ra LEFT JOIN assets a USING (asset_id) '
-            'WHERE a.schema NOT IN (SELECT schema FROM rwax_tokens2 WHERE template_id = a.template_id))'
+            'WHERE a.schema NOT IN (SELECT schema FROM rwax_tokens2 WHERE schema = a.schema))'
         )
 
         session.commit()
