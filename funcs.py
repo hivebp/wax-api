@@ -5002,6 +5002,40 @@ def load_create_token(session, token):
 
 
 @catch_and_log()
+def load_set_max_assets(session, token):
+    data = _get_data(token)
+    new_token = load_transaction_basics(token)
+    new_token['authorized_account'] = data['authorized_account']
+    new_token['collection'] = data['collection_name']
+    new_token['symbol'] = data['maximum_supply'].split(' ')[1]
+    new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
+    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1])
+    new_token['contract'] = data['contract']
+    new_token['max_assets'] = data['max_assets_to_tokenize']
+
+    session_execute_logged(
+        session,
+        'INSERT INTO rwax_max_assets_updates ('
+        '   collection, symbol, contract, decimals, new_max_assets, '
+        '   old_max_assets, timestamp, seq, block_num'
+        ') '
+        'SELECT :collection, :symbol, :contract, :decimals, :max_assets, '
+        '('
+        '  SELECT max_assets FROM rwax_tokens2 WHERE contract = :contract AND symbol = :symbol'
+        '), :timestamp, :seq, :block_num '
+        'WHERE NOT EXISTS (SELECT seq FROM rwax_max_assets_updates WHERE seq = :seq)',
+        new_token
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE rwax_tokens2 SET max_assets = :max_assets '
+        'WHERE contract = :contract AND symbol = :symbol ',
+        new_token
+    )
+
+
+@catch_and_log()
 def load_set_factors(session, token):
     data = _get_data(token)
     new_token = load_transaction_basics(token)
@@ -5028,7 +5062,7 @@ def load_set_factors(session, token):
 
     session_execute_logged(
         session,
-        'UPDATE rwax_tokens SET trait_factors = :trait_factors '
+        'UPDATE rwax_tokens2 SET trait_factors = :trait_factors '
         'WHERE contract = :contract AND symbol = :symbol ',
         new_token
     )

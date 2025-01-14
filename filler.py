@@ -1224,6 +1224,8 @@ def parse_action(session, action):
                 funcs.load_rwax_erasetoken(session, action)
             elif name == 'setfactors':
                 funcs.load_set_factors(session, action)
+            elif name == 'setmaxassets':
+                funcs.load_set_max_assets(session, action)
         elif account == 'waxtokenbase':
             if name == 'addtoken':
                 funcs.load_addtoken(session, action)

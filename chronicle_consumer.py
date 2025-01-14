@@ -851,7 +851,7 @@ def handle_transaction(action, block_num, timestamp, session):
                 ]) or (account == 'wufclaimtool' and name in [
                     'lognewdrop', 'addclaimers', 'delairdrop', 'claim', 'setready'
                 ]) or (account == 'rwax' and name in [
-                    'createtoken', 'logtokenize', 'redeem', 'erasetoken', 'setfactors'
+                    'createtoken', 'logtokenize', 'redeem', 'erasetoken', 'setfactors', 'setmaxassets'
                 ]) or (account == 'waxdaobacker' and name in [
                     'logbackasset'
                 ])
