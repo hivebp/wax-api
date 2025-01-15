@@ -487,8 +487,8 @@ def handle_rwax_max_assets_updates_reversed(session, block_num):
 
     for trx in reverse_trxs:
         session.execute(
-            'UPDATE rwax_tokens2 SET max_assets = :old_max_assets '
-            'WHERE r.seq = :seq AND r.symbol = :symbol AND r.contract = :contract',
+            'UPDATE rwax_tokens2 r SET max_assets = :old_max_assets '
+            'WHERE r.symbol = :symbol AND r.contract = :contract',
             {
                 'symbol': trx['symbol'],
                 'contract': trx['contract'],
