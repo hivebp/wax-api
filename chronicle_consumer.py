@@ -479,6 +479,24 @@ def handle_pack_template_updates_reversed(session, block_num):
         )
 
 
+def handle_rwax_max_assets_updates_reversed(session, block_num):
+    reverse_trxs = session.execute(
+        'SELECT * FROM rwax_max_assets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        session.execute(
+            'UPDATE rwax_tokens2 SET max_assets = :old_max_assets '
+            'WHERE r.seq = :seq AND r.symbol = :symbol AND r.contract = :contract',
+            {
+                'symbol': trx['symbol'],
+                'contract': trx['contract'],
+                'old_max_assets': trx['old_max_assets']
+            }
+        )
+
+
 def handle_rwax_trait_factor_updates_reversed(session, block_num):
     reverse_trxs = session.execute(
         'SELECT * FROM rwax_traitfactor_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
@@ -487,12 +505,13 @@ def handle_rwax_trait_factor_updates_reversed(session, block_num):
 
     for trx in reverse_trxs:
         session.execute(
-            'UPDATE rwax_tokens SET trait_factors = :old_trait_factors '
-            'WHERE symbol = :symbol AND contract = :contract',
+            'UPDATE rwax_tokens2 rt SET trait_factors = old_trait_factors '
+            'FROM rwax_traitfactor_updates_reversed r '
+            'WHERE r.seq = :seq AND r.symbol = :symbol AND r.contract = :contract',
             {
                 'symbol': trx['symbol'],
                 'contract': trx['contract'],
-                'old_trait_factors': trx['old_trait_factors']
+                'seq': trx['seq']
             }
         )
 
@@ -569,6 +588,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         handle_pack_display_updates_reversed(session, block_num)
         handle_pack_template_updates_reversed(session, block_num)
         handle_rwax_trait_factor_updates_reversed(session, block_num)
+        handle_rwax_max_assets_updates_reversed(session, block_num)
 
         session.commit()
 
