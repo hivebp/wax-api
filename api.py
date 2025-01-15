@@ -331,11 +331,12 @@ def assets():
 def filter_attributes(collection):
     schema = request.args.get('schema')
     templates = request.args.get('templates')
+    only = request.args.get('only')
 
     collection = _format_collection(collection)
 
     search_res = logic.filter_attributes(
-        collection, schema, templates
+        collection, schema, templates, only
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -433,10 +434,10 @@ def get_collections(collection='*'):
 
     market = request.args.get('market')
     owner = request.args.get('owner')
-    pfps_only = request.args.get('pfps_only', 'false') == 'true'
+    only = request.args.get('only')
 
     return flaskify(oto_response.Response(logic.get_collections_overview(
-        collection, type, tag_id, verified, trending, market, owner, pfps_only, limit, offset)))
+        collection, type, tag_id, verified, trending, market, owner, only, limit, offset)))
 
 
 @app.route('/api/crafts')
@@ -554,7 +555,8 @@ def get_drops():
 @app.route('/api/collection-schemas/<collection>')
 @catch_and_respond()
 def get_collection_schemas(collection):
-    return flaskify(oto_response.Response(logic.get_collection_schemas(collection)))
+    only = request.args.get('only', None)
+    return flaskify(oto_response.Response(logic.get_collection_schemas(collection, only)))
 
 
 @app.route('/api/tags/<collection>')

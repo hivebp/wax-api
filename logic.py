@@ -870,7 +870,7 @@ def get_health():
         session.remove()
 
 
-def filter_attributes(collection, schema=None, templates=None):
+def filter_attributes(collection, schema=None, templates=None, only=None):
     session = create_session()
 
     search_dict = {
@@ -886,6 +886,10 @@ def filter_attributes(collection, schema=None, templates=None):
         schema_clause += ' AND t.template_id IN :templates '
         search_dict['templates'] = tuple(templates.split(','))
 
+    join_clause = ''
+    if only == 'rwax':
+        join_clause = 'INNER JOIN rwax_tokens2 USING(collection, schema) '
+
     sql = (
         'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
         'MAX(int_value) AS max_int_value, MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value,'
@@ -893,6 +897,7 @@ def filter_attributes(collection, schema=None, templates=None):
         'AS avg_int_value, SUM(float_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE '
         'SUM(max_supply) END) AS avg_float_value, SUM(max_supply) AS max_supply, SUM(num_minted) AS num_minted '
         'FROM attributes a '
+        '{join_clause} '
         'LEFT JOIN template_attributes_mapping ta ON a.collection = ta.collection AND a.schema = ta.schema '
         'AND a.attribute_id = ta.attribute_id '
         'LEFT JOIN templates t ON a.collection = t.collection AND a.schema = t.schema '
@@ -902,7 +907,7 @@ def filter_attributes(collection, schema=None, templates=None):
         '{schema_clause} '
         'GROUP BY 1, 2, 3 '
         'ORDER BY attribute_name ASC, string_value ASC'.format(
-            schema_clause=schema_clause
+            schema_clause=schema_clause, join_clause=join_clause
         )
     )
 
@@ -1068,9 +1073,9 @@ def templates(
             if schema:
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
-            search_category_clause += construct_category_clause(
-                session, format_dict, collection, schema, attributes, 'a.'
-            )
+                search_category_clause += construct_category_clause(
+                    session, format_dict, collection, schema, attributes, 'a.'
+                )
             search_clause += search_category_clause
 
         if name:
@@ -1293,9 +1298,9 @@ def assets(
             if schema:
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
-            search_category_clause += construct_category_clause(
-                session, format_dict, collection, schema, attributes, 'a.'
-            )
+                search_category_clause += construct_category_clause(
+                    session, format_dict, collection, schema, attributes, 'a.'
+                )
             search_clause += search_category_clause
 
         if name:
@@ -1620,9 +1625,9 @@ def listings(
                 format_dict['schema'] = schema
                 search_category_clause += ' AND a.schema = :schema '
 
-            search_category_clause += construct_category_clause(
-                session, format_dict, collection, schema, attributes, 'a.'
-            )
+                search_category_clause += construct_category_clause(
+                    session, format_dict, collection, schema, attributes, 'a.'
+                )
             search_clause += search_category_clause
 
         if name:
@@ -1656,7 +1661,7 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens2 rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
@@ -1679,7 +1684,7 @@ def listings(
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens2 rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1745,12 +1750,14 @@ def listings(
             search_clause += (
                 'AND ra.asset_id IS NOT NULL '
             )
-            if rwax_symbol:
-                search_clause += 'AND rt.symbol = :rwax_symbol '
-                format_dict['rwax_symbol'] = rwax_symbol
+            if collection and collection != '*':
+                search_clause += 'AND rt.collection = :collection '
             if rwax_contract:
                 search_clause += 'AND rt.contract = :rwax_contract '
                 format_dict['rwax_contract'] = rwax_contract
+            if rwax_symbol:
+                search_clause += 'AND rt.symbol = :rwax_symbol '
+                format_dict['rwax_symbol'] = rwax_symbol
         elif only == 'backed':
             search_clause += ' AND ba.amount IS NOT NULL '
 
@@ -2023,7 +2030,7 @@ def _format_collection_overview(row, type, size=80):
 
 @cache.memoize(timeout=300)
 def get_collections_overview(
-    collection, type, tag_id, verified, trending, market, owner, pfps_only, limit=100, offset=0
+    collection, type, tag_id, verified, trending, market, owner, only, limit=100, offset=0
 ):
     session = create_session()
 
@@ -2161,8 +2168,11 @@ def get_collections_overview(
     elif verified == 'blacklisted':
         verified_clause = ' AND blacklisted '
 
-    if pfps_only or type == 'pfps':
+    if type == 'pfps':
         join_clause = ' INNER JOIN pfp_schemas USING(collection) '
+
+    if type == 'rwax':
+        join_clause = ' INNER JOIN rwax_tokens2 USING(collection) '
 
     search_clause = ''
     type_join = False
@@ -2492,8 +2502,11 @@ def get_rwax_tokens(collection, symbol, contract):
         session.remove()
 
 
-def get_collection_schemas(collection):
+def get_collection_schemas(collection, only):
     session = create_session()
+    join_clause = ''
+    if only == 'rwax':
+        join_clause = 'INNER JOIN rwax_tokens2 USING (collection, schema) '
     try:
         res = session.execute(
             'SELECT schema, collection, timestamp, json_agg(json_build_object('
@@ -2506,6 +2519,7 @@ def get_collection_schemas(collection):
             '   SUM(num_minted - COALESCE(num_burned, 0)) AS num_assets, SUM(volume_wax) AS volume_wax, '
             '   SUM(volume_usd) AS volume_usd '
             '   FROM schemas s '
+            '   {join_clause} '
             '   LEFT JOIN templates t USING(collection, schema) '
             '   LEFT JOIN template_stats_mv USING(template_id) '
             '   LEFT JOIN templates_minted_mv USING(template_id) '
@@ -2513,7 +2527,9 @@ def get_collection_schemas(collection):
             '   AND a.attribute_id = ANY(attribute_ids) AND LOWER(attribute_name) = \'rarity\' '
             '   WHERE s.collection = :collection '
             '   GROUP BY 1, 2, 3, 4'
-            ') b GROUP BY 1, 2, 3 HAVING SUM(num_assets) > 0 ORDER BY 6 DESC ', {
+            ') b GROUP BY 1, 2, 3 HAVING SUM(num_assets) > 0 ORDER BY 6 DESC '.format(
+                join_clause=join_clause
+            ), {
                 'collection': collection
             }
         )
