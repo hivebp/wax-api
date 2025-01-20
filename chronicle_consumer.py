@@ -885,25 +885,26 @@ def handle_transaction(action, block_num, timestamp, session):
                         trace
                     )
 
-                    action = {
-                        'act': {
-                            'account': trace['account'],
-                            'name': trace['name'],
-                            'data': trace['data'],
-                            'authorization': [{'actor': trace['actor']}]
-                        },
-                        'trx_id': trace['transaction_id'],
-                        'global_sequence': int(trace['seq']) if isinstance(trace['seq'], str) else trace['seq'],
-                        'block_num': int(trace['block_num']) if isinstance(
-                            trace['block_num'], str) else trace['block_num'],
-                        'timestamp': trace['timestamp']
-                    }
+                    if False:
+                        action = {
+                            'act': {
+                                'account': trace['account'],
+                                'name': trace['name'],
+                                'data': trace['data'],
+                                'authorization': [{'actor': trace['actor']}]
+                            },
+                            'trx_id': trace['transaction_id'],
+                            'global_sequence': int(trace['seq']) if isinstance(trace['seq'], str) else trace['seq'],
+                            'block_num': int(trace['block_num']) if isinstance(
+                                trace['block_num'], str) else trace['block_num'],
+                            'timestamp': trace['timestamp']
+                        }
 
-                    parse_action(session, action)
-                    session.execute(
-                        'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
-                        trace
-                    )
+                        parse_action(session, action)
+                        session.execute(
+                            'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
+                            trace
+                        )
                     session.commit()
             except SQLAlchemyError as err:
                 session.rollback()
