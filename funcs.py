@@ -3877,18 +3877,17 @@ def remassets(session, action, contract):
             new_pack_data
         )
     elif len(data['asset_ids']) > 1:
-        new_pack_data['asset_ids'] = data['asset_ids']
-        session_execute_logged(
-            session,
-            'INSERT INTO pool_deletions '
-            'SELECT * FROM (SELECT :pool_id AS pool_id, :contract AS contract, '
-            'CAST(UNNEST(:asset_ids) AS bigint) AS a_id, :seq AS seq, :block_num AS block_num, '
-            ':timestamp AS timestamp) a '
-            'WHERE (pool_id, contract, a_id) NOT IN ('
-            '   SELECT pool_id, contract, asset_id FROM pool_assets WHERE asset_id = a_id'
-            ') ',
-            new_pack_data
-        )
+        for asset_id in data['asset_ids']:
+            new_pack_data['asset_id'] = asset_id
+            session_execute_logged(
+                session,
+                'INSERT INTO pool_deletions '
+                'SELECT :pool_id, :contract, :asset_id, :seq, :block_num, :timestamp '
+                'WHERE (:pool_id, :contract, :a_id) NOT IN ('
+                '   SELECT pool_id, contract, asset_id FROM pool_assets WHERE asset_id = a_id'
+                ') ',
+                new_pack_data
+            )
 
 
 @catch_and_log()
