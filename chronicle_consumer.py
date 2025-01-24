@@ -487,7 +487,7 @@ def handle_rwax_max_assets_updates_reversed(session, block_num):
 
     for trx in reverse_trxs:
         session.execute(
-            'UPDATE rwax_tokens2 r SET max_assets = :old_max_assets '
+            'UPDATE rwax_tokens r SET max_assets = :old_max_assets '
             'WHERE r.symbol = :symbol AND r.contract = :contract',
             {
                 'symbol': trx['symbol'],
@@ -505,7 +505,7 @@ def handle_rwax_trait_factor_updates_reversed(session, block_num):
 
     for trx in reverse_trxs:
         session.execute(
-            'UPDATE rwax_tokens2 rt SET trait_factors = old_trait_factors '
+            'UPDATE rwax_tokens rt SET trait_factors = old_trait_factors '
             'FROM rwax_traitfactor_updates_reversed r '
             'WHERE r.seq = :seq AND r.symbol = :symbol AND r.contract = :contract',
             {

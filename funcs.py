@@ -4885,7 +4885,7 @@ def load_remint_mirror(session, mint):
 
 
 @catch_and_log()
-def load_create_token2(session, token):
+def load_create_token(session, token):
     data = _get_data(token)
     new_token = load_transaction_basics(token)
     new_token['authorized_account'] = data['authorized_account']
@@ -4894,7 +4894,7 @@ def load_create_token2(session, token):
     new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
     new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1])
     new_token['contract'] = data['contract']
-    new_token['max_assets_to_tokenize'] = data['max_assets_to_tokenize']
+    new_token['max_assets'] = data['max_assets_to_tokenize'] if 'max_assets_to_tokenize' in data else 0
 
     new_token['trait_factors'] = json.dumps(data['trait_factors'])
     new_token['token_name'] = data['token_name']
@@ -4903,14 +4903,19 @@ def load_create_token2(session, token):
 
     if 'templates' in data:
         new_token['template_id'] = data['templates'][0]['template_id']
+        max_assets_to_tokenize = 0
+        for template in data['templates']:
+            max_assets_to_tokenize += template['max_assets_to_tokenize']
+
+        new_token['max_assets'] = max_assets_to_tokenize
         session_execute_logged(
             session,
             'INSERT INTO rwax_tokens ('
-            '   collection, schema, symbol, contract, decimals, maximum_supply, trait_factors, '
+            '   collection, schema, symbol, contract, decimals, max_assets, maximum_supply, trait_factors, '
             '   token_name, token_logo, token_logo_lg, timestamp, seq, block_num'
             ') '
             'SELECT :collection, (SELECT schema FROM templates WHERE template_id = :template_id), :symbol, :contract, '
-            ':decimals, :maximum_supply, :trait_factors, :token_name, :token_logo, :token_logo_lg, '
+            ':decimals, :max_assets, :maximum_supply, :trait_factors, :token_name, :token_logo, :token_logo_lg, '
             ':timestamp, :seq, :block_num '
             'WHERE NOT EXISTS (SELECT seq FROM rwax_tokens WHERE seq = :seq)',
             new_token
@@ -4920,71 +4925,12 @@ def load_create_token2(session, token):
         session_execute_logged(
             session,
             'INSERT INTO rwax_tokens ('
-            '   collection, schema_name, symbol, contract, decimals, maximum_supply, trait_factors, '
+            '   collection, schema, symbol, contract, decimals, max_assets, maximum_supply, trait_factors, '
             '   token_name, token_logo, token_logo_lg, timestamp, seq, block_num'
             ') '
-            'SELECT :collection, :schema_name, :symbol, :contract, :decimals, :maximum_supply, '
+            'SELECT :collection, :schema_name, :symbol, :contract, :decimals, :max_assets, :maximum_supply, '
             ':trait_factors, :token_name, :token_logo, :token_logo_lg, :timestamp, :seq, :block_num '
             'WHERE NOT EXISTS (SELECT seq FROM rwax_tokens WHERE seq = :seq)',
-            new_token
-        )
-
-
-@catch_and_log()
-def load_create_token(session, token):
-    data = _get_data(token)
-    new_token = load_transaction_basics(token)
-    new_token['authorized_account'] = data['authorized_account']
-    new_token['collection'] = data['collection_name']
-    new_token['symbol'] = data['maximum_supply'].split(' ')[1]
-    new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
-    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1]) if len(
-        data['maximum_supply'].split(' ')[0].split('.')) > 1 else 0
-    new_token['contract'] = data['contract']
-    templates = []
-    new_token['template_ids'] = []
-    max_assets_accumulated = 0
-    for template in data['templates']:
-        new_token['template_ids'].append(template['template_id'])
-        max_assets = template['max_assets_to_tokonize'] if 'max_assets_to_tokonize' in template else template[
-            'max_assets_to_tokenize']
-        max_assets_accumulated += max_assets
-        templates.append(
-            {
-                'template_id': template['template_id'],
-                'max_assets': max_assets
-            }
-        )
-    new_token['templates'] = json.dumps(templates)
-    new_token['trait_factors'] = json.dumps(data['trait_factors'])
-    new_token['token_name'] = data['token_name']
-    new_token['token_logo'] = data['token_logo']
-    new_token['token_logo_lg'] = data['token_logo_lg']
-
-    session_execute_logged(
-        session,
-        'INSERT INTO rwax_tokens ('
-        '   collection, symbol, contract, decimals, maximum_supply, template_ids, templates_supply, trait_factors, '
-        '   token_name, token_logo, token_logo_lg, timestamp, seq, block_num'
-        ') '
-        'SELECT :collection, :symbol, :contract, :decimals, :maximum_supply, :template_ids, :templates, '
-        ':trait_factors, :token_name, :token_logo, :token_logo_lg, :timestamp, :seq, :block_num '
-        'WHERE NOT EXISTS (SELECT seq FROM rwax_tokens WHERE seq = :seq)',
-        new_token
-    )
-
-    for template in templates:
-        new_token['max_assets'] = template['max_assets']
-        new_token['template_id'] = template['template_id']
-
-        session_execute_logged(
-            session,
-            'INSERT INTO rwax_templates ('
-            '   template_id, collection, symbol, decimals, contract, max_assets, seq, block_num, timestamp'
-            ') '
-            'SELECT :template_id, :collection, :symbol, :decimals, :contract, :max_assets, :seq, :block_num, '
-            ':timestamp '
-            'WHERE NOT EXISTS (SELECT template_id FROM rwax_templates WHERE template_id = :template_id)',
             new_token
         )
 
@@ -5010,7 +4956,7 @@ def load_set_max_assets(session, token):
         ') '
         'SELECT :collection, :symbol, :contract, :decimals, :max_assets, '
         '('
-        '  SELECT max_assets FROM rwax_tokens2 WHERE contract = :contract AND symbol = :symbol'
+        '  SELECT max_assets FROM rwax_tokens WHERE contract = :contract AND symbol = :symbol'
         '), :timestamp, :seq, :block_num '
         'WHERE NOT EXISTS (SELECT seq FROM rwax_max_assets_updates WHERE seq = :seq)',
         new_token
@@ -5018,7 +4964,7 @@ def load_set_max_assets(session, token):
 
     session_execute_logged(
         session,
-        'UPDATE rwax_tokens2 SET max_assets = :max_assets '
+        'UPDATE rwax_tokens SET max_assets = :max_assets '
         'WHERE contract = :contract AND symbol = :symbol ',
         new_token
     )
@@ -5051,7 +4997,7 @@ def load_set_factors(session, token):
 
     session_execute_logged(
         session,
-        'UPDATE rwax_tokens2 SET trait_factors = :trait_factors '
+        'UPDATE rwax_tokens SET trait_factors = :trait_factors '
         'WHERE contract = :contract AND symbol = :symbol ',
         new_token
     )

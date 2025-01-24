@@ -892,7 +892,7 @@ def filter_attributes(collection, schema=None, templates=None, only=None):
 
     join_clause = ''
     if only == 'rwax':
-        join_clause = 'INNER JOIN rwax_tokens2 USING(collection, schema) '
+        join_clause = 'INNER JOIN rwax_tokens USING(collection, schema) '
 
     sql = (
         'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
@@ -1205,7 +1205,7 @@ def templates(
             'FROM {source_clause} '
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_schemas p USING(schema) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
+            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
             'LEFT JOIN template_stats_mv ts USING(template_id) '
             'LEFT JOIN templates_minted_mv tm USING(template_id) '
             'LEFT JOIN template_floor_prices_mv fp USING(template_id) '
@@ -1522,7 +1522,7 @@ def assets(
             'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) ' 
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
@@ -1665,7 +1665,7 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
@@ -1688,7 +1688,7 @@ def listings(
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
-            'LEFT JOIN rwax_tokens2 rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN collections col ON (col.collection = l.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
@@ -1818,7 +1818,7 @@ def listings(
                     '{join_clause} '
                     'LEFT JOIN rwax_assets ra ON (ra.asset_id = a.asset_id) '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
-                    'LEFT JOIN rwax_tokens2 rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
+                    'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
@@ -2176,7 +2176,7 @@ def get_collections_overview(
         join_clause = ' INNER JOIN pfp_schemas USING(collection) '
 
     if type == 'rwax':
-        join_clause = ' INNER JOIN rwax_tokens2 USING(collection) '
+        join_clause = ' INNER JOIN rwax_tokens USING(collection) '
 
     search_clause = ''
     type_join = False
@@ -2510,7 +2510,7 @@ def get_collection_schemas(collection, only):
     session = create_session()
     join_clause = ''
     if only == 'rwax':
-        join_clause = 'INNER JOIN rwax_tokens2 USING (collection, schema) '
+        join_clause = 'INNER JOIN rwax_tokens USING (collection, schema) '
     try:
         res = session.execute(
             'SELECT schema, collection, timestamp, json_agg(json_build_object('
