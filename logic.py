@@ -2457,13 +2457,12 @@ def get_rwax_tokens(collection, symbol, contract):
         res = session.execute(
             'SELECT symbol, contract, decimals, maximum_supply, token_name, token_logo, token_logo_lg, '
             'rt.timestamp,c.collection, cn.name AS display_name, ci.image AS collection_image, '
-            'c.verified, c.blacklisted, CAST(trait_factors AS text) AS trait_factors, '
-            'CAST(templates_supply AS text) AS templates_supply, {templates_obj} '
+            'c.verified, c.blacklisted, CAST(trait_factors AS text) AS trait_factors, {templates_obj} '
             'FROM rwax_tokens rt '
             'LEFT JOIN collections c USING (collection) '
             'LEFT JOIN images ci USING (image_id) '
             'LEFT JOIN names cn USING (name_id) '
-            'LEFT JOIN templates t ON t.template_id = ANY(template_ids) '
+            'LEFT JOIN templates t ON t.schema = rt.schema '
             'LEFT JOIN template_stats_mv ts USING (template_id) '
             'LEFT JOIN templates_minted_mv tm USING (template_id) '
             'LEFT JOIN template_floor_prices_mv fp USING (template_id) '
@@ -2472,7 +2471,7 @@ def get_rwax_tokens(collection, symbol, contract):
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
             'WHERE NOT blacklisted {token_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15'.format(
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14'.format(
                 templates_obj=_get_templates_object(),
                 token_clause=token_clause
             ), search_dict)
