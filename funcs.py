@@ -4938,7 +4938,8 @@ def load_create_token(session, token):
     new_token['collection'] = data['collection_name']
     new_token['symbol'] = data['maximum_supply'].split(' ')[1]
     new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
-    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1])
+    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1]) if len(
+        data['maximum_supply'].split(' ')[0].split('.')) > 1 else 0
     new_token['contract'] = data['contract']
     templates = []
     new_token['template_ids'] = []
@@ -4996,7 +4997,8 @@ def load_set_max_assets(session, token):
     new_token['collection'] = data['collection_name']
     new_token['symbol'] = data['maximum_supply'].split(' ')[1]
     new_token['maximum_supply'] = float(data['maximum_supply'].split(' ')[0])
-    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1])
+    new_token['decimals'] = len(data['maximum_supply'].split(' ')[0].split('.')[1]) if len(
+        data['maximum_supply'].split(' ')[0].split('.')) > 1 else 0
     new_token['contract'] = data['contract']
     new_token['max_assets'] = data['max_assets_to_tokenize']
 

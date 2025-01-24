@@ -124,11 +124,12 @@ def _get_templates_object():
 def _get_assets_object():
     return (
         'array_agg(json_build_object(\'asset_id\', a.asset_id, \'name\', n.name, \'collection\', a.collection, '
-        '\'contract\', a.contract, \'verified\', col.verified, \'collection_image\', ci.image, '
-        '\'display_name\', cn.name, \'schema\', a.schema, \'mutable_data\', m.data, \'immutable_data\', i.data, '
-        '\'template_immutable_data\', td.data, \'num_burned\', tm.num_burned, \'avg_wax_price\', ts.avg_wax_price, '
-        '\'avg_usd_price\', ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd,'
-        '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
+        '\'contract\', a.contract, \'verified\', col.verified, \'blacklisted\', col.blacklisted, '
+        '\'collection_image\', ci.image, \'display_name\', cn.name, \'schema\', a.schema, \'mutable_data\', m.data, '
+        '\'immutable_data\', i.data, \'template_immutable_data\', td.data, \'num_burned\', tm.num_burned, '
+        '\'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', ts.avg_usd_price, \'last_sold_wax\', ts.last_sold_wax,'
+        ' \'last_sold_usd\', ts.last_sold_usd, \'last_sold_listing_id\', last_sold_listing_id, '
+        '\'last_sold_timestamp\', ts.last_sold_timestamp, '
         '\'owner\', a.owner, \'burned\', burned, \'floor_price\', fp.floor_price, \'rwax_symbol\', rt.symbol, '
         '\'rwax_contract\', rt.contract, \'rwax_max_assets\', rt.max_assets, \'trait_factors\', rt.trait_factors, '
         '\'rwax_decimals\', rt.decimals, \'rwax_token_name\', rt.token_name, \'rwax_supply\', rt.maximum_supply, '
@@ -457,7 +458,9 @@ def _format_asset(asset):
                 'displayName': asset['display_name'],
                 'collectionImage': asset['collection_image'],
                 'tags': _format_tags(asset['tags']) if 'tags' in asset.keys() and asset['tags'] else [],
-                'badges': _format_badges(asset['badges']) if 'badges' in asset.keys() and asset['badges'] else []
+                'badges': _format_badges(asset['badges']) if 'badges' in asset.keys() and asset['badges'] else [],
+                'verification': asset['verified'],
+                'blacklisted': asset['blacklisted'] if 'blacklisted' in asset.keys() else None,
             }
         if asset['rarity_score']:
             asset_obj['rarityScore'] = asset['rarity_score']
@@ -570,7 +573,8 @@ def _format_listings(item):
             'collectionName': item['collection'],
             'displayName': item['display_name'],
             'collectionImage': item['collection_image'],
-            'verification': item['verified']
+            'verification': item['verified'],
+            'blacklisted': item['blacklisted']
         },
         'assets': _format_assets_object(item['assets'])
     }
@@ -1339,7 +1343,7 @@ def assets(
             'rt.symbol AS rwax_symbol, rt.contract AS rwax_contract, rt.max_assets AS rwax_max_assets, '
             'rt.trait_factors, rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, '
             'rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, a.transferable, a.burnable, '
-            'rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, '
+            'rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, col.verified, col.blacklisted, '
             '{badges_object}, {tags_obj}, {attributes_obj} AS traits, {listings_obj} AS listings'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(),
                 attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object()
@@ -1655,7 +1659,7 @@ def listings(
         with_clause += (
             ', filtered_listings AS ('
             'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
-            'l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
+            'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
             'FROM listings l '
             'LEFT JOIN listings_helper_mv h USING (sale_id) '
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
@@ -1672,7 +1676,7 @@ def listings(
             'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) ' 
             'WHERE TRUE {search_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
             '{group_clause} {order_clause} {limit_clause}) '
         )
 
@@ -1702,9 +1706,9 @@ def listings(
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
         )
         columns_clause = (
-            'l.market, l.seller, l.timestamp AS timestamp, l.listing_id, l.currency, '
-            'l.sale_id, col.verified, l.maker, l.collection, l.price, ci.image as collection_image, '
-            'cn.name AS display_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
+            'l.market, l.seller, l.timestamp AS timestamp, l.listing_id, l.currency, l.sale_id, col.verified, '
+            'col.blacklisted, l.maker, l.collection, l.price, ci.image as collection_image, cn.name AS display_name, '
+            '(SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
             '{badges_object}, {tags_obj}, {assets_object} '.format(
                 badges_object=_get_badges_object('l.'),
                 tags_obj=_get_tags_object('l.'),
@@ -1807,7 +1811,7 @@ def listings(
                     'GROUP BY 1) '
                     ', filtered_listings AS ('
                     'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
-                    'l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
+                    'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
                     'FROM listings l '
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
@@ -1824,7 +1828,7 @@ def listings(
                     'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
                     'LEFT JOIN names n ON (a.name_id = n.name_id) '
                     'WHERE a.template_id > 0 AND ma.template_id IS NULL '
-                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
                     '{group_clause} {order_clause} {limit_clause}) '
                 )
 
@@ -1855,7 +1859,7 @@ def listings(
                     'GROUP BY 1 ORDER BY 1 ASC) '
                     ', filtered_listings AS ('
                     'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
-                    'l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
+                    'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
                     'FROM listings l '
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
@@ -1870,7 +1874,7 @@ def listings(
                     'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
                     'LEFT JOIN names n ON (a.name_id = n.name_id) '
                     'WHERE a.mint < ma.mint {search_clause} '
-                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
                     '{group_clause} {order_clause} {limit_clause}) '
                 )
         if market:
@@ -1939,7 +1943,7 @@ def listings(
             'FROM {source_clause} '
             '{join_clause} '
             '{personal_blacklist_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, l.timestamp, f.user_name {group_clause}'
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, l.timestamp, f.user_name {group_clause}'
             '{order_clause}'.format(
                 with_clause=with_clause,
                 columns_clause=columns_clause,
@@ -2453,7 +2457,7 @@ def get_rwax_tokens(collection, symbol, contract):
         res = session.execute(
             'SELECT symbol, contract, decimals, maximum_supply, token_name, token_logo, token_logo_lg, '
             'rt.timestamp,c.collection, cn.name AS display_name, ci.image AS collection_image, '
-            'c.verified, CAST(trait_factors AS text) AS trait_factors, '
+            'c.verified, c.blacklisted, CAST(trait_factors AS text) AS trait_factors, '
             'CAST(templates_supply AS text) AS templates_supply, {templates_obj} '
             'FROM rwax_tokens rt '
             'LEFT JOIN collections c USING (collection) '
@@ -2468,19 +2472,19 @@ def get_rwax_tokens(collection, symbol, contract):
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
             'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
             'WHERE NOT blacklisted {token_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14'.format(
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15'.format(
                 templates_obj=_get_templates_object(),
                 token_clause=token_clause
             ), search_dict)
         tokens = []
         for token in res:
-            templates = _format_templates(token['templates'])
             tokens.append({
                 'collection': {
                     'collectionName': token['collection'],
                     'displayName': token['display_name'],
                     'collectionImage': token['collection_image'],
                     'verification': token['verified'],
+                    'blacklisted': token['blacklisted'],
                 },
                 'symbol': token['symbol'],
                 'contract': token['contract'],
@@ -2788,7 +2792,7 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
         sql = (
             'SELECT c.*, c2.outcomes, c2.recipe FROM ('
             'SELECT craft_id, extract(epoch from unlock_time AT time zone \'Europe/Berlin\')::bigint AS unlock_time, '
-            'c.timestamp, num_crafted, total, display_data, col.verified, '
+            'c.timestamp, num_crafted, total, display_data, col.verified, col.blacklisted, '
             'ci.image AS collection_image, cn.name AS display_name, c.collection, ' 
             'array_agg(CASE WHEN outcome_template_id IS NOT NULL THEN json_build_object('
             '\'template_id\', outcome_template_id, \'name\', tn1.name, \'collection\', json_build_object('
@@ -2836,7 +2840,7 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             'LEFT JOIN collections col2 ON (col2.collection = t2.collection) '
             'LEFT JOIN images ci2 ON col2.image_id = ci2.image_id '
             'LEFT JOIN names cn2 ON col2.name_id = cn2.name_id '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 '
             '{order_clause} '
             ') c LEFT JOIN crafts c2 USING(craft_id) '
             '{order_clause} '.format(
@@ -2869,6 +2873,7 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
                     'displayName': item['display_name'],
                     'collectionImage': item['collection_image'],
                     'verification': item['verified'],
+                    'blacklisted': item['blacklisted'],
                 },
                 'numCrafted': item['num_crafted'],
                 'total': item['total'],
@@ -3018,7 +3023,7 @@ def get_drops(
             'SELECT drop_id, price, currency, fee, '
             'extract(epoch from start_time AT time zone \'Europe/Berlin\')::bigint AS start_time, '
             'extract(epoch from end_time AT time zone \'Europe/Berlin\')::bigint AS end_time, d2.timestamp, '
-            'account_limit, account_limit_cooldown, max_claimable, num_claimed, verified, '
+            'account_limit, account_limit_cooldown, max_claimable, num_claimed, verified, blacklisted, '
             'display_data, (SELECT usd FROM usd_rate) as wax_usd, contract, cn.name as display_name, d2.collection, '
             'auth_required, ci.image AS collection_image, name_pattern, pd.drop_id AS is_pfp, '
             '(SELECT SUM(amount) FROM drop_actions '
@@ -3042,8 +3047,8 @@ def get_drops(
             'AND NOT erased AND NOT is_hidden {collection_clause} {search_clause} '
             'AND (currency IS NOT NULL OR price IS NULL OR price = 0) '
             '{market_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, start_time, end_time '
-            '{order_clause} LIMIT :limit OFFSET :offset'.format(
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, start_time, '
+            'end_time {order_clause} LIMIT :limit OFFSET :offset'.format(
                 order_clause=order_clause,
                 market_clause=market_clause,
                 collection_clause=collection_clause,
@@ -3083,6 +3088,7 @@ def get_drops(
                     'displayName': drop['display_name'],
                     'collectionImage': drop['collection_image'],
                     'verification': drop['verified'],
+                    'blacklisted': drop['blacklisted'],
                 },
                 'templatesToMint': _format_object(templates)
             }
