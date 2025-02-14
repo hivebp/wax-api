@@ -885,7 +885,6 @@ def handle_transaction(action, block_num, timestamp, session):
                         trace
                     )
 
-
                     action = {
                         'act': {
                             'account': trace['account'],

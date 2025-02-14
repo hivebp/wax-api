@@ -5038,14 +5038,14 @@ def load_rwax_erasetoken(session, erase):
         session,
         'INSERT INTO removed_rwax_tokens '
         'SELECT r.*, :seq, :block_num FROM rwax_tokens r '
-        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        'WHERE contract = :contract AND symbol = :symbol',
         erased_token
     )
 
     session_execute_logged(
         session,
         'DELETE FROM rwax_tokens '
-        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        'WHERE contract = :contract AND symbol = :symbol',
         erased_token
     )
 
@@ -5053,14 +5053,14 @@ def load_rwax_erasetoken(session, erase):
         session,
         'INSERT INTO removed_rwax_templates '
         'SELECT r.*, :seq, :block_num FROM rwax_templates r '
-        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        'WHERE contract = :contract AND symbol = :symbol',
         erased_token
     )
 
     session_execute_logged(
         session,
         'DELETE FROM rwax_templates '
-        'WHERE contract = :contract AND decimals = :decimals AND symbol = :symbol',
+        'WHERE contract = :contract AND symbol = :symbol',
         erased_token
     )
 
