@@ -66,45 +66,46 @@ def handle_atomicassets_updates_reversed(session, block_num):
                 'ORDER BY u.asset_id ASC ', {'seq': trx['seq']}
             ).first()
 
-            try:
-                data = funcs.parse_data(
-                    json.loads(update['tdata'])
-                ) if update['tdata'] else {}
-                if update['idata']:
-                    data.update(funcs.parse_data(json.loads(update['idata'])))
-                if update['mdata']:
-                    data.update(funcs.parse_data(json.loads(update['mdata'])))
+            if update:
+                try:
+                    data = funcs.parse_data(
+                        json.loads(update['tdata'])
+                    ) if update['tdata'] else {}
+                    if update['idata']:
+                        data.update(funcs.parse_data(json.loads(update['idata'])))
+                    if update['mdata']:
+                        data.update(funcs.parse_data(json.loads(update['mdata'])))
 
-                new_asset = {}
+                    new_asset = {}
 
-                new_asset['name'] = data['name'].strip()[0:255] if 'name' in data.keys() else None
-                new_asset['image'] = str(data['img']).strip()[0:255] if 'img' in data.keys() else None
-                new_asset['video'] = str(data['video']).strip()[0:255] if 'video' in data.keys() else None
-                new_asset['seq'] = update['seq']
-                new_asset['old_mdata_id'] = update['old_mdata_id']
-                new_asset['asset_id'] = update['asset_id']
+                    new_asset['name'] = data['name'].strip()[0:255] if 'name' in data.keys() else None
+                    new_asset['image'] = str(data['img']).strip()[0:255] if 'img' in data.keys() else None
+                    new_asset['video'] = str(data['video']).strip()[0:255] if 'video' in data.keys() else None
+                    new_asset['seq'] = update['seq']
+                    new_asset['old_mdata_id'] = update['old_mdata_id']
+                    new_asset['asset_id'] = update['asset_id']
 
-                new_asset['attribute_ids'] = funcs.parse_attributes(
-                    session, update['collection'], update['schema'], data)
+                    new_asset['attribute_ids'] = funcs.parse_attributes(
+                        session, update['collection'], update['schema'], data)
 
-                session.execute(
-                   'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
-                   '{name_clause} {image_clause} {video_clause} '
-                   'WHERE asset_id = :asset_id '.format(
-                       name_clause=(
-                           ', name_id = (SELECT name_id FROM names WHERE name = :name)'
-                       ) if new_asset['name'] else ', name_id = NULL',
-                       image_clause=(
-                           ', image_id = (SELECT image_id FROM images WHERE image = :image)'
-                       ) if new_asset['image'] else ', image_id = NULL',
-                       video_clause=(
-                           ', video_id = (SELECT video_id FROM videos WHERE video = :video)'
-                       ) if new_asset['video'] else ', video_id = NULL',
-                   ), new_asset
-                )
-            except Exception as err:
-                log_error('handle_atomicassets_updates_reversed: {} {}'.format(err, data))
-                raise err
+                    session.execute(
+                       'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
+                       '{name_clause} {image_clause} {video_clause} '
+                       'WHERE asset_id = :asset_id '.format(
+                           name_clause=(
+                               ', name_id = (SELECT name_id FROM names WHERE name = :name)'
+                           ) if new_asset['name'] else ', name_id = NULL',
+                           image_clause=(
+                               ', image_id = (SELECT image_id FROM images WHERE image = :image)'
+                           ) if new_asset['image'] else ', image_id = NULL',
+                           video_clause=(
+                               ', video_id = (SELECT video_id FROM videos WHERE video = :video)'
+                           ) if new_asset['video'] else ', video_id = NULL',
+                       ), new_asset
+                    )
+                except Exception as err:
+                    log_error('handle_atomicassets_updates_reversed: {} {}'.format(err, data))
+                    raise err
         except SQLAlchemyError as err:
             log_error('handle_atomicassets_updates_reversed: {} {}'.format(err, data))
             raise err
@@ -369,41 +370,42 @@ def handle_simpleassets_updates_reversed(session, block_num):
                 'ORDER BY u.asset_id ASC ', {'seq': trx['seq']}
             ).first()
 
-            try:
-                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] else {}
-                if 'mdata' in update.keys() and update['mdata']:
-                    data.update(json.loads(update['mdata']))
+            if update:
+                try:
+                    data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] else {}
+                    if 'mdata' in update.keys() and update['mdata']:
+                        data.update(json.loads(update['mdata']))
 
-                new_asset = {}
+                    new_asset = {}
 
-                new_asset['name'] = data['name'].strip()[0:255] if 'name' in data.keys() else None
-                new_asset['image'] = str(data['img']).strip()[0:255] if 'img' in data.keys() else None
-                new_asset['video'] = str(data['video']).strip()[0:255] if 'video' in data.keys() else None
-                new_asset['seq'] = update['seq']
-                new_asset['old_mdata_id'] = update['old_mdata_id']
-                new_asset['asset_id'] = update['asset_id']
+                    new_asset['name'] = data['name'].strip()[0:255] if 'name' in data.keys() else None
+                    new_asset['image'] = str(data['img']).strip()[0:255] if 'img' in data.keys() else None
+                    new_asset['video'] = str(data['video']).strip()[0:255] if 'video' in data.keys() else None
+                    new_asset['seq'] = update['seq']
+                    new_asset['old_mdata_id'] = update['old_mdata_id']
+                    new_asset['asset_id'] = update['asset_id']
 
-                new_asset['attribute_ids'] = funcs.parse_attributes(
-                    session, update['collection'], update['schema'], data)
+                    new_asset['attribute_ids'] = funcs.parse_attributes(
+                        session, update['collection'], update['schema'], data)
 
-                session.execute(
-                   'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
-                   '{name_clause} {image_clause} {video_clause} '
-                   'WHERE asset_id = :asset_id '.format(
-                       name_clause=(
-                           ', name_id = (SELECT name_id FROM names WHERE name = :name)'
-                       ) if new_asset['name'] else ', name_id = NULL',
-                       image_clause=(
-                           ', image_id = (SELECT image_id FROM images WHERE image = :image)'
-                       ) if new_asset['image'] else ', image_id = NULL',
-                       video_clause=(
-                           ', video_id = (SELECT video_id FROM videos WHERE video = :video)'
-                       ) if new_asset['video'] else ', video_id = NULL',
-                   ), new_asset
-                )
-            except Exception as err:
-                log_error('handle_simpleassets_updates_reversed: {}'.format(err))
-                raise err
+                    session.execute(
+                       'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
+                       '{name_clause} {image_clause} {video_clause} '
+                       'WHERE asset_id = :asset_id '.format(
+                           name_clause=(
+                               ', name_id = (SELECT name_id FROM names WHERE name = :name)'
+                           ) if new_asset['name'] else ', name_id = NULL',
+                           image_clause=(
+                               ', image_id = (SELECT image_id FROM images WHERE image = :image)'
+                           ) if new_asset['image'] else ', image_id = NULL',
+                           video_clause=(
+                               ', video_id = (SELECT video_id FROM videos WHERE video = :video)'
+                           ) if new_asset['video'] else ', video_id = NULL',
+                       ), new_asset
+                    )
+                except Exception as err:
+                    log_error('handle_simpleassets_updates_reversed: {}'.format(err))
+                    raise err
         except SQLAlchemyError as err:
             log_error('handle_simpleassets_updates_reversed: {}'.format(err))
             raise err

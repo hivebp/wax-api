@@ -453,7 +453,7 @@ def add_sets():
 def handle_atomicassets_updates_reversed():
     session = create_session()
 
-    block_num = 345597868
+    block_num = 126827993
 
     reverse_trxs = session.execute(
         'SELECT * FROM atomicassets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
