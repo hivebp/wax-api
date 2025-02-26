@@ -16,7 +16,7 @@ import config
 from config import PostgresConsumerConfig
 from filler import parse_action
 
-logging.basicConfig(filename='consumer.err', level=logging.ERROR)
+logging.basicConfig(filename='test.err', level=logging.ERROR)
 
 engine = create_engine(PostgresConsumerConfig.SQLALCHEMY_DATABASE_URI)
 
