@@ -640,6 +640,7 @@ def handle_transaction(action, block_num, timestamp, session):
     if not action or 'trace' not in action.keys():
         return
     try:
+        logging.error(action)
         traces = action['trace']
         status = traces['status']
         if status != 'executed':
@@ -877,7 +878,7 @@ def handle_transaction(action, block_num, timestamp, session):
                 ]) or (account == 'waxdaobacker' and name in [
                     'logbackasset'
                 ])
-                
+
                 log_error('handle_transaction {}: {}'.format(insert_transaction, trace['block_num']))
 
                 if insert_transaction:
