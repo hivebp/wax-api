@@ -969,7 +969,6 @@ class Server:
                         msg_type = int.from_bytes(msg[0:3], byteorder='little')
 
                         do_ack = False
-                        logging.error(msg_type)
 
                         if msg_type == 1003:
                             message = json.loads(msg[8:].decode())
@@ -991,9 +990,14 @@ class Server:
                             message = json.loads(msg[8:].decode())
                             block_num = int(message['block_num'])
                             self.unconfirmed_block = block_num
+                            logging.error(message)
                             if self.unconfirmed_block - self.confirmed_block >= 100:
                                 self.confirmed_block = self.unconfirmed_block
                                 do_ack = True
+                        elif msg_type == 1014:
+                            message = json.loads(msg[8:].decode())
+                            logging.error(message)
+
                         if do_ack:
                             self.emitter.emit('ackBlock', self.confirmed_block)
                             session.commit()
