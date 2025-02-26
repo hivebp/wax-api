@@ -901,6 +901,7 @@ def handle_transaction(action, block_num, timestamp, session):
                         'timestamp': trace['timestamp']
                     }
 
+                    log_error('handle_transaction sql {}: {}'.format(trace, trace['block_num']))
                     parse_action(session, action)
                     session.execute(
                         'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
