@@ -877,6 +877,8 @@ def handle_transaction(action, block_num, timestamp, session):
                 ]) or (account == 'waxdaobacker' and name in [
                     'logbackasset'
                 ])
+                
+                log_error('handle_transaction {}: {}'.format(insert_transaction, trace['block_num']))
 
                 if insert_transaction:
                     trace['data'] = json.dumps(trace['act']['data'])
@@ -901,7 +903,7 @@ def handle_transaction(action, block_num, timestamp, session):
                         'timestamp': trace['timestamp']
                     }
 
-                    log_error('handle_transaction sql {}: {}'.format(trace, trace['block_num']))
+                    log_error('handle_transaction: {}'.format(trace['block_num']))
                     parse_action(session, action)
                     session.execute(
                         'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
