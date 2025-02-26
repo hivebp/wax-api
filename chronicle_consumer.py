@@ -969,6 +969,7 @@ class Server:
                         msg_type = int.from_bytes(msg[0:3], byteorder='little')
 
                         do_ack = False
+                        logging.error(msg_type)
 
                         if msg_type == 1003:
                             message = json.loads(msg[8:].decode())
