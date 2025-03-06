@@ -16,7 +16,7 @@ import config
 from config import PostgresConsumerConfig
 from filler import parse_action
 
-logging.basicConfig(filename='test.err', level=logging.ERROR)
+logging.basicConfig(filename='consumer.err', level=logging.ERROR)
 
 engine = create_engine(PostgresConsumerConfig.SQLALCHEMY_DATABASE_URI)
 
@@ -640,7 +640,6 @@ def handle_transaction(action, block_num, timestamp, session):
     if not action or 'trace' not in action.keys():
         return
     try:
-        logging.error(action)
         traces = action['trace']
         status = traces['status']
         if status != 'executed':
@@ -990,13 +989,9 @@ class Server:
                             message = json.loads(msg[8:].decode())
                             block_num = int(message['block_num'])
                             self.unconfirmed_block = block_num
-                            logging.error(message)
                             if self.unconfirmed_block - self.confirmed_block >= 100:
                                 self.confirmed_block = self.unconfirmed_block
                                 do_ack = True
-                        elif msg_type == 1014:
-                            message = json.loads(msg[8:].decode())
-                            logging.error(message)
 
                         if do_ack:
                             self.emitter.emit('ackBlock', self.confirmed_block)
