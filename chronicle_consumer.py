@@ -878,8 +878,6 @@ def handle_transaction(action, block_num, timestamp, session):
                     'logbackasset'
                 ])
 
-                log_error('handle_transaction {}: {}'.format(insert_transaction, trace['block_num']))
-
                 if insert_transaction:
                     trace['data'] = json.dumps(trace['act']['data'])
                     session.execute(
@@ -903,7 +901,6 @@ def handle_transaction(action, block_num, timestamp, session):
                         'timestamp': trace['timestamp']
                     }
 
-                    log_error('handle_transaction: {}'.format(trace['block_num']))
                     parse_action(session, action)
                     session.execute(
                         'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
