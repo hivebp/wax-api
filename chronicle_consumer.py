@@ -970,6 +970,8 @@ class Server:
 
                         do_ack = False
 
+                        logging.error(msg_type)
+
                         if msg_type == 1003:
                             message = json.loads(msg[8:].decode())
                             block_num = int(message['block_num'])
