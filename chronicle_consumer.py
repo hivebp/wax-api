@@ -594,6 +594,17 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         session.commit()
 
+        for tables in block_num_tables_reversed:
+            if tables['reverse_table_name']:
+                session.execute(
+                    'DELETE FROM {reverse_table_name} '
+                    'WHERE block_num >= :block_num'.format(
+                        reverse_table_name=tables['reverse_table_name'],
+                        table_name=tables['table_name']
+                    ), {'block_num': block_num}
+                )
+        session.commit()
+
         removed_tables = session.execute(
             'SELECT table_name, \'SELECT \' || array_to_string(ARRAY(SELECT \' r\' || \'.\' || c.column_name '
             'FROM information_schema.columns c '
