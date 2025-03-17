@@ -608,8 +608,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
                 session.execute(
                     'DELETE FROM {reverse_table_name} '
                     'WHERE block_num >= :block_num'.format(
-                        reverse_table_name=table['reverse_table_name'],
-                        table_name=table['table_name']
+                        reverse_table_name=table['reverse_table_name']
                     ), {'block_num': block_num})
         session.commit()
 
