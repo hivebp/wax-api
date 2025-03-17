@@ -2,9 +2,6 @@ import asyncio
 import itertools
 import json
 import logging
-import time
-
-import websockets
 
 from websockets import WebSocketServerProtocol
 from sqlalchemy import create_engine
@@ -947,49 +944,27 @@ class Server:
     confirmed_block = 0
     unconfirmed_block = 0
 
-    async def keepalive(websocket, ping_interval=30):
-        for ping in itertools.count():
-            await asyncio.sleep(ping_interval)
-            try:
-                await websocket.send(json.dumps({"ping": ping}))
-            except ConnectionClosed:
-                break
+    async def register(self, ws) -> None:
+        ws.send('connected')
 
-    async def register(self, ws: WebSocketServerProtocol) -> None:
-        self.clients.add(ws)
-        self.emitter.emit('connected', {
-            'remoteAddress': config.chronicle_settings['host'],
-            'remoteFamily': 'IPv4',
-            'remotePort': config.chronicle_settings['port']
-        })
-
-    async def unregister(self, ws: WebSocketServerProtocol) -> None:
-        self.emitter.emit('disconnected', {
-            'remoteAddress': config.chronicle_settings['host'],
-            'remoteFamily': 'IPv4',
-            'remotePort': config.chronicle_settings['port']
-        })
-        if ws in self.clients:
-            self.clients.remove(ws)
-
-    async def send_to_clients(self, ws: WebSocketServerProtocol) -> None:
-        self.clients.remove(ws)
+    async def unregister(self, ws) -> None:
+        ws.send('disconnected')
 
     async def ws_handler(self, ws: WebSocketServerProtocol, uri: str):
-        keepalive_task = asyncio.create_task(self.keepalive(ws))
         await self.register(ws)
         try:
             await self.distribute(ws)
         finally:
             await self.unregister(ws)
 
-    async def distribute(self, ws: WebSocketServerProtocol):
+    async def distribute(self, ws):
         if not ws:
             logging.error('No Socket')
         try:
             session = create_session()
             try:
-                async for msg in ws:
+                while True:
+                    msg = await ws.recv()
                     try:
                         msg_type = int.from_bytes(msg[0:3], byteorder='little')
 
@@ -1020,7 +995,9 @@ class Server:
                                 do_ack = True
 
                         if do_ack:
-                            self.emitter.emit('ackBlock', self.confirmed_block)
+                            await ws.send(json.dumps({
+                                "ackBlock": self.confirmed_block
+                            }))
                             session.commit()
                             await ws.send('{}'.format(self.confirmed_block))
                     except SQLAlchemyError as err:
@@ -1034,16 +1011,24 @@ class Server:
                 session.remove()
         except Exception as err:
             logging.error('distribute: {}'.format(err))
-            self.emitter.emit('error', {
-                'remoteAddress': config.chronicle_settings['host'],
-                'remoteFamily': 'IPv4',
-                'remotePort': config.chronicle_settings['port']
-            })
+            await ws.send('error')
 
 
-server = Server()
-start_server = websockets.serve(server.ws_handler, "0.0.0.0", 8800, max_size=12000000)
+import asyncio
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(start_server)
-loop.run_forever()
+from websockets.asyncio.server import serve
+
+
+async def handler(websocket):
+    while True:
+        message = await websocket.recv()
+        print(message)
+
+
+async def main():
+    async with serve(Server().ws_handler, "0.0.0.0", 8800, max_size=12000000) as server:
+        await server.serve_forever()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
