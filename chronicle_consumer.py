@@ -340,7 +340,8 @@ def handle_drop_times_updates_reversed(session, block_num):
 
 def handle_simpleassets_burns_reversed(session, block_num):
     reverse_trxs = session.execute(
-        'SELECT * FROM simpleassets_burns_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        'SELECT * FROM simpleassets_burns_reversed WHERE block_num >= :block_num GROUP BY 1, 2, 3, 4, 5 '
+        'ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
@@ -353,7 +354,8 @@ def handle_simpleassets_burns_reversed(session, block_num):
 
 def handle_simpleassets_updates_reversed(session, block_num):
     reverse_trxs = session.execute(
-        'SELECT * FROM simpleassets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        'SELECT * FROM simpleassets_updates_reversed WHERE block_num >= :block_num '
+        'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8 ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
@@ -416,7 +418,8 @@ def handle_simpleassets_updates_reversed(session, block_num):
 
 def handle_transfers_reversed(session, block_num):
     reverse_trxs = session.execute(
-        'SELECT * FROM transfers_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        'SELECT * FROM transfers_reversed WHERE block_num >= :block_num '
+        'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8 ORDER BY seq ASC ',
         {'block_num': block_num}
     )
 
@@ -594,15 +597,20 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         session.commit()
 
-        for tables in block_num_tables_reversed:
-            if tables['reverse_table_name']:
+        tables_reversed = session.execute(
+            'SELECT t1.table_name AS reverse_table_name '
+            'FROM tables_with_block_num t1 '
+            'WHERE t1.table_name LIKE \'%_reversed\' '
+        )
+
+        for table in tables_reversed:
+            if table['reverse_table_name']:
                 session.execute(
                     'DELETE FROM {reverse_table_name} '
                     'WHERE block_num >= :block_num'.format(
                         reverse_table_name=tables['reverse_table_name'],
                         table_name=tables['table_name']
-                    ), {'block_num': block_num}
-                )
+                    ), {'block_num': block_num})
         session.commit()
 
         removed_tables = session.execute(
