@@ -355,7 +355,7 @@ def handle_simpleassets_burns_reversed(session, block_num):
 def handle_simpleassets_updates_reversed(session, block_num):
     reverse_trxs = session.execute(
         'SELECT * FROM simpleassets_updates_reversed WHERE block_num >= :block_num '
-        'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8 ORDER BY seq ASC',
+        'GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
@@ -608,8 +608,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
                 session.execute(
                     'DELETE FROM {reverse_table_name} '
                     'WHERE block_num >= :block_num'.format(
-                        reverse_table_name=tables['reverse_table_name'],
-                        table_name=tables['table_name']
+                        reverse_table_name=table['reverse_table_name'],
+                        table_name=table['table_name']
                     ), {'block_num': block_num})
         session.commit()
 
