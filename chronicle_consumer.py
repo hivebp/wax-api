@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import json
 import logging
 import time
@@ -10,6 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from eventemitter import EventEmitter
+from websockets.exceptions import ConnectionClosed
 
 import funcs
 import config
@@ -945,6 +947,14 @@ class Server:
     confirmed_block = 0
     unconfirmed_block = 0
 
+    async def keepalive(websocket, ping_interval=30):
+        for ping in itertools.count():
+            await asyncio.sleep(ping_interval)
+            try:
+                await websocket.send(json.dumps({"ping": ping}))
+            except ConnectionClosed:
+                break
+
     async def register(self, ws: WebSocketServerProtocol) -> None:
         self.clients.add(ws)
         self.emitter.emit('connected', {
@@ -966,6 +976,7 @@ class Server:
         self.clients.remove(ws)
 
     async def ws_handler(self, ws: WebSocketServerProtocol, uri: str):
+        keepalive_task = asyncio.create_task(self.keepalive(ws))
         await self.register(ws)
         try:
             await self.distribute(ws)
@@ -1014,7 +1025,6 @@ class Server:
                             await ws.send('{}'.format(self.confirmed_block))
                     except SQLAlchemyError as err:
                         log_error('distribute SQLAlchemyError: {}'.format(err))
-                        time.sleep(30)
                         raise err
             except SQLAlchemyError as err:
                 log_error('distribute SQLAlchemyError: {}'.format(err))
