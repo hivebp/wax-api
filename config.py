@@ -78,3 +78,5 @@ contracts = [
     'waxtokenbase',  # Token Registration
     'waxdaobacker'   # Token Backing
 ]
+
+parse_transactions = True

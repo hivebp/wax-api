@@ -2,6 +2,9 @@ import asyncio
 import itertools
 import json
 import logging
+import time
+
+import websockets
 
 from websockets import WebSocketServerProtocol
 from sqlalchemy import create_engine
@@ -904,26 +907,27 @@ def handle_transaction(action, block_num, timestamp, session):
                         trace
                     )
 
-                    action = {
-                        'act': {
-                            'account': trace['account'],
-                            'name': trace['name'],
-                            'data': trace['data'],
-                            'authorization': [{'actor': trace['actor']}]
-                        },
-                        'trx_id': trace['transaction_id'],
-                        'global_sequence': int(trace['seq']) if isinstance(trace['seq'], str) else trace['seq'],
-                        'block_num': int(trace['block_num']) if isinstance(
-                            trace['block_num'], str) else trace['block_num'],
-                        'timestamp': trace['timestamp']
-                    }
+                    if config.parse_transactions:
+                        action = {
+                            'act': {
+                                'account': trace['account'],
+                                'name': trace['name'],
+                                'data': trace['data'],
+                                'authorization': [{'actor': trace['actor']}]
+                            },
+                            'trx_id': trace['transaction_id'],
+                            'global_sequence': int(trace['seq']) if isinstance(trace['seq'], str) else trace['seq'],
+                            'block_num': int(trace['block_num']) if isinstance(
+                                trace['block_num'], str) else trace['block_num'],
+                            'timestamp': trace['timestamp']
+                        }
 
-                    parse_action(session, action)
-                    session.execute(
-                        'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
-                        trace
-                    )
-                    session.commit()
+                        parse_action(session, action)
+                        session.execute(
+                            'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
+                            trace
+                        )
+                        session.commit()
             except SQLAlchemyError as err:
                 session.rollback()
                 session.remove()
@@ -944,11 +948,25 @@ class Server:
     confirmed_block = 0
     unconfirmed_block = 0
 
-    async def register(self, ws) -> None:
-        ws.send('connected')
+    async def register(self, ws: WebSocketServerProtocol) -> None:
+        self.clients.add(ws)
+        self.emitter.emit('connected', {
+            'remoteAddress': config.chronicle_settings['host'],
+            'remoteFamily': 'IPv4',
+            'remotePort': config.chronicle_settings['port']
+        })
 
-    async def unregister(self, ws) -> None:
-        ws.send('disconnected')
+    async def unregister(self, ws: WebSocketServerProtocol) -> None:
+        self.emitter.emit('disconnected', {
+            'remoteAddress': config.chronicle_settings['host'],
+            'remoteFamily': 'IPv4',
+            'remotePort': config.chronicle_settings['port']
+        })
+        if ws in self.clients:
+            self.clients.remove(ws)
+
+    async def send_to_clients(self, ws: WebSocketServerProtocol) -> None:
+        self.clients.remove(ws)
 
     async def ws_handler(self, ws: WebSocketServerProtocol, uri: str):
         await self.register(ws)
@@ -957,14 +975,13 @@ class Server:
         finally:
             await self.unregister(ws)
 
-    async def distribute(self, ws):
+    async def distribute(self, ws: WebSocketServerProtocol):
         if not ws:
             logging.error('No Socket')
         try:
             session = create_session()
             try:
-                while True:
-                    msg = await ws.recv()
+                async for msg in ws:
                     try:
                         msg_type = int.from_bytes(msg[0:3], byteorder='little')
 
@@ -978,7 +995,8 @@ class Server:
                         elif msg_type == 1001:
                             message = json.loads(msg[8:].decode())
                             block_num = int(message['block_num'])
-                            handle_fork(block_num, self.unconfirmed_block, self.confirmed_block, session)
+                            if config.parse_transactions:
+                                handle_fork(block_num, self.unconfirmed_block, self.confirmed_block, session)
                             self.confirmed_block = block_num - 1
                             self.unconfirmed_block = block_num - 1
                             do_ack = True
@@ -995,9 +1013,7 @@ class Server:
                                 do_ack = True
 
                         if do_ack:
-                            await ws.send(json.dumps({
-                                "ackBlock": self.confirmed_block
-                            }))
+                            self.emitter.emit('ackBlock', self.confirmed_block)
                             session.commit()
                             await ws.send('{}'.format(self.confirmed_block))
                     except SQLAlchemyError as err:
@@ -1011,24 +1027,16 @@ class Server:
                 session.remove()
         except Exception as err:
             logging.error('distribute: {}'.format(err))
-            await ws.send('error')
+            self.emitter.emit('error', {
+                'remoteAddress': config.chronicle_settings['host'],
+                'remoteFamily': 'IPv4',
+                'remotePort': config.chronicle_settings['port']
+            })
 
 
-import asyncio
+server = Server()
+start_server = websockets.serve(server.ws_handler, "0.0.0.0", 8800, max_size=12000000)
 
-from websockets.asyncio.server import serve
-
-
-async def handler(websocket):
-    while True:
-        message = await websocket.recv()
-        print(message)
-
-
-async def main():
-    async with serve(Server().ws_handler, "0.0.0.0", 8800, max_size=12000000) as server:
-        await server.serve_forever()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+loop = asyncio.get_event_loop()
+loop.run_until_complete(start_server)
+loop.run_forever()
