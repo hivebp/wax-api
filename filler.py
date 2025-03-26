@@ -194,7 +194,7 @@ def vacuum():
 
 @app.route('/loader/reboot-database')
 def reboot_database():
-    return "Dangerous, enable only when you intend to erase all data and reset the tables"
+    #return "Dangerous, enable only when you intend to erase all data and reset the tables"
 
     start_time = time.time()
     session = create_session()

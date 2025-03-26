@@ -21,7 +21,7 @@ class PostgresConfig(object):
         'pool_size': 100,
         'max_overflow': 20,
         'pool_recycle': 30,
-        'connect_args': {'options': '-c statement_timeout=40s'}
+        'connect_args': {'options': '-c statement_timeout=10s'}
     }
 
 
