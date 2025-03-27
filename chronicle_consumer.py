@@ -1,8 +1,6 @@
 import asyncio
-import itertools
 import json
 import logging
-import time
 
 import websockets
 
@@ -11,7 +9,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from eventemitter import EventEmitter
-from websockets.exceptions import ConnectionClosed
 
 import funcs
 import config
