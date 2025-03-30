@@ -874,6 +874,7 @@ def get_health():
         session.remove()
 
 
+@cache.memoize(timeout=300)
 def filter_attributes(collection, schema=None, templates=None, only=None):
     session = create_session()
 
@@ -979,6 +980,7 @@ def filter_attributes(collection, schema=None, templates=None, only=None):
     return attributes
 
 
+@cache.memoize(timeout=300)
 def collection_filters(collection):
     session = create_session()
 
