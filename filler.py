@@ -66,7 +66,157 @@ last_wax_stash_sync = 0
 
 hyperions = [
     {
+        'url': 'https://wax-history.eosdac.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://apiwax.3dkrender.com',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://hyperion-wax.a-dex.xyz',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://hyperion.oiac.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://api-wax.tacocrypto.io/hyperion',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://apiwax.3dkrender.com',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://api.wax.alohaeos.com',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.eosusa.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.eu.eosamsterdam.net',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.eosphere.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.greymass.com',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://api-wax.eosauthority.com',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://apiwax.3dkrender.com',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://waxapi.ledgerwise.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://hyperion7.sentnl.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.cryptolions.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.dapplica.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://history-wax-mainnet.wecan.dev',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax.eosrio.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://api.waxeastern.cn',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://history.waxsweden.org',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
         'url': 'https://wax.hivebp.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://hyperion.wax.detroitledger.tech',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://api.wax.liquidstudios.io',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://api.waxsweden.org',
+        'status': 200,
+        'blocks_behind': 0,
+        'limit': 1000,
+    },
+    {
+        'url': 'https://wax-hyperion.alcor.exchange',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -1345,42 +1495,6 @@ def update_floor_prices():
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
         isUpdatingFloorPrices = False
-        session.remove()
-
-
-@app.route('/loader/clean-up')
-def clean_up():
-    session = create_session()
-    try:
-        res = session.execute(
-            'SELECT transaction_id, listing_id, seq, seller '
-            'FROM duplicate_atomic_listings '
-            'LEFT JOIN chronicle_transactions USING (seq) '
-            'ORDER BY listing_id DESC'
-        )
-
-        for trx in res:
-            trx_id = trx['transaction_id']
-
-            url = 'https://wax.hivebp.io/v2/history/get_transaction?id=' + trx_id
-
-            response = requests.request("GET", url)
-
-            content = json.loads(response.content)
-            if not content['executed']:
-                session.execute(
-                    'INSERT INTO deleted_chronicle_transactions '
-                    'SELECT * FROM chronicle_transactions WHERE seq = :seq AND transaction_id = :transaction_id',
-                    {'seq': trx['seq'], 'transaction_id': trx_id}
-                )
-                session.commit()
-    except SQLAlchemyError as err:
-        log_error('clean_up: {}'.format(err))
-        session.rollback()
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    except Exception as err:
-        print(err)
-    finally:
         session.remove()
 
 

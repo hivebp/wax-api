@@ -128,7 +128,7 @@ https://hivebp.github.io/wax-api/
 
 Download the full snapshot here:
 
-[snapshot_wax_api_341065560](https://download.hivebp.io/snapshots/snapshot_wax_api_341065560.tar.gz)
+[snapshot_wax_api_361957186.sql](https://download.hivebp.io/snapshots/snapshot_wax_api_361957186.sql.tar.gz)
 
 Import the snapshot with these commands:
 * ```tar -xvf snapshot_wax_api_341065560.tar.gz```
