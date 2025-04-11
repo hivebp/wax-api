@@ -131,7 +131,7 @@ Download the full snapshot here:
 [snapshot_wax_api_361957186.sql](https://download.hivebp.io/snapshots/snapshot_wax_api_361957186.sql.tar.gz)
 
 Import the snapshot with these commands:
-* ```tar -xvf snapshot_wax_api_341065560.tar.gz```
+* ```tar -xvf snapshot_wax_api_361957186.sql.tar.gz```
 * ```su - postgres```
-* ```psql your_database < /path/to/the/snapshot_wax_api_341065560.sql```
+* ```psql your_database < /path/to/the/snapshot_wax_api_361957186.sql```
 
