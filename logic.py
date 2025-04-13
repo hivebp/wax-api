@@ -878,166 +878,180 @@ def get_health():
 def filter_attributes(collection, schema=None, templates=None, only=None):
     session = create_session()
 
-    search_dict = {
-        'collection': collection
-    }
+    try:
+        search_dict = {
+            'collection': collection
+        }
 
-    schema_clause = ''
-    if schema:
-        schema_clause += ' AND a.schema = :schema'
-        search_dict['schema'] = schema
+        schema_clause = ''
+        if schema:
+            schema_clause += ' AND a.schema = :schema'
+            search_dict['schema'] = schema
 
-    if templates:
-        schema_clause += ' AND t.template_id IN :templates '
-        search_dict['templates'] = tuple(templates.split(','))
+        if templates:
+            schema_clause += ' AND t.template_id IN :templates '
+            search_dict['templates'] = tuple(templates.split(','))
 
-    join_clause = ''
-    if only == 'rwax':
-        join_clause = 'INNER JOIN rwax_tokens USING(collection, schema) '
+        join_clause = ''
+        if only == 'rwax':
+            join_clause = 'INNER JOIN rwax_tokens USING(collection, schema) '
 
-    sql = (
-        'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
-        'MAX(int_value) AS max_int_value, MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value,'
-        'SUM(int_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE SUM(max_supply) END) '
-        'AS avg_int_value, SUM(float_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE '
-        'SUM(max_supply) END) AS avg_float_value, SUM(max_supply) AS max_supply, SUM(num_minted) AS num_minted '
-        'FROM attributes a '
-        '{join_clause} '
-        'LEFT JOIN template_attributes_mapping ta ON a.collection = ta.collection AND a.schema = ta.schema '
-        'AND a.attribute_id = ta.attribute_id '
-        'LEFT JOIN templates t ON a.collection = t.collection AND a.schema = t.schema '
-        'AND t.template_id = ta.template_id '
-        'LEFT JOIN templates_minted_mv tm ON tm.template_id = t.template_id '
-        'WHERE a.collection = :collection '
-        '{schema_clause} '
-        'GROUP BY 1, 2, 3 '
-        'ORDER BY attribute_name ASC, string_value ASC'.format(
-            schema_clause=schema_clause, join_clause=join_clause
+        sql = (
+            'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
+            'MAX(int_value) AS max_int_value, MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value,'
+            'SUM(int_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE SUM(max_supply) END) '
+            'AS avg_int_value, SUM(float_value * max_supply) / (CASE WHEN SUM(max_supply) = 0 THEN 1 ELSE '
+            'SUM(max_supply) END) AS avg_float_value, SUM(max_supply) AS max_supply, SUM(num_minted) AS num_minted '
+            'FROM attributes a '
+            '{join_clause} '
+            'LEFT JOIN template_attributes_mapping ta ON a.collection = ta.collection AND a.schema = ta.schema '
+            'AND a.attribute_id = ta.attribute_id '
+            'LEFT JOIN templates t ON a.collection = t.collection AND a.schema = t.schema '
+            'AND t.template_id = ta.template_id '
+            'LEFT JOIN templates_minted_mv tm ON tm.template_id = t.template_id '
+            'WHERE a.collection = :collection '
+            '{schema_clause} '
+            'GROUP BY 1, 2, 3 '
+            'ORDER BY attribute_name ASC, string_value ASC'.format(
+                schema_clause=schema_clause, join_clause=join_clause
+            )
         )
-    )
 
-    res = session.execute(
-        sql,
-        search_dict
-    )
+        res = session.execute(
+            sql,
+            search_dict
+        )
 
-    attributes = {}
+        attributes = {}
 
-    for attribute in res:
-        value = attribute['string_value']
+        for attribute in res:
+            value = attribute['string_value']
 
-        attribute_type = None
-        min_value = 0
-        max_value = 0
-        avg_value = 0
+            attribute_type = None
+            min_value = 0
+            max_value = 0
+            avg_value = 0
 
-        if value:
-            attribute_type = 'string'
-        else:
-            min_value = attribute['min_int_value']
-            max_value = attribute['max_int_value']
-            avg_value = attribute['avg_int_value']
-            if min_value or max_value or max_value == 0:
-                attribute_type = 'integer'
+            if value:
+                attribute_type = 'string'
             else:
-                min_value = attribute['min_float_value']
-                max_value = attribute['max_float_value']
-                avg_value = attribute['avg_float_value']
-                if min_value or max_value or max_value == 0.0:
-                    attribute_type = 'float'
-        if not attribute_type:
-            value = attribute['bool_value']
-            attribute_type = 'boolean'
+                min_value = attribute['min_int_value']
+                max_value = attribute['max_int_value']
+                avg_value = attribute['avg_int_value']
+                if min_value or max_value or max_value == 0:
+                    attribute_type = 'integer'
+                else:
+                    min_value = attribute['min_float_value']
+                    max_value = attribute['max_float_value']
+                    avg_value = attribute['avg_float_value']
+                    if min_value or max_value or max_value == 0.0:
+                        attribute_type = 'float'
+            if not attribute_type:
+                value = attribute['bool_value']
+                attribute_type = 'boolean'
 
-        if value and attribute_type in ['string', 'boolean']:
-            num_minted = attribute['num_minted']
-            max_supply = attribute['max_supply']
-            if attribute['attribute_name'] in attributes.keys():
-                attributes[attribute['attribute_name']]['values'].append(
-                    {
-                        'value': value,
-                        'maxSupply': int(max_supply) if max_supply else 0,
-                        'numMinted': int(num_minted) if num_minted else 0
+            if value and attribute_type in ['string', 'boolean']:
+                num_minted = attribute['num_minted']
+                max_supply = attribute['max_supply']
+                if attribute['attribute_name'] in attributes.keys():
+                    attributes[attribute['attribute_name']]['values'].append(
+                        {
+                            'value': value,
+                            'maxSupply': int(max_supply) if max_supply else 0,
+                            'numMinted': int(num_minted) if num_minted else 0
+                        }
+                    )
+                else:
+                    attributes[attribute['attribute_name']] = {
+                        'values': [{
+                            'value': value,
+                            'maxSupply': int(max_supply) if max_supply else 0,
+                            'numMinted': int(num_minted) if num_minted else 0
+                        }],
+                        'type': attribute_type
                     }
-                )
-            else:
+            elif attribute_type in ['float', 'integer']:
                 attributes[attribute['attribute_name']] = {
-                    'values': [{
-                        'value': value,
-                        'maxSupply': int(max_supply) if max_supply else 0,
-                        'numMinted': int(num_minted) if num_minted else 0
-                    }],
+                    'minValue': float(min_value) if min_value else 0,
+                    'maxValue': float(max_value) if max_value else 0,
+                    'avgValue': float(avg_value) if avg_value else 0,
                     'type': attribute_type
                 }
-        elif attribute_type in ['float', 'integer']:
-            attributes[attribute['attribute_name']] = {
-                'minValue': float(min_value) if min_value else 0,
-                'maxValue': float(max_value) if max_value else 0,
-                'avgValue': float(avg_value) if avg_value else 0,
-                'type': attribute_type
-            }
 
-    return attributes
+        return attributes
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
 
 
 @cache.memoize(timeout=300)
 def collection_filters(collection):
     session = create_session()
 
-    search_dict = {
-        'collection': collection
-    }
+    try:
+        search_dict = {
+            'collection': collection
+        }
 
-    res = session.execute(
-        'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
-        'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
-        'FROM attributes a '
-        'WHERE collection = :collection '
-        'GROUP BY 1, 2, 7 '
-        'ORDER BY attribute_name ASC, string_value ASC',
-        search_dict
-    )
+        res = session.execute(
+            'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
+            'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
+            'FROM attributes a '
+            'WHERE collection = :collection '
+            'GROUP BY 1, 2, 7 '
+            'ORDER BY attribute_name ASC, string_value ASC',
+            search_dict
+        )
 
-    attributes = {}
+        attributes = {}
 
-    for attribute in res:
-        value = attribute['string_value']
+        for attribute in res:
+            value = attribute['string_value']
 
-        attribute_type = None
+            attribute_type = None
 
-        if value:
-            attribute_type = 'string'
-        else:
-            min_value = attribute['min_int_value']
-            max_value = attribute['max_int_value']
-            if min_value or max_value or max_value == 0:
-                attribute_type = 'integer'
+            if value:
+                attribute_type = 'string'
             else:
-                min_value = attribute['min_float_value']
-                max_value = attribute['max_float_value']
-                if min_value or max_value or max_value == 0.0:
-                    value = attribute['float_value']
-                    attribute_type = 'float'
-        if not attribute_type:
-            value = attribute['bool_value']
-            attribute_type = 'boolean'
+                min_value = attribute['min_int_value']
+                max_value = attribute['max_int_value']
+                if min_value or max_value or max_value == 0:
+                    attribute_type = 'integer'
+                else:
+                    min_value = attribute['min_float_value']
+                    max_value = attribute['max_float_value']
+                    if min_value or max_value or max_value == 0.0:
+                        value = attribute['float_value']
+                        attribute_type = 'float'
+            if not attribute_type:
+                value = attribute['bool_value']
+                attribute_type = 'boolean'
 
-        if value and attribute_type in ['string', 'boolean']:
-            if attribute['attribute_name'] in attributes.keys():
-                attributes[attribute['attribute_name']]['values'].append(value)
-            else:
+            if value and attribute_type in ['string', 'boolean']:
+                if attribute['attribute_name'] in attributes.keys():
+                    attributes[attribute['attribute_name']]['values'].append(value)
+                else:
+                    attributes[attribute['attribute_name']] = {
+                        'values': [value],
+                        'type': attribute_type
+                    }
+            elif attribute_type in ['float', 'integer']:
                 attributes[attribute['attribute_name']] = {
-                    'values': [value],
+                    'minValue': min_value,
+                    'maxValue': max_value,
                     'type': attribute_type
                 }
-        elif attribute_type in ['float', 'integer']:
-            attributes[attribute['attribute_name']] = {
-                'minValue': min_value,
-                'maxValue': max_value,
-                'type': attribute_type
-            }
 
-    return attributes
+        return attributes
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
 
 
 def templates(

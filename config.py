@@ -18,10 +18,10 @@ class PostgresConfig(object):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DB')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 100,
-        'max_overflow': 20,
+        'pool_size': 250,
+        'max_overflow': 50,
         'pool_recycle': 30,
-        'connect_args': {'options': '-c statement_timeout=10s'}
+        'connect_args': {'options': '-c statement_timeout=15s'}
     }
 
 
