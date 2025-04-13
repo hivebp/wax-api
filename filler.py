@@ -192,12 +192,6 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://wax.hivebp.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://hyperion.wax.detroitledger.tech',
         'status': 200,
         'blocks_behind': 0,
