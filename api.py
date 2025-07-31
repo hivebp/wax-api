@@ -1,4 +1,3 @@
-import datetime
 import os
 from functools import wraps
 
@@ -9,6 +8,7 @@ from flask_cors import CORS
 
 from flask_executor import Executor
 from flask_sqlalchemy import SQLAlchemy
+
 from app_runner import run_app
 from config import PostgresConfig
 
@@ -39,6 +39,9 @@ db = SQLAlchemy(app, session_options={'autocommit': False})
 
 import logic
 import stats_v3
+import legacy
+import verify
+import pfps
 
 env = os.environ.get('FLASK_ENV')
 
@@ -46,6 +49,21 @@ Compress(app)
 
 CORS(app, resources={
     r"/api/*": {
+        "origins": [
+            "*",
+        ]
+    },
+    r"/legacy/*": {
+        "origins": [
+            "*",
+        ]
+    },
+    r"/verify-api/*": {
+        "origins": [
+            "*",
+        ]
+    },
+    r"/pfp-api/*": {
         "origins": [
             "*",
         ]
@@ -249,6 +267,9 @@ def templates():
     search_type = request.args.get('search_type') if request.args.get('search_type') else ''
     attributes = request.args.get('attributes', None)
 
+    template_ids = request.args.get('template_ids')
+    template_ids = template_ids.split(',') if template_ids and ',' in template_ids else [template_ids]
+
     if collection:
         collection = _format_collection(collection)
 
@@ -263,10 +284,24 @@ def templates():
     search_res = logic.templates(
         term, collection, schema, tags, limit, order_by,
         exact_search, search_type, offset, verified,
-        user, favorites, recently_sold, attributes
+        user, favorites, recently_sold, attributes,
+        template_ids
     )
 
     return flaskify(oto_response.Response(search_res))
+
+
+@app.route('/api/asset/<asset_id>')
+@catch_and_respond()
+def get_asset(asset_id):
+    search_res = logic.assets(
+        term=asset_id, verified='all', burned='all'
+    )
+
+    if search_res:
+        return flaskify(oto_response.Response(search_res[0]))
+
+    return flaskify(oto_response.Response({}))
 
 
 @app.route('/api/assets')
@@ -297,6 +332,9 @@ def assets():
     rwax_symbol = request.args.get('rwax_symbol', None)
     rwax_contract = request.args.get('rwax_contract', None)
 
+    asset_ids = request.args.get('asset_ids')
+    asset_ids = asset_ids.split(',') if asset_ids and ',' in asset_ids else [asset_ids]
+
     if collection:
         collection = _format_collection(collection)
 
@@ -321,10 +359,39 @@ def assets():
     search_res = logic.assets(
         term, owner, collection, schema, tags, limit, order_by,
         exact_search, search_type, min_average, max_average, min_mint, max_mint, contract, offset, verified,
-        user, favorites, backed, recently_sold, attributes, only, rwax_symbol, rwax_contract
+        user, favorites, backed, recently_sold, attributes, only, rwax_symbol, rwax_contract, asset_ids
     )
 
     return flaskify(oto_response.Response(search_res))
+
+
+@app.route('/api/craft-search')
+@catch_and_respond()
+def craft_search():
+    try:
+        owner = request.args.get('owner')
+        collection = request.args.get('collection')
+        schema = request.args.get('schema')
+        term = request.args.get('term')
+        attribute = request.args.get('attribute', None)
+
+        if collection:
+            collection = _format_collection(collection)
+
+        search_type = 'inventory'
+        verified = 'all'
+        limit = request.args.get('limit')
+
+        search_res = logic.assets(
+            term=term, owner=owner, collection=collection, schema=schema, limit=limit, order_by='asset_id_desc',
+            verified=verified, search_type=search_type, attributes=attribute
+        )
+
+        return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response(
+            {'error': 'An unexpected Error occured: {}'.format(err)}, errors=err, status=500))
 
 
 @app.route('/api/filter-attributes/<collection>')
@@ -351,6 +418,17 @@ def collection_filters(collection):
     search_res = logic.collection_filters(collection)
 
     return flaskify(oto_response.Response(search_res))
+
+
+@app.route('/api/collection-fee/<collection>')
+@catch_and_respond()
+def collection_fee(collection):
+    collection = _format_collection(collection)
+    try:
+        return flaskify(oto_response.Response(logic.get_collection_fee(collection)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
 @app.route('/api/listings')
@@ -528,7 +606,6 @@ def get_drops():
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'drop_id_desc'
     verified = request.args.get('verified')
     token = request.args.get('token')
-    highlight = request.args.get('highlight') == 'true'
     home = request.args.get('home') == 'home'
     upcoming = request.args.get('upcoming') == 'true'
     user_name = request.args.get('user', None)
@@ -546,7 +623,7 @@ def get_drops():
         limit = 40
 
     search_res = logic.get_drops(
-        drop_id, collection, term, limit, order_by, offset, verified, market, token, highlight, upcoming,
+        drop_id, collection, term, limit, order_by, offset, verified, market, token, upcoming,
         user_name, currency, home
     )
 
@@ -566,6 +643,12 @@ def get_tags(collection):
     return flaskify(oto_response.Response(logic.get_tags(collection)))
 
 
+@app.route('/api/missing-tags/<collection>')
+@catch_and_respond()
+def get_missing_tags(collection):
+    return flaskify(oto_response.Response(logic.get_missing_tags(collection)))
+
+
 @app.route('/api/calc-rwax')
 @catch_and_respond()
 def calc_rwax_tokens():
@@ -579,6 +662,18 @@ def get_rwax_tokens():
     symbol = request.args.get('symbol', None)
     contract = request.args.get('contract', None)
     return flaskify(oto_response.Response(logic.get_rwax_tokens(collection, symbol, contract)))
+
+
+@app.route('/api/template/<template_id>')
+@catch_and_respond()
+def get_template(template_id):
+    templates = logic.templates(
+        template_id, verified='all'
+    )
+
+    if templates and len(templates) == 1:
+        return flaskify(oto_response.Response(templates[0]))
+    return flaskify(oto_response.Response({}))
 
 
 @app.route('/v3/collection-stats/<collection>')
@@ -892,6 +987,365 @@ def feed_status():
     return flaskify(oto_response.Response(
         {'status': stats_announcer.get_status(), 'listeners': stats_announcer.get_listeners()}
     ))
+
+
+# PFP API
+@app.route('/pfp-api/asset/<asset_id>')
+def get_pfp_asset(asset_id):
+    try:
+        return flaskify(oto_response.Response(pfps.get_pfp_asset(
+            asset_id
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/pfp-api/trait-list/<collection>/<schema>')
+def get_pfp_trait_list(collection, schema):
+    try:
+        limit = request.args.get('limit', 20)
+        offset = request.args.get('offset', 0)
+        return flaskify(oto_response.Response(pfps.get_pfp_trait_list(
+            collection, schema, limit, offset
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/pfp-api/top-holders/<collection>/<schema>')
+def get_pfp_top_holders(collection, schema):
+    try:
+        limit = request.args.get('limit', 20)
+        offset = request.args.get('offset', 0)
+        return flaskify(oto_response.Response(pfps.get_pfp_top_holders(
+            collection, schema, limit, offset
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/pfp-api/ranking/<collection>/<schema>')
+def get_pfp_ranking(collection, schema):
+    try:
+        limit = request.args.get('limit', 20)
+        offset = request.args.get('offset', 0)
+        return flaskify(oto_response.Response(pfps.get_pfp_ranking(
+            collection, schema, limit, offset
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/pfp-api/collection/<collection>')
+def get_pfp_collection_info(collection):
+    try:
+        limit = request.args.get('limit', 20)
+        offset = request.args.get('offset', 0)
+        return flaskify(oto_response.Response(pfps.get_pfp_collections_info(
+            collection, limit, offset
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/pfp-api/collections')
+def get_pfp_collections():
+    try:
+        limit = request.args.get('limit', 20)
+        offset = request.args.get('offset', 0)
+        collection = request.args.get('collection', '')
+        return flaskify(oto_response.Response(pfps.get_pfp_collections_info(
+            collection, limit, offset
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+# Verify API
+@app.route('/verify-api/status/<collection>')
+def get_verify_status(collection):
+    try:
+        return flaskify(oto_response.Response(verify.get_verify_status(
+            collection
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/verify-api/votes/<collection>')
+def get_votes(collection):
+    try:
+        return flaskify(oto_response.Response(verify.get_voting_status(
+            collection
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/verify-api/top-voted-collections')
+def top_voted_collections():
+    try:
+        limit = request.args.get('limit', 20)
+        offset = request.args.get('offset', 0)
+
+        return flaskify(oto_response.Response(verify.get_top_voted_collections(
+            limit, offset
+        )))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/verify-api/top-voted-collections-total-rows')
+def top_voted_collections_total_rows():
+    try:
+        return flaskify(oto_response.Response(verify.get_top_voted_collections_total_rows()))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/collection-table')
+@app.route('/legacy/collection-table/<verified>')
+def get_collection_table(verified=True):
+    try:
+        term = request.args.get('term')
+        market = request.args.get('market')
+        type = request.args.get('type')
+        owner = request.args.get('owner')
+        collection = request.args.get('collection')
+        pfps_only = request.args.get('pfps_only', 'false') == 'true'
+        return flaskify(oto_response.Response(legacy.get_collection_table(
+            verified, term, market, type, owner, collection, pfps_only)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/drops-data/<contract>')
+def get_drops_data(contract):
+    try:
+        drop_ids = request.args.get('drop_ids')
+        drop_ids = drop_ids.split(',') if drop_ids and ',' in drop_ids else [drop_ids]
+
+        search_res = logic.get_drops(
+            drop_ids=drop_ids, market=contract, limit=len(drop_ids)
+        )
+
+        return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/claimable-packs')
+def get_claimable_packs():
+    start_time = time.time()
+    asset_ids = request.args.get('asset_ids')
+
+    if asset_ids:
+        asset_ids = asset_ids.split(',')
+    else:
+        return flaskify(oto_response.Response('An unexpected Error occured', errors='Invalid Assets', status=500))
+    try:
+        return flaskify(oto_response.Response(logic.assets(asset_ids=asset_ids, verified='all', burned='all')))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        end_time = time.time()
+        print('get_my_packs({}): {}'.format(asset_ids, end_time - start_time))
+
+
+@app.route('/legacy/craft-data')
+def get_crafts_data():
+    try:
+        craft_ids = request.args.get('craft_ids')
+        craft_ids = craft_ids.split(',') if craft_ids and ',' in craft_ids else [craft_ids]
+
+        search_res = logic.get_crafts(
+            craft_ids=craft_ids, limit=len(craft_ids)
+        )
+
+        return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-wax-tokens')
+def get_wax_tokens():
+    try:
+        return flaskify(oto_response.Response(legacy.get_wax_tokens()))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/currencies')
+def get_currencies():
+    try:
+        tokens = legacy.get_currencies()
+
+        return flaskify(oto_response.Response(tokens))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+# Legacy Endpoints, Retiring NFTHive API
+@app.route('/legacy/collection-minimal/<collection>')
+@catch_and_respond()
+def get_collection_minimal(collection):
+    return flaskify(oto_response.Response(legacy.get_collection(collection)))
+
+
+@app.route('/legacy/asset-minimal/<asset_id>')
+def show_minimal_asset(asset_id):
+    try:
+        return flaskify(oto_response.Response(legacy.get_minimal_asset(asset_id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/template-minimal/<template_id>')
+def show_minimal_template(template_id):
+    try:
+        return flaskify(oto_response.Response(legacy.get_minimal_template(template_id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/drop-minimal')
+def show_minimal_drop():
+    try:
+        drop_id = request.args.get('drop_id')
+        contract = request.args.get('contract')
+        return flaskify(oto_response.Response(legacy.get_minimal_drop(drop_id, contract)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/ownership-info')
+def get_ownership_info():
+    try:
+        asset_id = request.args.get('asset_id')
+        owner = request.args.get('owner')
+        return flaskify(oto_response.Response(legacy.get_ownership_info(asset_id, owner)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/ownership-info-template')
+def get_ownership_info_template():
+    try:
+        template_id = request.args.get('template_id')
+        owner = request.args.get('owner')
+        return flaskify(oto_response.Response(legacy.get_ownership_info_template(template_id, owner)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-wuffi-airdrop/<airdrop_id>')
+def get_wuffi_airdrop(airdrop_id):
+    username = request.args.get('username')
+    try:
+        return flaskify(oto_response.Response(legacy.get_wuffi_airdrop(airdrop_id, username)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/banners')
+def get_banners():
+    try:
+        return flaskify(oto_response.Response(legacy.get_banners()))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-personal-blacklist')
+def get_personal_blacklist():
+    try:
+        user = request.args.get('user', None)
+        limit = request.args.get('limit', 40)
+        term = request.args.get('term', None)
+        return flaskify(oto_response.Response(legacy.get_personal_blacklist(user, term, limit)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-wuffi-airdrops')
+def get_wuffi_airdrops():
+    try:
+        ready = request.args.get('ready')
+        creator = request.args.get('creator')
+        username = request.args.get('username')
+        contract = request.args.get('contract')
+        return flaskify(oto_response.Response(legacy.get_wuffi_airdrops(ready, creator, username, contract)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/user-picture/<user>')
+def get_user_picture(user):
+    try:
+        return flaskify(oto_response.Response(legacy.get_user_picture(user)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/pfps/<collection>')
+def get_pfps(collection):
+    try:
+        return flaskify(oto_response.Response(legacy.get_pfps(collection)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/num-auctions/<collection>')
+def get_num_auctions(collection):
+    try:
+        return flaskify(oto_response.Response(legacy.get_num_auctions(collection)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/num-drops/<collection>')
+def get_num_drops(collection):
+    try:
+        return flaskify(oto_response.Response(legacy.get_num_drops(collection)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/num-crafts/<collection>')
+def get_num_crafts(collection):
+    try:
+        return flaskify(oto_response.Response(legacy.get_num_crafts(collection)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
 if __name__ == '__main__':

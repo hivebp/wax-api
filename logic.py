@@ -2,6 +2,7 @@ import concurrent
 import datetime
 import json
 
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from api import logging
@@ -16,6 +17,13 @@ DATE_FROM_STRING_SPLIT_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 def create_session():
     return db.session
+
+
+def execute_sql(session, sql, args=None):
+    res = session.execute(text(sql), args)
+    mappings = res.mappings()
+    mappings.rowcount = res.rowcount
+    return mappings
 
 
 def _format_video(video):
@@ -108,14 +116,14 @@ def _format_object(item):
 def _get_templates_object():
     return (
         'array_agg(json_build_object(\'template_id\', t.template_id, \'name\', tn.name, \'collection\', t.collection, '
-        '\'schema\', t.schema, \'immutable_data\', td.data, \'image\', ti.image, \'video\', tv.video, '
+        '\'schema\', t.schema, \'template_immutable_data\', td.data, \'image\', ti.image, \'video\', tv.video, '
         '\'avg_wax_price\', ts.avg_wax_price, \'avg_usd_price\', ts.avg_usd_price, '
         '\'last_sold_wax\', ts.last_sold_wax, \'last_sold_usd\', ts.last_sold_usd, '
         '\'last_sold_listing_id\', last_sold_listing_id, \'last_sold_timestamp\', ts.last_sold_timestamp, '
         '\'floor_price\', fp.floor_price, \'num_burned\', tm.num_burned, \'num_minted\', tm.num_minted, '
         '\'volume_wax\', ts.volume_wax, \'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, '
-        '\'created_at\', t.timestamp, \'block_num\', t.block_num, \'created_seq\', t.seq, '
-        '\'traits\', {attributes_obj})) AS templates '.format(
+        '\'created_timestamp\', t.timestamp, \'created_block_num\', t.block_num, \'created_seq\', t.seq, '
+        '\'max_supply\', t.max_supply, \'traits\', {attributes_obj})) AS templates '.format(
             attributes_obj=_get_template_attributes_object()
         )
     )
@@ -169,6 +177,15 @@ def _get_attributes_object():
         'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
         'LEFT JOIN attribute_stats USING(attribute_id) '
         'WHERE asset_id = a.asset_id) '
+    )
+
+
+def _get_listings_object():
+    return (
+        '(SELECT array_agg(json_build_object(\'listing_id\', listing_id, \'market\', market, ' 
+        '\'asset_ids\', asset_ids, \'price\', price, \'currency\', currency, \'seller\', seller)) '
+        'FROM listings l '
+        'WHERE l.collection = a.collection AND seller = owner AND a.asset_id = ANY(asset_ids) ) '
     )
 
 
@@ -266,7 +283,7 @@ def construct_category_clause(
                 attr_sql += ' AND attribute_name = :attribute_name AND {column} = :value '.format(column=column)
                 attr_dict['value'] = value
 
-            res = session.execute(attr_sql, attr_dict)
+            res = execute_sql(session, attr_sql, attr_dict)
 
             if use_range and res.rowcount > 1:
                 range_attribute_ids = []
@@ -430,6 +447,41 @@ def _format_template(template):
         return None
 
 
+def _format_asset_template(template):
+    stats_obj = {}
+    if template['avg_wax_price'] and template['avg_usd_price']:
+        stats_obj['averageWaxPrice'] = template['avg_wax_price']
+        stats_obj['averageUsd'] = template['avg_usd_price']
+    if template['last_sold_wax'] and template['last_sold_usd']:
+        stats_obj['lastSoldWax'] = template['last_sold_wax']
+        stats_obj['lastSoldUsd'] = template['last_sold_usd']
+    if template['last_sold_timestamp'] and template['last_sold_listing_id'] and template['last_sold_wax'] and template[
+        'last_sold_usd']:
+        stats_obj['lastSold'] = {
+            'date': _format_date(template['last_sold_timestamp']),
+            'listingId': template['last_sold_listing_id'],
+            'priceWax': template['last_sold_wax'],
+            'priceUsd': template['last_sold_usd']
+        }
+    if template['volume_wax'] and template['volume_usd']:
+        stats_obj['volumeWax'] = template['volume_wax']
+        stats_obj['volumeUsd'] = template['volume_usd']
+    if template['num_sales']:
+        stats_obj['numSales'] = template['num_sales']
+    if template['num_burned']:
+        stats_obj['numBurned'] = template['num_burned']
+    if template['num_minted']:
+        stats_obj['numMinted'] = template['num_minted']
+    if template['floor_price']:
+        stats_obj['floorPrice'] = template['floor_price']
+    return {
+        'templateId': template['template_id'],
+        'immutableData': json.loads(template['template_immutable_data']) if template[
+            'template_immutable_data'] else '{}',
+        'stats': stats_obj,
+    }
+
+
 def _format_asset(asset):
     try:
         asset_obj = {
@@ -479,43 +531,18 @@ def _format_asset(asset):
                 'traitFactors': _format_object(asset['trait_factors']),
                 'rwaxTokenSupply': asset['rwax_supply']
             }
+        if 'pack_id' in asset.keys() and asset['pack_id']:
+            asset_obj['pack'] = {
+                'packId': asset['pack_id'],
+                'contract': asset['pack_contract'],
+                'unpackUrl': asset['unpack_url']
+            }
         if asset['video']:
             asset_obj['video'] = asset['video']
         if asset['image']:
             asset_obj['image'] = asset['image']
         if 'template_id' in asset.keys() and asset['template_id']:
-            stats_obj = {}
-            if asset['avg_wax_price'] and asset['avg_usd_price']:
-                stats_obj['averageWaxPrice'] = asset['avg_wax_price']
-                stats_obj['averageUsd'] = asset['avg_usd_price']
-            if asset['last_sold_wax'] and asset['last_sold_usd']:
-                stats_obj['lastSoldWax'] = asset['last_sold_wax']
-                stats_obj['lastSoldUsd'] = asset['last_sold_usd']
-            if asset['last_sold_timestamp'] and asset['last_sold_listing_id'] and asset['last_sold_wax'] and asset[
-                    'last_sold_usd']:
-                stats_obj['lastSold'] = {
-                    'date': _format_date(asset['last_sold_timestamp']),
-                    'listingId': asset['last_sold_listing_id'],
-                    'priceWax': asset['last_sold_wax'],
-                    'priceUsd': asset['last_sold_usd']
-                }
-            if asset['volume_wax'] and asset['volume_usd']:
-                stats_obj['volumeWax'] = asset['volume_wax']
-                stats_obj['volumeUsd'] = asset['volume_usd']
-            if asset['num_sales']:
-                stats_obj['numSales'] = asset['num_sales']
-            if asset['num_burned']:
-                stats_obj['numBurned'] = asset['num_burned']
-            if asset['num_minted']:
-                stats_obj['numMinted'] = asset['num_minted']
-            if asset['floor_price']:
-                stats_obj['floorPrice'] = asset['floor_price']
-            asset_obj['template'] = {
-                'templateId': asset['template_id'],
-                'immutableData': json.loads(asset['template_immutable_data']) if asset[
-                    'template_immutable_data'] else '{}',
-                'stats': stats_obj,
-            }
+            asset_obj['template'] = _format_asset_template(asset)
             if 'listings' in asset.keys():
                 asset_obj['listings'] = _format_object(asset['listings'])
         return asset_obj
@@ -586,7 +613,8 @@ def _get_search_term(session, term):
     name = None
     collection = None
     if (isinstance(term, int) or (isinstance(term, str) and term.isnumeric())) and int(term) < 1099511627776:
-        template = session.execute(
+        template = execute_sql(
+            session,
             'SELECT template_id, collection FROM templates WHERE template_id = :term', {
                 'term': term
             }
@@ -595,7 +623,8 @@ def _get_search_term(session, term):
             template_id = template['template_id']
             collection = template['collection']
     elif (isinstance(term, int) or (isinstance(term, str) and term.isnumeric())) and int(term) >= 1099511627776:
-        asset = session.execute(
+        asset = execute_sql(
+            session,
             'SELECT asset_id, collection FROM assets WHERE asset_id = :term', {
                 'term': term
             }
@@ -826,7 +855,7 @@ def schemas(
                 personal_blacklist_clause=personal_blacklist_clause
             ))
 
-        res = session.execute(sql, format_dict)
+        res = execute_sql(session, sql, format_dict)
 
         results = []
 
@@ -850,7 +879,8 @@ def schemas(
 def get_health():
     session = create_session()
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT block_num, timestamp '
             'FROM chronicle_transactions '
             'WHERE seq = (SELECT MAX(seq) FROM chronicle_transactions)'
@@ -917,7 +947,8 @@ def filter_attributes(collection, schema=None, templates=None, only=None):
             )
         )
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             sql,
             search_dict
         )
@@ -996,7 +1027,8 @@ def collection_filters(collection):
             'collection': collection
         }
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT attribute_name, string_value, MIN(int_value) AS min_int_value, MAX(int_value) AS max_int_value, '
             'MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value, bool_value '
             'FROM attributes a '
@@ -1054,10 +1086,30 @@ def collection_filters(collection):
         session.remove()
 
 
+def get_collection_fee(collection):
+    session = create_session()
+    try:
+        res = execute_sql(session,
+            'SELECT market_fee FROM collections WHERE collection = :collection',
+            {'collection': collection}
+        ).first()
+
+        if res:
+            return {'collection': collection, 'fee': res['market_fee']}
+
+        return {'fee': 0.06}
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def templates(
     term=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='templates', offset=0, verified='verified', user='', favorites=False,
-    recently_sold=None, attributes=None
+    recently_sold=None, attributes=None, template_ids=None
 ):
     session = create_session()
 
@@ -1114,11 +1166,14 @@ def templates(
             format_dict['asset_id'] = '{}'.format(asset_id)
             search_clause += ' AND a.template_id = (SELECT template_id FROM assets WHERE asset_id = :asset_id) '
 
-        if template_id:
-            format_dict['template_id'] = template_id
-            search_clause += (
-                ' AND a.template_id = :template_id '
-            )
+
+        if template_id or (template_ids and len(template_ids) == 1):
+            format_dict['template_id'] = '{}'.format(template_id if template_id else template_ids[0])
+            search_clause += ' AND a.template_id = :template_id '
+
+        if template_ids and len(template_ids) > 1:
+            format_dict['template_ids'] = tuple(map(lambda a: int(a), list(template_ids)))
+            search_clause += ' AND a.template_id IN :template_ids '
 
         source_clause = (
             'templates a '
@@ -1250,7 +1305,7 @@ def templates(
                 personal_blacklist_clause=personal_blacklist_clause
             ))
 
-        res = session.execute(sql, format_dict)
+        res = execute_sql(session, sql, format_dict)
 
         results = []
 
@@ -1275,7 +1330,7 @@ def assets(
     term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
     contract=None, offset=0, verified='verified', user='', favorites=False, backed=False, recently_sold=None,
-    attributes=None, only=None, rwax_symbol=None, rwax_contract=None
+    attributes=None, only=None, rwax_symbol=None, rwax_contract=None, burned='not_burned', asset_ids=None
 ):
     session = create_session()
 
@@ -1335,9 +1390,13 @@ def assets(
                 )
                 format_dict['search_name'] = '%{}%'.format(name)
 
-        if asset_id:
-            format_dict['asset_id'] = '{}'.format(asset_id)
+        if asset_id or (asset_ids and len(asset_ids) == 1):
+            format_dict['asset_id'] = '{}'.format(asset_id if asset_id else asset_ids[0])
             search_clause += ' AND a.asset_id = :asset_id '
+
+        if asset_ids and len(asset_ids) > 1:
+            format_dict['asset_ids'] = tuple(map(lambda a: int(a), list(asset_ids)))
+            search_clause += ' AND a.asset_id IN :asset_ids '
 
         if template_id:
             format_dict['template_id'] = template_id
@@ -1360,7 +1419,8 @@ def assets(
             'rt.trait_factors, rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, '
             'rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, a.transferable, a.burnable, '
             'rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, col.verified, col.blacklisted, '
-            '{badges_object}, {tags_obj}, {attributes_obj} AS traits, {listings_obj} AS listings'.format(
+            'pk.unpack_url, pk.pack_id, pk.contract AS pack_contract, {badges_object}, {tags_obj}, '
+            '{attributes_obj} AS traits, {listings_obj} AS listings'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(),
                 attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object()
             )
@@ -1475,6 +1535,8 @@ def assets(
                     search_clause += ' AND a.asset_id = min_mint'
                 else:
                     search_clause += ' AND a.asset_id = max_mint'
+            elif search_type == 'my_packs':
+                search_clause += ' AND a.owner = :owner AND pk.pack_id IS NOT NULL '
             else:
                 search_clause += ' AND a.owner = :owner '
         if order_by == 'rarity_score' and only == 'pfps':
@@ -1482,6 +1544,8 @@ def assets(
         elif order_by == 'rarity_score':
             order_clause = 'ORDER BY a.collection, a.schema, p.rarity_score {}'.format(order_dir)
             search_clause += ' AND p.rarity_score IS NOT NULL '
+        elif order_by == 'transferred' and owner:
+            order_clause = 'ORDER BY COALESCE(a.transferred, a.timestamp) {}'.format(order_dir)
         elif order_by == 'date' and only == 'staked':
             order_clause = 'ORDER BY s.seq {}'.format(order_dir)
         elif order_by == 'date':
@@ -1526,12 +1590,20 @@ def assets(
             search_clause += ' AND ts.avg_usd_price <= :max_average '
             format_dict['max_average'] = max_average
 
+        if burned == 'burned':
+            search_clause += ' AND burned '
+        elif burned != 'all':
+            search_clause += ' AND NOT burned '
+
         sql = (
             'WITH usd_rate AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
             '{with_clause} '
             'SELECT {columns_clause}, f.user_name IS NOT NULL AS favorited '
             'FROM {source_clause} {filter_join_clause} '
             'LEFT JOIN templates t ON (a.template_id = t.template_id) '
+            'LEFT JOIN packs pk ON (a.template_id IS NOT NULL AND a.template_id = pk.template_id AND pk.seq = ('
+            '   SELECT MAX(seq) FROM packs WHERE template_id = pk.template_id'
+            ')) '
             'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
             'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) ' 
@@ -1568,11 +1640,12 @@ def assets(
                 limit_clause=limit_clause,
                 join_clause=join_clause,
                 personal_blacklist_clause=personal_blacklist_clause
-            ))
+            )
+        )
 
         print(sql)
 
-        res = session.execute(sql, format_dict)
+        res = execute_sql(session, sql, format_dict)
 
         results = []
 
@@ -1692,7 +1765,7 @@ def listings(
             'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) ' 
             'WHERE TRUE {search_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
             '{group_clause} {order_clause} {limit_clause}) '
         )
 
@@ -1972,7 +2045,407 @@ def listings(
             ))
 
         print(sql)
-        res = session.execute(sql, format_dict)
+        res = execute_sql(session, sql, format_dict)
+
+        results = []
+
+        for row in res:
+            try:
+                result = _format_listings(row)
+
+                results.append(result)
+            except Exception as e:
+                logging.error(e)
+
+        return results
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def auctions(
+    term=None, owner=None, market=None, collection=None, schema=None, limit=100, order_by='name_asc',
+    exact_search=False, search_type='listings', min_price=None, max_price=None, min_mint=None, max_mint=None,
+    contract=None, offset=0, verified='verified', user='', favorites=False, recently_sold=None,
+    attributes=None, only=False, rwax_symbol=None, rwax_contract=None
+):
+    session = create_session()
+
+    name, asset_id, template_id, col = _get_search_term(session, term)
+
+    if not collection:
+        collection = col
+
+    order_dir = 'ASC'
+
+    if '_asc' in order_by:
+        order_dir = 'ASC'
+        order_by = order_by.replace('_asc', '')
+    elif '_desc' in order_by:
+        order_dir = 'DESC'
+        order_by = order_by.replace('_desc', '')
+
+    try:
+        format_dict = {'user': user, 'limit': limit, 'offset': offset}
+
+        if not user and search_type in ['missing']:
+            return []
+
+        limit_clause = 'LIMIT :limit OFFSET :offset'
+
+        join_clause = (
+            'LEFT JOIN favorites f ON ((f.asset_id = a.asset_id OR f.template_id = a.template_id) '
+            'AND f.user_name = :user) '
+        ) if user else (
+            'LEFT JOIN favorites f ON (f.asset_id IS NULL AND f.user_name IS NULL) '
+        )
+
+        search_clause = ''
+        order_clause = ''
+        with_clause = ''
+        personal_blacklist_clause = ''
+        search_category_clause = ''
+
+        if collection:
+            format_dict['collection'] = collection
+
+            search_category_clause += ' AND l.collection = :collection '
+
+            if schema:
+                format_dict['schema'] = schema
+                search_category_clause += ' AND a.schema = :schema '
+
+                search_category_clause += construct_category_clause(
+                    session, format_dict, collection, schema, attributes, 'a.'
+                )
+            search_clause += search_category_clause
+
+        if name:
+            if exact_search:
+                search_clause += (
+                    ' AND h.name = :search_name '
+                )
+                format_dict['search_name'] = '{}'.format(name)
+            else:
+                search_clause += (
+                    ' AND h.name ILIKE :search_name '
+                )
+                format_dict['search_name'] = '%{}%'.format(name)
+
+        if asset_id:
+            format_dict['asset_id'] = '{}'.format(asset_id)
+            search_clause += ' AND :asset_id = ANY(l.asset_ids) '
+
+        if template_id:
+            format_dict['template_id'] = template_id
+            search_clause += (
+                ' AND a.template_id = :template_id '
+            )
+
+        with_clause += (
+            ', filtered_auctions AS ('
+            'SELECT au.sale_id, au.market, au.seller, au.timestamp, au.listing_id, au.currency, col.verified, '
+            'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, array_agg(asset_ids) AS assets '
+            'FROM auctions au '
+            'LEFT JOIN listings_helper_mv h USING (sale_id) '
+            'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
+            'LEFT JOIN rwax_assets ra USING (asset_id) '
+            'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
+            'LEFT JOIN backed_assets ba USING (asset_id) ' 
+            '{join_clause}'
+            'LEFT JOIN collections col ON (col.collection = l.collection) '
+            'LEFT JOIN templates t ON (t.template_id = a.template_id) '
+            'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
+            'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
+            'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
+            'LEFT JOIN names n ON (a.name_id = n.name_id) ' 
+            'WHERE TRUE {search_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+            '{group_clause} {order_clause} {limit_clause}) '
+        )
+
+        source_clause = (
+            'filtered_listings l2 '
+            'INNER JOIN listings l USING (sale_id) '
+            'LEFT JOIN listings_helper_mv h USING (sale_id) '
+            'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
+            'LEFT JOIN rwax_assets ra USING(asset_id) '
+            'LEFT JOIN pfp_assets p USING (asset_id) '
+            'LEFT JOIN backed_assets ba USING (asset_id) '
+            'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
+            'LEFT JOIN collections col ON (col.collection = l.collection) '
+            'LEFT JOIN templates t ON (t.template_id = a.template_id) '
+            'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
+            'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
+            'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
+            'LEFT JOIN names n ON (a.name_id = n.name_id) '
+            'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
+            'LEFT JOIN names cn ON (col.name_id = cn.name_id) '
+            'LEFT JOIN images img ON (a.image_id = img.image_id) '
+            'LEFT JOIN images ci ON (col.image_id = ci.image_id) '
+            'LEFT JOIN videos vid ON (a.video_id = vid.video_id) '
+            'LEFT JOIN data m ON (a.mutable_data_id = m.data_id) '
+            'LEFT JOIN data i ON (a.immutable_data_id = i.data_id) '
+            'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
+        )
+        columns_clause = (
+            'l.market, l.seller, l.timestamp AS timestamp, l.listing_id, l.currency, l.sale_id, col.verified, '
+            'col.blacklisted, l.maker, l.collection, l.price, ci.image as collection_image, cn.name AS display_name, '
+            '(SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
+            '{badges_object}, {tags_obj}, {assets_object} '.format(
+                badges_object=_get_badges_object('l.'),
+                tags_obj=_get_tags_object('l.'),
+                assets_object=_get_assets_object()
+            )
+        )
+        group_clause = ' '
+        if search_type == 'packs':
+            search_clause += (
+                ' AND EXISTS (SELECT template_id FROM packs p WHERE template_id = a.template_id) '
+            )
+        elif search_type == 'below_average':
+            search_clause += (
+                ' AND ts.avg_wax_price IS NOT NULL and l.estimated_wax_price < ts.avg_wax_price ')
+        elif search_type == 'below_last_sold':
+            search_clause += (
+                ' AND ts.last_sold_wax IS NOT NULL and l.estimated_wax_price < ts.last_sold_wax ')
+        elif search_type == 'floor':
+            search_clause += (
+                ' AND l.estimated_wax_price = fp.floor_price '
+            )
+
+        if verified == 'verified':
+            search_clause += ' AND col.verified '
+        elif verified == 'unverified':
+            search_clause += (
+                ' AND ((col.verified IS NULL AND col.blacklisted IS NULL)'
+                '  OR (NOT col.verified AND NOT col.blacklisted))'
+            )
+        elif verified == 'all':
+            search_clause += ' AND (NOT col.blacklisted OR col.blacklisted IS NULL) '
+        elif verified == 'blacklisted':
+            search_clause += ' AND col.blacklisted '
+
+        search_clause += _get_mint_filter(min_mint, max_mint, format_dict)
+        search_clause += _get_recently_sold_filter(recently_sold)
+
+        if only == 'pfps':
+            search_clause += (
+                'AND p.asset_id IS NOT NULL '
+            )
+        elif only == 'rwax':
+            search_clause += (
+                'AND ra.asset_id IS NOT NULL '
+            )
+            if collection and collection != '*':
+                search_clause += 'AND rt.collection = :collection '
+            if rwax_contract:
+                search_clause += 'AND rt.contract = :rwax_contract '
+                format_dict['rwax_contract'] = rwax_contract
+            if rwax_symbol:
+                search_clause += 'AND rt.symbol = :rwax_symbol '
+                format_dict['rwax_symbol'] = rwax_symbol
+        elif only == 'backed':
+            search_clause += ' AND ba.amount IS NOT NULL '
+
+        source_clause = source_clause
+
+        if contract:
+            format_dict['contract'] = contract
+            search_clause += ' AND a.contract = :contract'
+
+        if favorites:
+            search_clause += ' AND f.user_name IS NOT NULL'
+
+        if min_price and max_price:
+            search_clause += (
+                ' AND estimated_wax_price BETWEEN :min_price AND :max_price '
+            )
+            format_dict['min_price'] = min_price
+            format_dict['max_price'] = max_price
+        elif min_price:
+            search_clause += (
+                ' AND estimated_wax_price >= :min_price '
+            )
+            format_dict['min_price'] = min_price
+        elif max_price:
+            search_clause += (
+                ' AND estimated_wax_price <= :max_price '
+            )
+            format_dict['max_price'] = max_price
+        if user:
+            if search_type == 'bulk_buy':
+                search_clause += ' AND l.seller != :user '
+            elif search_type in ['missing', 'floor_missing']:
+                with_clause = (
+                    ', my_assets AS ( '
+                    'SELECT template_id FROM '
+                    '('
+                    '   SELECT a.template_id FROM assets a WHERE NOT burned '
+                    '   AND owner = :user AND a.template_id > 0 '
+                    '   UNION '
+                    '   SELECT a.template_id FROM listings l INNER JOIN assets a ON a.asset_id = l.asset_ids[1] '
+                    '   WHERE seller = :user AND a.template_id > 0 ' 
+                    '   UNION '
+                    '   SELECT a.template_id FROM stakes rs '
+                    '   INNER JOIN assets a USING(asset_id) '
+                    '   WHERE staker = :user AND NOT burned AND a.template_id > 0'
+                    ') a '
+                    'GROUP BY 1) '
+                    ', filtered_listings AS ('
+                    'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
+                    'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
+                    'FROM listings l '
+                    'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
+                    'LEFT JOIN my_assets ma USING (template_id) '
+                    '{join_clause} '
+                    'LEFT JOIN rwax_assets ra ON (ra.asset_id = a.asset_id) '
+                    'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
+                    'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
+                    'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
+                    'LEFT JOIN collections col ON (col.collection = l.collection) '
+                    'LEFT JOIN templates t ON (t.template_id = a.template_id) '
+                    'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
+                    'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
+                    'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
+                    'LEFT JOIN names n ON (a.name_id = n.name_id) '
+                    'WHERE a.template_id > 0 AND ma.template_id IS NULL '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
+                    '{group_clause} {order_clause} {limit_clause}) '
+                )
+
+                source_clause += (
+                    'LEFT JOIN my_assets ma ON a.template_id = ma.template_id '
+                )
+                if search_type == 'floor_missing':
+                    search_clause += ' AND fp.floor_price = estimated_wax_price '
+            elif search_type == 'owned_lower_mints':
+                with_clause = (
+                    ', my_assets AS ( '
+                    '    SELECT template_id, MIN(mint) AS mint FROM '
+                    '    ('
+                    '        SELECT a1.template_id, MIN(mint) AS mint FROM assets a1 '
+                    '        WHERE owner = :user AND a1.template_id IS NOT NULL AND a1.mint IS NOT NULl '
+                    '        AND NOT burned GROUP BY 1 '
+                    '        UNION '
+                    '        SELECT a2.template_id, MIN(a2.mint) AS mint FROM listings a1 '
+                    '        INNER JOIN assets a2 ON asset_id = asset_ids[1] '
+                    '        WHERE seller = :user AND a2.template_id IS NOT NULL AND a2.mint IS NOT NULL '
+                    '        AND NOT burned GROUP BY 1 ' 
+                    '        UNION '
+                    '        SELECT a1.template_id, MIN(mint) AS mint FROM stakes rs '
+                    '        INNER JOIN assets a1 USING(asset_id) '
+                    '        WHERE staker = :user AND a1.template_id IS NOT NULL AND a1.mint IS NOT NULL '
+                    '        AND NOT burned GROUP BY 1 '
+                    '   ) a '
+                    'GROUP BY 1 ORDER BY 1 ASC) '
+                    ', filtered_listings AS ('
+                    'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
+                    'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
+                    'FROM listings l '
+                    'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
+                    'LEFT JOIN my_assets ma USING (template_id) '
+                    '{join_clause} '
+                    'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
+                    'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
+                    'LEFT JOIN collections col ON (col.collection = l.collection) '
+                    'LEFT JOIN templates t ON (t.template_id = a.template_id) '
+                    'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
+                    'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
+                    'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
+                    'LEFT JOIN names n ON (a.name_id = n.name_id) '
+                    'WHERE a.mint < ma.mint {search_clause} '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
+                    '{group_clause} {order_clause} {limit_clause}) '
+                )
+        if market:
+            format_dict['market'] = '{}'.format(market.lower().strip())
+            search_clause += ' AND l.market = :market '
+        if owner:
+            format_dict['owner'] = '{}'.format(owner.lower().strip())
+            if search_type == 'my_exp_auctions':
+                search_clause += ' AND a.owner = \'atomicmarket\' AND au.seller = :owner AND au.bidder IS NULL '
+            elif search_type == 'my_auctions':
+                search_clause += (
+                    ' AND (a1.asset_id, a1.listing_id, a1.transaction_id) IN ('
+                    '     SELECT asset_id, listing_id, transaction_id FROM auctions WHERE '
+                    '     asset_id = a1.asset_id AND (bidder = :owner OR seller = :owner) '
+                    ' ) '
+                )
+                search_clause += ' AND a1.mint = max_mint'
+            else:
+                search_clause += ' AND l.seller = :owner '
+
+        if order_by == 'rarity_score':
+            order_clause = 'ORDER BY l.collection, h.schema, h.rarity_score {}'.format(order_dir)
+            group_clause += ', l.collection, h.schema, h.rarity_score '
+            search_clause += ' AND h.rarity_score IS NOT NULL '
+        elif order_by == 'date':
+            order_clause = 'ORDER BY l.seq {}'.format(order_dir)
+            group_clause += ', l.seq '
+        elif order_by == 'price':
+            order_clause = 'ORDER BY estimated_wax_price {}'.format(order_dir)
+            group_clause += ', estimated_wax_price '
+        elif order_by == 'mint':
+            group_clause += ', h.mint '
+            search_clause += ' AND h.mint > 0 '
+            order_clause = 'ORDER BY h.mint {}'.format(order_dir)
+        elif order_by == 'template_id':
+            search_clause += ' AND h.template_id IS NOT NULL '
+            order_clause = (
+                'ORDER BY h.template_id {}'
+            ).format(order_dir)
+            search_clause += ' AND h.template_id IS NOT NULL '
+            group_clause += ', h.template_id '
+        elif order_by == 'collection':
+            order_clause = (
+                'ORDER BY l.collection {}'
+            ).format(order_dir)
+        elif order_by == 'floor':
+            search_clause += ' AND h.floor_price IS NOT NULL '
+            order_clause = (
+                'ORDER BY h.floor_price {}'
+            ).format(order_dir)
+            group_clause += ', h.floor_price '
+
+        with_clause = with_clause.format(
+            search_clause=search_clause,
+            limit_clause=limit_clause,
+            order_clause=order_clause,
+            columns_clause=columns_clause,
+            group_clause=group_clause,
+            join_clause=join_clause
+        )
+
+        sql = (
+            'WITH usd_rate AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
+            '{with_clause} '
+            'SELECT {columns_clause}, f.user_name IS NOT NULL AS favorited '
+            'FROM {source_clause} '
+            '{join_clause} '
+            '{personal_blacklist_clause} '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, l.timestamp, f.user_name {group_clause}'
+            '{order_clause}'.format(
+                with_clause=with_clause,
+                columns_clause=columns_clause,
+                source_clause=source_clause,
+                group_clause=group_clause,
+                order_clause=order_clause,
+                limit_clause=limit_clause,
+                join_clause=join_clause,
+                personal_blacklist_clause=personal_blacklist_clause
+            ))
+
+        print(sql)
+        res = execute_sql(session, sql, format_dict)
 
         results = []
 
@@ -1996,7 +2469,8 @@ def listings(
 def health():
     session = create_session()
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT block_num, timestamp FROM chronicle_transactions WHERE seq = ('
             'SELECT max(seq) FROM chronicle_transactions WHERE ingested)'
         ).first()
@@ -2214,7 +2688,8 @@ def get_collections_overview(
         type_join = True
 
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             '{with_clause} '
             'SELECT c.*, '
             'SUM(COALESCE(cv1.wax_volume, 0)) AS wax_volume_1_day, '
@@ -2279,9 +2754,31 @@ def get_collections_overview(
 def get_tags(collection):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT * FROM tags_mv t INNER JOIN tags USING(tag_id) '
             'WHERE collection = :collection ', {'collection': collection})
+        tags = []
+        for tag in res:
+            tags.append({'tagId': tag['tag_id'], 'tagName': tag['tag_name']})
+
+        return tags
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_missing_tags(collection):
+    session = create_session()
+    try:
+        res = execute_sql(
+            session,
+            'SELECT * FROM tags t '
+            'WHERE tag_id NOT IN (SELECT tag_id FROM tags_mv '
+            'WHERE collection = :collection ) ', {'collection': collection})
         tags = []
         for tag in res:
             tags.append({'tagId': tag['tag_id'], 'tagName': tag['tag_name']})
@@ -2450,6 +2947,44 @@ def test_rwax_stuff():
     print('Tokens Total: ' + str(total_share))
 
 
+def get_template(template_ids):
+    session = create_session()
+    try:
+        template = execute_sql(
+            session,
+            'SELECT t.*, ts.*, c.verified, c.blacklisted, ci.image AS collection_image, '
+            'cn.name AS display_name '
+            'FROM templates t '
+            'INNER JOIN collections c USING (collection) '
+            'LEFT JOIN template_stats_mv ts USING (template_id) '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'WHERE {template_clause} '.format(
+                template_clause='t.template_id = :template_id' if len(template_ids) == 1 else 't.template_id IN :template_id'
+            ),
+            {'template_id': template_ids[0] if len(template_ids) == 1 else tuple(map(lambda a: int(a), list(template_ids)))}
+        ).first()
+
+        templ_obj = {}
+
+        if template:
+            templ_obj = _format_template(template)
+            templ_obj['collection'] = {
+                'collectionName': template['collection'],
+                'displayName': template['display_name'],
+                'collectionImage': template['collection_image'],
+                'verification': template['verified'],
+                'blacklisted': template['blacklisted'],
+            }
+        return templ_obj
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def get_rwax_tokens(collection, symbol, contract):
     session = create_session()
 
@@ -2470,7 +3005,8 @@ def get_rwax_tokens(collection, symbol, contract):
         search_dict['collection'] = collection
 
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT symbol, contract, decimals, maximum_supply, token_name, token_logo, token_logo_lg, '
             'rt.timestamp,c.collection, cn.name AS display_name, ci.image AS collection_image, '
             'c.verified, c.blacklisted, CAST(trait_factors AS text) AS trait_factors '
@@ -2480,7 +3016,6 @@ def get_rwax_tokens(collection, symbol, contract):
             'LEFT JOIN names cn USING (name_id) '
             'WHERE NOT blacklisted {token_clause} '
             'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14'.format(
-                templates_obj=_get_templates_object(),
                 token_clause=token_clause
             ), search_dict)
         tokens = []
@@ -2519,7 +3054,8 @@ def get_collection_schemas(collection, only):
     if only == 'rwax':
         join_clause = 'INNER JOIN rwax_tokens USING (collection, schema) '
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT schema, collection, timestamp, json_agg(json_build_object('
             '\'rarity\', CASE WHEN string_value IS NULL THEN \'\' ELSE string_value END, \'num_assets\', num_assets, '
             '\'num_templates\', num_templates '
@@ -2676,7 +3212,8 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
         }
 
         if collection:
-            result1 = session.execute(
+            result1 = execute_sql(
+                session,
                 'SELECT c.collection, ci.image, cn.name, verified, blacklisted, cv.wax_volume '
                 'FROM collections c '
                 'LEFT JOIN names cn ON (c.name_id = cn.name_id) '
@@ -2704,7 +3241,8 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
                     collections['blacklisted'][collection] = blacklisted
                     collections['volume24h'][collection] = volume_24h
 
-        result = session.execute(
+        result = execute_sql(
+            session,
             '{with_clause} '
             'SELECT c.collection, ci.image, cn.name, verified, blacklisted, cv.wax_volume {cnt_clause} '
             'FROM collections c '
@@ -2751,7 +3289,7 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
         session.remove()
 
 
-def get_crafts(craft_id, collection, limit, order_by, offset, verified):
+def get_crafts(craft_id=None, collection=None, limit=40, order_by='craft_id_desc', offset=0, verified='all', craft_ids=None):
     session = create_session()
     try:
         order_dir = 'DESC'
@@ -2792,9 +3330,13 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
         elif verified == 'all':
             search_clause += ' AND NOT blacklisted '
 
-        if craft_id:
-            search_dict['craft_id'] = craft_id
+        if craft_id or (craft_ids and len(craft_ids) == 1):
+            search_dict['craft_id'] = craft_id if craft_id else craft_ids[0]
             search_clause += ' AND craft_id = :craft_id '
+
+        if craft_ids and len(craft_ids) > 1:
+            search_dict['craft_ids'] = tuple(map(lambda a: int(a), list(craft_ids)))
+            search_clause += ' AND craft_id IN :craft_ids '
 
         sql = (
             'SELECT c.*, c2.outcomes, c2.recipe FROM ('
@@ -2803,14 +3345,23 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             'ci.image AS collection_image, cn.name AS display_name, c.collection, ' 
             'array_agg(CASE WHEN outcome_template_id IS NOT NULL THEN json_build_object('
             '\'template_id\', outcome_template_id, \'name\', tn1.name, \'collection\', json_build_object('
-            '\'collection_name\', t1.collection, \'verification\', col1.verified, \'collection_image\', '
-            'ci1.image, \'display_name\', cn1.name), \'image\', ti1.image, \'video\', tv1.video, \'schema\', t1.schema)'
+            '\'collection_name\', t1.collection, \'verification\', col1.verified, \'collection_image\', ci1.image, '
+            '\'display_name\', cn1.name), \'image\', ti1.image, \'video\', tv1.video, \'schema\', t1.schema, '
+            '\'immutable_data\', td1.data::json'
+            ')'
             'ELSE NULL END) AS outcome_templates, '
             'array_agg(CASE WHEN recipe_template_id IS NOT NULL THEN json_build_object('
             '\'template_id\', recipe_template_id, \'name\', tn2.name, \'collection\', json_build_object('
             '\'collection_name\', t2.collection, \'verification\', col2.verified, \'collection_image\', ti2.image, '
-            '\'display_name\', cn2.name), \'image\', ti2.image, \'video\', tv2.video, \'schema\', t2.schema)'
-            'ELSE NULL END) AS recipe_templates ' 
+            '\'display_name\', cn2.name), \'image\', ti2.image, \'video\', tv2.video, \'schema\', t2.schema, '
+            '\'immutable_data\', td2.data::json'
+            ')'
+            'ELSE NULL END) AS recipe_templates, '
+            'array_agg(CASE WHEN recipe_collection_name IS NOT NULL THEN json_build_object('
+            '\'collection_name\', rc.collection, \'verification\', rc.verified, \'collection_image\', rci.image, '
+            '\'display_name\', rcn.name'
+            ')'
+            'ELSE NULL END) AS recipe_collections '  
             'FROM ('
             '    SELECT c.craft_id, c.unlock_time, c.timestamp, c.display_data, c.collection, (SELECT COUNT(1) '
             '    FROM craft_actions WHERE craft_id = c.craft_id) AS num_crafted, c2.total, '
@@ -2820,6 +3371,9 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             '    CAST('
             '       json_array_elements(c2.recipe->\'ingredients\')->>\'template_id\' AS bigint'
             '    ) AS recipe_template_id, '
+            '    CAST('
+            '       json_array_elements(c2.recipe->\'ingredients\')->>\'collection_name\' AS varchar '
+            '    ) AS recipe_collection_name, '
             '    json_array_elements(outcomes->\'token_outcomes\') AS token_outcomes, '
             '    json_array_elements(recipe->\'ingredients\') AS token_ingredients '
             '    FROM ('
@@ -2837,6 +3391,7 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             'LEFT JOIN names tn1 ON (tn1.name_id = t1.name_id) '
             'LEFT JOIN images ti1 ON (ti1.image_id = t1.image_id) '
             'LEFT JOIN videos tv1 ON (tv1.video_id = t1.video_id) '
+            'LEFT JOIN data td1 ON (td1.data_id = t1.immutable_data_id) '
             'LEFT JOIN collections col1 ON (col1.collection = t1.collection) '
             'LEFT JOIN images ci1 ON col1.image_id = ci1.image_id '
             'LEFT JOIN names cn1 ON col1.name_id = cn1.name_id '
@@ -2844,9 +3399,13 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             'LEFT JOIN names tn2 ON (tn2.name_id = t2.name_id) '
             'LEFT JOIN images ti2 ON (ti2.image_id = t2.image_id) '
             'LEFT JOIN videos tv2 ON (tv2.video_id = t2.video_id) '
+            'LEFT JOIN data td2 ON (td2.data_id = t2.immutable_data_id) '
             'LEFT JOIN collections col2 ON (col2.collection = t2.collection) '
             'LEFT JOIN images ci2 ON col2.image_id = ci2.image_id '
             'LEFT JOIN names cn2 ON col2.name_id = cn2.name_id '
+            'LEFT JOIN collections rc ON (rc.collection = recipe_collection_name) '
+            'LEFT JOIN images rci ON rc.image_id = rci.image_id '
+            'LEFT JOIN names rcn ON rc.name_id = rcn.name_id '
             'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 '
             '{order_clause} '
             ') c LEFT JOIN crafts c2 USING(craft_id) '
@@ -2857,9 +3416,11 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
             )
         )
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             sql,
-            search_dict)
+            search_dict
+        )
 
         recipes = []
 
@@ -2885,8 +3446,11 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
                 'numCrafted': item['num_crafted'],
                 'total': item['total'],
                 'outcomeTemplates': _format_object(item['outcome_templates']),
-                'recipeTemplates': _format_object(item['recipe_templates'])
+                'recipeTemplates': _format_object(item['recipe_templates']),
+                'recipeCollections': _format_object(item['recipe_collections'])
             })
+
+        print(recipes)
 
         return recipes
     except SQLAlchemyError as e:
@@ -2898,8 +3462,8 @@ def get_crafts(craft_id, collection, limit, order_by, offset, verified):
 
 
 def get_drops(
-    drop_id, collection, term, limit, order_by, offset, verified, market, token, highlight, upcoming, user_name,
-    currency, home
+    drop_id=None, collection=None, term=None, limit=40, order_by='drop_id_desc', offset=0, verified='all', market=None,
+    token=None, upcoming=False, user_name=None, currency=None, home=None, drop_ids=None
 ):
     session = create_session()
     try:
@@ -2952,7 +3516,7 @@ def get_drops(
             search_clause += (
                 ' AND (d2.drop_id = ('
                 '   SELECT MAX(drop_id) FROM drops WHERE contract = \'nfthivedrops\' AND collection = d2.collection'
-                ') OR highlighted OR 10 > (SELECT COUNT(1) FROM drops '
+                ') OR 10 > (SELECT COUNT(1) FROM drops '
                 'WHERE contract = \'nfthivedrops\' AND collection = d2.collection '
                 'AND timestamp > NOW() AT time zone \'UTC\' - INTERVAL \'7 days\' )) '
                 'AND ('
@@ -2962,16 +3526,15 @@ def get_drops(
                 ') < 3 '
             )
 
-        if highlight:
-            search_clause += (
-                ' AND highlighted '
-            )
-
         if term:
             if isinstance(term, int) or (isinstance(term, str) and term.isnumeric()):
-                template = session.execute('SELECT template_id FROM templates WHERE template_id = :term', {
-                    'term': term
-                }).first()
+                template = execute_sql(
+                    session,
+                    'SELECT template_id FROM templates WHERE template_id = :term',
+                    {
+                        'term': term
+                    }
+                ).first()
                 if template:
                     search_dict['template_id'] = template['template_id']
                     search_clause += (
@@ -3008,9 +3571,13 @@ def get_drops(
         elif verified == 'all':
             search_clause += ' AND NOT blacklisted '
 
-        if drop_id:
-            search_dict['drop_id'] = drop_id
+        if drop_id or (drop_ids and len(drop_ids) == 1):
+            search_dict['drop_id'] = drop_id if drop_id else drop_ids[0]
             search_clause += ' AND drop_id = :drop_id '
+
+        if drop_ids and len(drop_ids) > 1:
+            search_dict['drop_ids'] = tuple(map(lambda a: int(a), list(drop_ids)))
+            search_clause += ' AND drop_id IN :drop_ids '
 
         if token:
             search_clause += ' AND currency ilike :token '
@@ -3030,13 +3597,14 @@ def get_drops(
             'SELECT drop_id, price, currency, fee, '
             'extract(epoch from start_time AT time zone \'Europe/Berlin\')::bigint AS start_time, '
             'extract(epoch from end_time AT time zone \'Europe/Berlin\')::bigint AS end_time, d2.timestamp, '
-            'account_limit, account_limit_cooldown, max_claimable, num_claimed, verified, blacklisted, '
+            'account_limit, account_limit_cooldown, max_claimable, total_claims, verified, blacklisted, '
             'display_data, (SELECT usd FROM usd_rate) as wax_usd, contract, cn.name as display_name, d2.collection, '
             'auth_required, ci.image AS collection_image, name_pattern, pd.drop_id AS is_pfp, '
             '(SELECT SUM(amount) FROM drop_actions '
             'WHERE drop_id = d2.drop_id AND contract = d2.contract AND '
             'action = \'claim\') AS num_bought, {templates_obj} '
             'FROM drops d2 '
+            'LEFT JOIN drop_claim_counts_mv USING(drop_id, contract) '
             'INNER JOIN templates t ON (t.template_id = ANY(d2.templates_to_mint)) '
             'LEFT JOIN template_stats_mv ts USING (template_id) '
             'LEFT JOIN templates_minted_mv tm USING (template_id) '
@@ -3064,9 +3632,11 @@ def get_drops(
             )
         )
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             sql,
-            search_dict)
+            search_dict
+        )
 
         drops = []
 
@@ -3075,9 +3645,12 @@ def get_drops(
                 display_data = _format_object(json.loads(drop['display_data']))
             except Exception as e:
                 display_data = drop['display_data']
-            templates = _format_templates(drop['templates'])
+            templates = []
+            for template in drop['templates']:
+                templates.append(_format_template(template))
             drop_item = {
                 'dropId': drop['drop_id'],
+                'contract': drop['contract'],
                 'price': drop['price'],
                 'currency': drop['currency'],
                 'startTime': drop['start_time'],
@@ -3086,7 +3659,7 @@ def get_drops(
                 'accountLimit': drop['account_limit'],
                 'accountLimitCooldown': drop['account_limit_cooldown'],
                 'maxClaimable': drop['max_claimable'],
-                'numClaimed': drop['num_claimed'],
+                'numClaimed': drop['total_claims'],
                 'verified': drop['verified'],
                 'displayData': display_data,
                 'authRequired': drop['auth_required'],
@@ -3097,10 +3670,10 @@ def get_drops(
                     'verification': drop['verified'],
                     'blacklisted': drop['blacklisted'],
                 },
-                'templatesToMint': _format_object(templates)
+                'templatesToMint': templates
             }
             if drop['is_pfp']:
-                drop_item['namePattern'] = drop['name_pattern'],
+                drop_item['namePattern'] = drop['name_pattern']
                 drop_item['isPfp'] = drop['is_pfp']
             drops.append(drop_item)
 
@@ -3186,9 +3759,11 @@ def get_drop_claims(
             )
         )
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             sql,
-            search_dict)
+            search_dict
+        )
 
         drops = []
 

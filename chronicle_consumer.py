@@ -823,6 +823,7 @@ def handle_transaction(action, block_num, timestamp, session):
                     'createpack',
                     'createspack',
                     'lognewpack',
+                    'delpack',
                     'setpackdata'
                 ]) or (account == 'waxbuyoffers' and name in [
                     'logsale',

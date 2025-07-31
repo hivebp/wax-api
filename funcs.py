@@ -5,6 +5,7 @@ import logging
 import time
 
 import pytz
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from functools import wraps
 
@@ -92,7 +93,7 @@ def session_execute_logged(session, sql, args={}):
 
     start = time.time()
 
-    res = session.execute(sql, args)
+    res = session.execute(text(sql), args)
 
     end = time.time()
 
@@ -108,7 +109,7 @@ def session_execute_logged(session, sql, args={}):
             'average': elapsed
         }
 
-    return res
+    return res.mappings()
 
 
 def parse_attributes(session, collection, schema, data):
@@ -1439,6 +1440,21 @@ def load_atomic_market_claim_auct(session, transaction):
         new_sale
     )
 
+    session_execute_logged(
+        session,
+        'INSERT INTO removed_atomicmarket_auctions '
+        'SELECT au.*, :seq, :block_num FROM auctions au LEFT JOIN auction_claims ac USING(auction_id) '
+        'WHERE auction_id = ac.auction_id AND ac.seq = :seq '
+        'AND NOT EXISTS (SELECT seq FROM removed_atomicmarket_auctions WHERE removed_seq = :seq)',
+        new_sale
+    )
+
+    session_execute_logged(
+        session,
+        'DELETE FROM auctions WHERE auction_id = :auction_id',
+        new_sale
+    )
+
 
 @catch_and_log()
 def load_atomic_market_cancel_buy_offer(session, transaction):
@@ -1653,7 +1669,7 @@ def load_atomic_market_sale_start(session, transaction):
         '   asset_ids, collection, seller, market, maker, price, currency, listing_id, seq, block_num, timestamp, '
         '   estimated_wax_price '
         ') '
-        'SELECT asset_ids[\:99], collection, seller, \'atomicmarket\', maker, price, currency, listing_id, s.seq, '
+        'SELECT asset_ids[:99], collection, seller, \'atomicmarket\', maker, price, currency, listing_id, s.seq, '
         's.block_num, s.timestamp, CASE WHEN currency = \'WAX\' THEN price ELSE '
         '(price / (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1)) END '
         'FROM atomicmarket_sale_starts s '
@@ -2842,7 +2858,7 @@ def load_nft_hive_execute(session, transaction):
         name = action['name']
         data = action['data']
         trx['user'] = signer
-        if name == 'create-banner' and signer in ['frcqu.wam', 't1.5c.wam', 'tgz5k.wam', 'scfay.wam']:
+        if name == 'create-banner' and signer in ['frcqu.wam', 't1.5c.wam', 'tgz5k.wam', 'scfay.wam', 'nonoswax.gm']:
             if not 'startTime' in data:
                 data['startTime'] = datetime.datetime.utcnow()
             else:
@@ -3715,6 +3731,13 @@ def load_delpack(session, action, contract):
 
     session_execute_logged(
         session,
+        'INSERT INTO removed_packs SELECT p.*, :seq, :block_num FROM packs p '
+        'WHERE pack_id = :pack_id AND contract = :contract ',
+        new_pack_data
+    )
+
+    session_execute_logged(
+        session,
         'DELETE FROM packs WHERE pack_id = :pack_id AND contract = :contract ',
         new_pack_data
     )
@@ -3726,6 +3749,13 @@ def load_delrelease(session, action):
     data = _get_data(action)
 
     new_pack_data['release_id'] = data['release_id']
+
+    session_execute_logged(
+        session,
+        'INSERT INTO removed_packs SELECT p.*, :seq, :block_num FROM packs p '
+        'WHERE release_id = :release_id AND contract = \'nfthivepacks\' ',
+        new_pack_data
+    )
 
     session_execute_logged(
         session,

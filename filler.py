@@ -7,11 +7,13 @@ import time
 
 import _thread
 
+import pytz
 from flask import Flask, json, request
 from oto.adaptors.flask import flaskify
 from oto import response as oto_response
 
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 import funcs
@@ -27,7 +29,7 @@ app = Flask(__name__)
 app.config.from_object(PostgresFillerConfig if os.getenv('env') != 'dev' else PostgresFillerConfig)
 
 db = SQLAlchemy(app, session_options={'autocommit': False})
-db_auto = SQLAlchemy(app, session_options={'autocommit': True})
+#db_auto = SQLAlchemy(app, session_options={'autocommit': True})
 
 executor = Executor(app)
 
@@ -276,7 +278,7 @@ def load_wax_usd_rate(session, action):
                                                '%Y-%m-%dT%H:%M:%S.%f')
         usd = float(median)/10000.0
 
-        session.execute('INSERT INTO usd_prices VALUES (:timestamp, :usd)', {
+        execute_sql(session, 'INSERT INTO usd_prices VALUES (:timestamp, :usd)', {
             'timestamp': timestamp, 'usd': usd
         })
     except SQLAlchemyError as e:
@@ -285,6 +287,13 @@ def load_wax_usd_rate(session, action):
     except Exception as err:
         log_error('load_wax_usd_rate: {}'.format(err))
         raise err
+
+
+def execute_sql(session, sql, args=None):
+    res = session.execute(text(sql), args)
+    mappings = res.mappings()
+    mappings.rowcount = res.rowcount
+    return mappings
 
 
 @app.route('/loader/vacuum')
@@ -299,27 +308,27 @@ def vacuum():
 
         session.connection().connection.set_isolation_level(0)
         start_time = time.time()
-        session.execute('VACUUM listing_prices_new_mv')
+        execute_sql(session, 'VACUUM listing_prices_new_mv')
         end_time = time.time()
         print('VACUUM VIEW 1: {}'.format(end_time - start_time))
 
         start_time = time.time()
-        session.execute('VACUUM cheapest_new_mv')
+        execute_sql(session, 'VACUUM cheapest_new_mv')
         end_time = time.time()
         print('VACUUM VIEW 2: {}'.format(end_time - start_time))
 
         start_time = time.time()
-        session.execute('VACUUM collection_users_mw')
+        execute_sql(session, 'VACUUM collection_users_mw')
         end_time = time.time()
         print('VACUUM VIEW 5: {}'.format(end_time - start_time))
 
         start_time = time.time()
-        session.execute('VACUUM users_mv')
+        execute_sql(session, 'VACUUM users_mv')
         end_time = time.time()
         print('VACUUM VIEW 6: {}'.format(end_time - start_time))
 
         start_time = time.time()
-        session.execute('VACUUM price_limits_mv')
+        execute_sql(session, 'VACUUM price_limits_mv')
         end_time = time.time()
         print('VACUUM VIEW 7: {}'.format(end_time - start_time))
 
@@ -336,6 +345,54 @@ def vacuum():
     return flaskify(oto_response.Response('Refreshed Cheapest {}'.format(total_end_time - total_start_time)))
 
 
+@app.route('/loader/sync-tokens')
+def sync_tokens():
+    url = 'https://raw.githubusercontent.com/eoscafe/eos-airdrops/master/tokens.json'
+
+    response = requests.request("GET", url)
+
+    if response.status_code != 200:
+        log_error('sync_tokens {}: {}'.format(response.status_code, response.content))
+        return flaskify(oto_response.Response(
+            'An unexpected Error occured', errors=response.content, status=response.status_code))
+
+    tokens = json.loads(response.content)
+    session = create_session()
+    try:
+        old_res = execute_sql(session, 'SELECT * FROM eos_tokens')
+
+        old_tokens = []
+
+        for token in old_res:
+            old_tokens.append(token['symbol'] + '_' + token['account'] + '_' + token['chain'])
+
+        for token in tokens:
+            if token['symbol'] + '_' + token['account'] + '_' + token['chain'] in old_tokens:
+                execute_sql(
+                    session,
+                   'UPDATE eos_tokens SET name = :name, logo = :logo, logo_lg = :logo_lg '
+                   'WHERE symbol = :symbol AND account = :account AND chain = :chain',
+                   token
+               )
+            else:
+                execute_sql(
+                    session,
+                   'INSERT INTO eos_tokens (name, logo, logo_lg, symbol, account, chain) '
+                   'VALUES (:name, :logo, :logo_lg, :symbol, :account, :chain) ',
+                   token
+               )
+    except SQLAlchemyError as err:
+        log_error('sync_tokens: {}'.format(err))
+        session.rollback()
+        raise err
+    except Exception as err:
+        log_error('sync_tokens: {}'.format(err))
+        raise err
+    finally:
+        session.commit()
+        session.remove()
+
+
 @app.route('/loader/reboot-database')
 def reboot_database():
     #return "Dangerous, enable only when you intend to erase all data and reset the tables"
@@ -343,7 +400,8 @@ def reboot_database():
     start_time = time.time()
     session = create_session()
     try:
-        block_num_tables = session.execute(
+        block_num_tables = execute_sql(
+            session,
             'SELECT t1.table_name '
             'FROM tables_with_block_num t1 '
         )
@@ -354,76 +412,76 @@ def reboot_database():
                     table_name=tables['table_name']
                 )
             )
-            session.execute(
+            execute_sql(session, 
                 'TRUNCATE {table_name}'.format(
                     table_name=tables['table_name']
                 )
             )
 
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE transfers'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE simpleassets_offers'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE simpleassets_updates'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE simpleassets_burns'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE collections'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE schemas'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE templates'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE assets'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE attributes'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE attributes_attribute_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE data'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE data_data_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE images'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE listings_sale_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE images_image_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE videos'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE videos_video_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE names'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE names_name_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'TRUNCATE transactions'
         )
-        session.execute(
+        execute_sql(session, 
             'ALTER SEQUENCE transactions_id_seq RESTART WITH 1'
         )
-        session.execute(
+        execute_sql(session, 
             'INSERT INTO handle_fork VALUES (false, 0)'
         )
         session.commit()
@@ -437,13 +495,15 @@ def reboot_database():
 
 
 def verify_account(session, account):
-    session.execute(
-        'UPDATE collections SET verified = TRUE WHERE collection = :collection', {'collection': account}
+    execute_sql(
+        session,
+        'UPDATE collections SET verified = TRUE WHERE collection = :collection',
+        {'collection': account}
     )
 
 
 def verify_accounts(session, accounts):
-    res = session.execute('SELECT distinct collection FROM collections WHERE verified')
+    res = execute_sql(session, 'SELECT distinct collection FROM collections WHERE verified')
     already_verified = []
     for collection in res:
         already_verified.append(collection['collection'])
@@ -456,13 +516,13 @@ def verify_accounts(session, accounts):
 
 
 def unverify_account(session, account):
-    session.execute(
+    execute_sql(session, 
         'UPDATE collections SET verified = FALSE WHERE collection = :collection', {'collection': account}
     )
 
 
 def unverify_accounts(session, accounts):
-    res = session.execute('SELECT distinct collection FROM collections WHERE NOT verified')
+    res = execute_sql(session, 'SELECT distinct collection FROM collections WHERE NOT verified')
     already_unverified = []
     for collection in res:
         already_unverified.append(collection['collection'])
@@ -475,12 +535,12 @@ def unverify_accounts(session, accounts):
 
 
 def blacklist_account(session, account):
-    session.execute('INSERT INTO blacklisted_collections VALUES (:collection)', {'collection': account})
-    session.execute('UPDATE collections SET blacklisted = TRUE WHERE collection = :collection', {'collection': account})
+    execute_sql(session, 'INSERT INTO blacklisted_collections VALUES (:collection)', {'collection': account})
+    execute_sql(session, 'UPDATE collections SET blacklisted = TRUE WHERE collection = :collection', {'collection': account})
 
 
 def blacklist_accounts(session, accounts):
-    res = session.execute('SELECT distinct collection FROM blacklisted_collections')
+    res = execute_sql(session, 'SELECT distinct collection FROM blacklisted_collections')
     already_blacklisted = []
     for collection in res:
         already_blacklisted.append(collection['collection'])
@@ -492,8 +552,8 @@ def blacklist_accounts(session, accounts):
 
 
 def unblacklist_account(session, account):
-    session.execute('DELETE FROM blacklisted_collections WHERE collection = :collection', {'collection': account})
-    session.execute(
+    execute_sql(session, 'DELETE FROM blacklisted_collections WHERE collection = :collection', {'collection': account})
+    execute_sql(session, 
         'UPDATE collections SET blacklisted = FALSE WHERE collection = :collection', {'collection': account}
     )
 
@@ -517,7 +577,7 @@ def add_sets():
 
     attribute_ids = []
     for attribute_name in attribute_names.split(','):
-        res = session.execute(
+        res = execute_sql(session, 
             'SELECT attribute_id '
             'FROM attributes '
             'WHERE collection = :collection '
@@ -536,13 +596,13 @@ def add_sets():
     cnt = 0
 
     if use_name:
-        names = session.execute(
+        names = execute_sql(session, 
             'SELECT DISTINCT name_id FROM assets WHERE collection = :collection AND schema = :schema',
             {'collection': collection, 'schema': schema}
         )
         for name in names:
             for combination in combinations:
-                res = session.execute(
+                res = execute_sql(session, 
                     'INSERT INTO sets '
                     'SELECT :collection, :schema, :attribute_ids, NULL, :name_id '
                     'WHERE EXISTS ('
@@ -568,7 +628,7 @@ def add_sets():
                 session.commit()
     else:
         for combination in combinations:
-            res = session.execute(
+            res = execute_sql(session, 
                 'INSERT INTO sets '
                 'SELECT :collection, :schema, :attribute_ids '
                 'WHERE EXISTS ('
@@ -599,14 +659,14 @@ def handle_atomicassets_updates_reversed():
 
     block_num = 126827993
 
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session, 
         'SELECT * FROM atomicassets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
         try:
-            update = session.execute(
+            update = execute_sql(session, 
                 'SELECT a.collection, a.schema, a.asset_id, d1.data AS mdata, d2.data AS idata, d3.data AS tdata, '
                 'u.seq, old_mdata_id '
                 'FROM atomicassets_updates_reversed u '
@@ -640,7 +700,7 @@ def handle_atomicassets_updates_reversed():
                 new_asset['attribute_ids'] = funcs.parse_attributes(
                     session, update['collection'], update['schema'], data)
 
-                session.execute(
+                execute_sql(session, 
                    'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
                    '{name_clause} {image_clause} {video_clause} '
                    'WHERE asset_id = :asset_id '.format(
@@ -677,14 +737,14 @@ def update_rwax_assets():
     session = create_session()
 
     try:
-        session.execute(
+        execute_sql(session, 
             'INSERT INTO rwax_assets '
             'SELECT asset_id, a.collection, schema, template_id '
             'FROM assets a WHERE (collection, schema) IN (SELECT collection, schema FROM rwax_tokens) '
             'AND NOT EXISTS (SELECT asset_id FROM rwax_assets WHERE asset_id = a.asset_id)'
         )
 
-        session.execute(
+        execute_sql(session, 
             'DELETE FROM rwax_assets '
             'WHERE asset_id IN (SELECT asset_id FROM rwax_assets ra LEFT JOIN assets a USING (asset_id) '
             'WHERE a.schema NOT IN (SELECT schema FROM rwax_tokens WHERE schema = a.schema))'
@@ -718,7 +778,8 @@ def update_pfp_attributes():
     try:
         session.commit()
 
-        session.execute(
+        execute_sql(
+            session,
             'INSERT INTO pfp_templates '
             'SELECT collection, schema, template_id '
             'FROM ('
@@ -734,7 +795,8 @@ def update_pfp_attributes():
         )
         session.commit()
 
-        session.execute(
+        execute_sql(
+            session,
             'INSERT INTO pfp_schemas '
             'SELECT collection, schema '
             'FROM pfp_templates '
@@ -742,7 +804,8 @@ def update_pfp_attributes():
         )
         session.commit()
 
-        session.execute(
+        execute_sql(
+            session,
             'INSERT INTO pfp_assets '
             'SELECT a.asset_id, a.collection, a.schema, a.template_id, array_agg(attribute_id) '
             'FROM ('
@@ -758,9 +821,10 @@ def update_pfp_attributes():
         )
         session.commit()
 
-        collections = session.execute('SELECT DISTINCT collection FROM pfp_schemas')
+        collections = execute_sql(session, 'SELECT DISTINCT collection FROM pfp_schemas')
         for collection in collections:
-            session.execute(
+            execute_sql(
+                session,
                 'UPDATE pfp_assets a SET num_traits = ('
                 '   SELECT COUNT(attribute_id) '
                 '   FROM ('
@@ -775,7 +839,8 @@ def update_pfp_attributes():
                 {'collection': collection['collection']}
             )
 
-            session.execute(
+            execute_sql(
+                session,
                 'DELETE FROM pfp_assets WHERE asset_id IN ('
                 '   SELECT asset_id '
                 '   FROM pfp_assets p '
@@ -789,7 +854,8 @@ def update_pfp_attributes():
 
         session.commit()
 
-        session.execute(
+        execute_sql(
+            session,
             'INSERT INTO attribute_stats '
             'SELECT collection, schema, attribute_id '
             'FROM attributes a '
@@ -810,7 +876,8 @@ def update_pfp_attributes():
 
         session.commit()
 
-        session.execute(
+        execute_sql(
+            session,
             'WITH attribute_totals AS ('
             '   SELECT attribute_id, COUNT(1) AS total '
             '   FROM attributes '
@@ -822,7 +889,8 @@ def update_pfp_attributes():
             'atu.attribute_id '
         )
 
-        session.execute(
+        execute_sql(
+            session,
             'WITH template_totals AS ('
             '   SELECT a.collection, a.schema, COUNT(1) AS total_schema '
             '   FROM pfp_assets a '
@@ -833,13 +901,15 @@ def update_pfp_attributes():
             'FROM template_totals tt WHERE asu.collection = tt.collection AND asu.schema = tt.schema '
         )
 
-        session.execute(
+        execute_sql(
+            session,
             'UPDATE attribute_stats SET rarity_score = 1 / (total / CAST(total_schema AS float)) '
             'WHERE total IS NOT NULL AND total_schema > 0'
         )
         session.commit()
 
-        collections = session.execute(
+        collections = execute_sql(
+            session,
             'SELECT DISTINCT collection FROM pfp_schemas'
         )
 
@@ -847,7 +917,8 @@ def update_pfp_attributes():
 
         session = create_session()
         for collection in collections:
-            session.execute(
+            execute_sql(
+                session,
                 'UPDATE pfp_assets aa SET rarity_score = asu.rarity_score FROM ('
                 '   SELECT aa.asset_id, SUM(asu.rarity_score) AS rarity_score '
                 '   FROM attribute_stats asu '
@@ -860,14 +931,16 @@ def update_pfp_attributes():
                 ') asu WHERE asu.asset_id = aa.asset_id ', {'collection': collection['collection']}
             )
 
-            session.execute(
+            execute_sql(
+                session,
                 'UPDATE pfp_assets asu SET rank = NULL, rarity_score = NULL '
                 'FROM assets a '
                 'WHERE asu.asset_id = a.asset_id AND a.burned AND rank IS NOT NULL AND rarity_score IS NOT NULL '
                 'AND asu.collection = :collection', {'collection': collection['collection']}
             )
 
-            session.execute(
+            execute_sql(
+                session,
                 'UPDATE pfp_assets asu SET rank = ats.rank FROM ('
                 '   SELECT asset_id, '
                 '   RANK() OVER(PARTITION BY asu.collection, asu.schema ORDER BY rarity_score DESC NULLS LAST) AS rank,'
@@ -877,7 +950,8 @@ def update_pfp_attributes():
                 'WHERE ats.asset_id = asu.asset_id AND NOT ats.burned', {'collection': collection['collection']}
             )
 
-            session.execute(
+            execute_sql(
+                session,
                 'UPDATE attribute_stats atu SET floor_wax = tp.floor_wax '
                 'FROM attribute_floors_mv tp '
                 'WHERE tp.attribute_id = atu.attribute_id AND collection = :collection',
@@ -885,6 +959,11 @@ def update_pfp_attributes():
             )
             session.commit()
 
+            execute_sql(
+                session,
+                'REFRESH MATERIALIZED VIEW CONCURRENTLY pfp_top_owners_mv'
+            )
+            session.commit()
         return flaskify(oto_response.Response('Updated PFP Attributes'))
     except SQLAlchemyError as err:
         log_error('load_pfp_attributes: {}'.format(err))
@@ -937,15 +1016,15 @@ def sync_new_collection_verifications():
 
     session = create_session()
 
-    old_badges = session.execute( 'SELECT * FROM badges')
+    old_badges = execute_sql(session,  'SELECT * FROM badges')
     for old_badge in old_badges:
         if old_badge['collection'] not in badges:
-            session.execute(
+            execute_sql(session, 
                 'DELETE FROM badges WHERE collection = :collection',
                 {'collection': old_badge['collection']}
             )
         elif old_badge['name'] not in badges[old_badge['collection']]:
-            session.execute(
+            execute_sql(session, 
                 'DELETE FROM badges WHERE collection = :collection AND name = :name',
                 {'collection': old_badge['collection'], 'name': old_badge['name']}
             )
@@ -956,7 +1035,7 @@ def sync_new_collection_verifications():
         for name in badges[collection]:
             badge = badges[collection][name]
             if 'update' in badge:
-                session.execute(
+                execute_sql(session, 
                     'UPDATE badges SET value = :value, level = :level, timestamp = :timestamp '
                     'WHERE collection = :collection AND name = :name',
                     {
@@ -968,7 +1047,7 @@ def sync_new_collection_verifications():
                     }
                 )
             else:
-                session.execute(
+                execute_sql(session, 
                     'INSERT INTO badges SELECT :collection, :name, :level, :value, :timestamp '
                     'WHERE NOT EXISTS ('
                     '   SELECT collection, name FROM badges WHERE collection = :collection AND name = :name'
@@ -981,15 +1060,15 @@ def sync_new_collection_verifications():
                     }
                 )
 
-    blacklisted_collections = session.execute('SELECT distinct collection FROM blacklisted_collections')
+    blacklisted_collections = execute_sql(session, 'SELECT distinct collection FROM blacklisted_collections')
 
-    whitelist_overwrite = session.execute('SELECT collection FROM whitelist_overwrite')
+    whitelist_overwrite = execute_sql(session, 'SELECT collection FROM whitelist_overwrite')
 
     for collection in whitelist_overwrite:
         if collection['collection'] in unverified:
             unverified.remove(collection['collection'])
 
-    unverify_overwrite = session.execute(
+    unverify_overwrite = execute_sql(session, 
         'SELECT collection FROM unverify_overwrite'
     )
 
@@ -1002,7 +1081,7 @@ def sync_new_collection_verifications():
         if collection['collection'] not in blacklist:
             unblacklist.append(collection['collection'])
 
-    blacklist_overwrite = session.execute(
+    blacklist_overwrite = execute_sql(session, 
         'SELECT collection FROM blacklist_overwrite'
     )
 
@@ -1213,6 +1292,8 @@ def parse_action(session, action):
                 funcs.load_neftyblocksp_lognewpack(session, action)
             elif name == 'setpackdata':
                 funcs.load_setpackdata(session, action, 'neftyblocksp')
+            elif name == 'delpack':
+                funcs.load_delpack(session, action, 'neftyblocksp')
         elif account == 'nfthivepacks':
             if name == 'lognewpack':
                 funcs.load_nfthivepacks_lognewpack(session, action)
@@ -1409,7 +1490,7 @@ def update_estimated_wax_price():
     session = create_session()
 
     try:
-        session.execute(
+        execute_sql(session, 
             'WITH current_usd_price AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
             'UPDATE listings SET estimated_wax_price = price / (SELECT usd FROM current_usd_price) '
             'WHERE currency = \'USD\''
@@ -1438,17 +1519,17 @@ def update_small_views():
     session = create_session()
 
     try:
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY tags_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY tags_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY user_pictures_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY user_pictures_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY tag_filters_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY tag_filters_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_actions_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_actions_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY personal_blacklist_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY drop_prices_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY drop_prices_mv')
         session.commit()
 
         return flaskify(oto_response.Response('Small Views Updated'))
@@ -1473,13 +1554,15 @@ def update_floor_prices():
     session = create_session()
 
     try:
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY listings_floor_breakdown_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY listings_floor_breakdown_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_floor_prices_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY template_floor_prices_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY attribute_floors_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY attribute_floors_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
+        session.commit()
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
         session.commit()
 
         return flaskify(oto_response.Response('Floor Prices Updated'))
@@ -1503,7 +1586,7 @@ def update_template_stats():
 
     session = create_session()
     try:
-        session.execute(
+        execute_sql(session, 
             'INSERT INTO template_sales '
             'SELECT template_id, a.schema, a.collection, wax_price, usd_price, s.seq, s.block_num, s.timestamp '
             'FROM sales s '
@@ -1513,13 +1596,13 @@ def update_template_stats():
         )
         session.commit()
 
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_stats_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY template_stats_mv')
         session.commit()
 
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY schema_stats_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY schema_stats_mv')
         session.commit()
 
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY templates_minted_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY templates_minted_mv')
         session.commit()
 
         return flaskify(oto_response.Response('Template Stats Updated'))
@@ -1556,7 +1639,7 @@ def create_volume_day_views():
                 )
             )
 
-            session.execute(
+            execute_sql(session, 
                 'DROP MATERIALIZED VIEW IF EXISTS volume_{table}_{day}_mv CASCADE'.format(
                     table=table, day=day
                 )
@@ -1597,12 +1680,12 @@ def create_volume_day_views():
             print(sql)
 
             start = time.time()
-            session.execute(sql)
+            execute_sql(session, sql)
             end = time.time()
 
             print(end - start)
 
-            session.execute(
+            execute_sql(session, 
                 'CREATE UNIQUE INDEX ON volume_{table}_{day}_mv ({columns}type) '.format(
                     table=table, columns=columns, day=day
                 )
@@ -1666,13 +1749,13 @@ def create_volumes_views():
                 )
             )
 
-            session.execute(
+            execute_sql(session, 
                 'DROP MATERIALIZED VIEW IF EXISTS volume_{table}_{year}_mv CASCADE'.format(
                     table=table, year=year
                 )
             )
 
-            session.execute(
+            execute_sql(session, 
                 'CREATE MATERIALIZED VIEW IF NOT EXISTS volume_{table}_{year}_mv AS ' 
                 'SELECT {columns}type, '
                 '{aggregates} ' 
@@ -1683,7 +1766,7 @@ def create_volumes_views():
                 )
             )
 
-            session.execute(
+            execute_sql(session, 
                 'CREATE UNIQUE INDEX ON volume_{table}_{year}_mv ({columns}type) '.format(
                     table=table, columns=columns.replace('t.', ''), year=year
                 )
@@ -1721,7 +1804,7 @@ def create_volumes_views():
             )
         )
 
-        session.execute(
+        execute_sql(session, 
             'DROP MATERIALIZED VIEW IF EXISTS volume_{table}_all_time_mv CASCADE'.format(
                 table=table
             )
@@ -1787,12 +1870,12 @@ def create_volumes_views():
         print(sql)
 
         start = time.time()
-        session.execute(sql)
+        execute_sql(session, sql)
         end = time.time()
 
         print(end - start)
 
-        session.execute(
+        execute_sql(session, 
             'CREATE UNIQUE INDEX ON volume_{table}_all_time_mv ({columns}type) '.format(
                 table=table, columns=columns
             )
@@ -1823,7 +1906,7 @@ def create_volumes_views():
         for day in [
             '1_day'
         ]:
-            session.execute(
+            execute_sql(session, 
                 'DROP MATERIALIZED VIEW IF EXISTS volume_{table}_{day}_mv CASCADE'.format(
                     table=table, day=day
                 )
@@ -1839,7 +1922,7 @@ def create_volumes_views():
                 )
             )
 
-            session.execute(
+            execute_sql(session, 
                 'DROP MATERIALIZED VIEW IF EXISTS volume_{table}_{day}_mv CASCADE'.format(
                     table=table, day=day
                 )
@@ -1888,12 +1971,12 @@ def create_volumes_views():
             print(sql)
 
             start = time.time()
-            session.execute(sql)
+            execute_sql(session, sql)
             end = time.time()
 
             print(end - start)
 
-            session.execute(
+            execute_sql(session, 
                 'CREATE UNIQUE INDEX ON volume_{table}_{day}_mv ({columns}type) '.format(
                     table=table, columns=columns.replace('t.', ''), day=day
                 )
@@ -1915,72 +1998,72 @@ def update_big_volumes():
     session = create_session()
 
     try:
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_from_2024_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_from_2024_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_seller_from_2024_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_seller_from_2024_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_buyer_from_2024_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_buyer_from_2024_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW collection_sales_by_date_from_2024_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW collection_sales_by_date_from_2024_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW template_collection_sales_by_date_from_2024_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW template_collection_sales_by_date_from_2024_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_all_time_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_365_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_180_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_90_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_60_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_30_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_all_time_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_365_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_180_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_90_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_60_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_30_days_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW volume_template_user_from_2024_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_template_user_from_2024_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_template_user_all_time_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW monthly_collection_volume_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW monthly_collection_volume_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_sales_by_date_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY collection_sales_by_date_mv')
         session.commit()
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY template_collection_sales_by_date_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY template_collection_sales_by_date_mv')
         session.commit()
 
         for days in ['all_time', '365_days', '180_days', '90_days', '60_days', '30_days']:
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_market_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_market_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_seller_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_seller_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_buyer_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_buyer_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_drop_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_template_user_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_template_{days}_mv'.format(days=days)
             )
             session.commit()
@@ -2009,53 +2092,53 @@ def update_small_volumes():
     try:
         funcs.update_sales_summary(session)
 
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_15_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_14_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_7_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_3_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_2_days_mv')
-        session.execute('REFRESH MATERIALIZED VIEW volume_collection_market_user_1_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_15_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_14_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_7_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_3_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_2_days_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW volume_collection_market_user_1_days_mv')
         session.commit()
 
-        session.execute(
+        execute_sql(session, 
             'REFRESH MATERIALIZED VIEW CONCURRENTLY sales_seven_day_chart_mv'
         )
         session.commit()
 
         for days in ['15_days', '14_days', '7_days', '3_days', '2_days', '1_days']:
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_market_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_market_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_seller_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_seller_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_collection_buyer_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_buyer_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_drop_{days}_mv'.format(days=days)
             )
             session.commit()
-            session.execute(
+            execute_sql(session, 
                 'REFRESH MATERIALIZED VIEW CONCURRENTLY volume_template_{days}_mv'.format(days=days)
             )
             session.commit()
@@ -2082,13 +2165,13 @@ def update_collection_user_stats():
     session = create_session()
 
     try:
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_users_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY collection_users_mv')
         session.commit()
 
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY collection_user_count_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY collection_user_count_mv')
         session.commit()
 
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY users_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY users_mv')
         session.commit()
 
         return flaskify(oto_response.Response('Collection User Stats Updated'))
@@ -2144,7 +2227,7 @@ def refresh_drops_views():
     start_time = time.time()
     session = create_session()
     try:
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY drop_claim_counts_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY drop_claim_counts_mv')
         session.commit()
     except SQLAlchemyError as err:
         log_error('refresh_drops_views: {}'.format(err))
@@ -2170,10 +2253,10 @@ def refresh_recently_sold():
     start_time = time.time()
     session = create_session()
     try:
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_hour_mv')
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_day_mv')
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_week_mv')
-        session.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_month_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_hour_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_day_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_week_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY recently_sold_month_mv')
         session.commit()
     except SQLAlchemyError as err:
         log_error('refresh_recently_sold: {}'.format(err))
@@ -2207,7 +2290,8 @@ def load_chronicle_transactions():
             start_full_time = time.time()
             start = time.time()
 
-            txs = session.execute(
+            txs = execute_sql(
+                session,
                 'SELECT * FROM chronicle_transactions '
                 'WHERE NOT ingested AND NOT EXISTS (SELECT * FROM handle_fork WHERE forked) '
                 'ORDER BY seq ASC LIMIT 10000 '
@@ -2225,7 +2309,7 @@ def load_chronicle_transactions():
                     min_seq = tx['seq']
                 max_seq = tx['seq']
                 start = time.time()
-                forked = session.execute('SELECT * FROM handle_fork').first()
+                forked = execute_sql(session, 'SELECT * FROM handle_fork').first()
 
                 if isForked:
                     isForked = forked['forked']
@@ -2253,7 +2337,7 @@ def load_chronicle_transactions():
                 parse_time = parse_action(session, action)
 
                 action_measure_god['parse_time'] = action_measure_god['parse_time'] + parse_time
-                session.execute(
+                execute_sql(session, 
                     'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :max_seq', {'max_seq': max_seq}
                 )
 
@@ -2277,7 +2361,7 @@ def load_chronicle_transactions():
             isStopped = True
         except Exception as err:
             log_error('load_chronicle_transactions: {}'.format(err))
-            session.execute(
+            execute_sql(session, 
                 'INSERT INTO error_transactions SELECT * FROM chronicle_transactions WHERE seq = :seq',
                 {'seq': max_seq}
             )

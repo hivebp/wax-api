@@ -1,6 +1,7 @@
 import json
 import time
 
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from api import cache, logging, db
@@ -76,7 +77,7 @@ def add_trend(res):
 def user_stats(user):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(session, 
             'SELECT owner as user_name, wax_value, usd_value, num_assets, image, '
             'SUM(s.wax_volume_all_time + b.wax_volume_all_time) AS wax_volume_all_time, '
             'SUM(s.usd_volume_all_time + b.usd_volume_all_time) AS usd_volume_all_time, '
@@ -129,7 +130,7 @@ def user_stats(user):
 def collection_stats(collection):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(session, 
             'SELECT num_users, wax_value, usd_value, num_assets  '
             'FROM collection_user_count_mv '
             'WHERE collection = :collection',
@@ -162,7 +163,7 @@ def collection_stats(collection):
 def get_user_info(user):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(session, 
             'SELECT owner as user_name, wax_value, usd_value, num_assets, image '
             'FROM users_mv '
             'LEFT JOIN user_pictures_mv up ON owner = user_name '
@@ -194,12 +195,20 @@ def get_user_info(user):
         session.remove()
 
 
+def execute_sql(session, sql, args=None):
+    res = session.execute(text(sql), args)
+    mappings = res.mappings()
+    mappings.rowcount = res.rowcount
+    return mappings
+
+
 @cache.memoize(timeout=300)
 def get_monthly_volume(collection, days, type):
     session = create_session()
 
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT to_date, SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
             'FROM monthly_collection_volume_mv WHERE TRUE {type_clause} {date_clause} {collection_clause} '
             'GROUP BY 1 ORDER BY 1 ASC'.format(
@@ -255,7 +264,8 @@ def get_users_table(days, collection, actor, type, term):
         users = []
 
         if actor == 'all':
-            total_result = session.execute(
+            total_result = execute_sql(
+                session,
                 'SELECT MAX(actors) AS total_results '
                 'FROM ('
                 'SELECT COUNT(DISTINCT seller) AS actors '
@@ -318,7 +328,8 @@ def get_users_table(days, collection, actor, type, term):
                 )
             )
 
-            user_results = session.execute(
+            user_results = execute_sql(
+                session,
                 sql, {
                     'interval': '{} days'.format(days), 'collection': collection, 'term': term, 'actor': actor,
                     'type': type
@@ -346,7 +357,8 @@ def get_users_table(days, collection, actor, type, term):
                     }
                 )
         else:
-            total_result = session.execute(
+            total_result = execute_sql(
+                session,
                 'SELECT COUNT(1) AS total_results '
                 'FROM {table} tb '
                 'WHERE TRUE {collection_clause} {type_clause} '.format(
@@ -377,7 +389,8 @@ def get_users_table(days, collection, actor, type, term):
                 )
             )
 
-            user_results = session.execute(
+            user_results = execute_sql(
+                session,
                 sql, {
                     'interval': '{} days'.format(days), 'collection': collection, 'term': term, 'actor': actor,
                     'type': type
@@ -412,7 +425,8 @@ def get_users_table(days, collection, actor, type, term):
 def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all'):
     session = create_session()
     try:
-        sales_volume = session.execute(
+        sales_volume = execute_sql(
+            session,
             'SELECT date, SUM(price) AS volume, SUM(usd_price) AS usdVolume, SUM(sales) AS sales '
             'FROM {template}sales_by_date t '
             'WHERE TRUE {date_clause}{collection_clause}{type_clause}{template_clause}'
@@ -469,7 +483,8 @@ def get_sales_volume_graph(days=60, template_id=None, collection=None, type='all
             )
         )
 
-        sales_volume = session.execute(
+        sales_volume = execute_sql(
+            session,
             sql, {
                 'interval': '{} days'.format(days),
                 'collection': collection,
@@ -508,14 +523,16 @@ def get_drops_table(days, limit, offset):
         if days and days != '0':
             table = 'volume_drop_{days}_days_mv'.format(days=days)
 
-        total_result = session.execute(
+        total_result = execute_sql(
+            session,
             'SELECT COUNT(1) AS total_results '
             'FROM {table} tb '.format(
                 table=table
             )
         ).first()
 
-        drops_result = session.execute(
+        drops_result = execute_sql(
+            session,
             'SELECT dv.drop_id, dv.market, d.display_data, d.collection, cn.name AS display_name, '
             'ci.image AS collection_image, wax_volume, usd_volume, buyers, sales AS claims, '
             'json_agg(json_build_object(\'template_id\', t.template_id, \'data\', td.data)) AS template_data, '
@@ -600,7 +617,8 @@ def get_template_table(days, collection, limit, offset):
         if days and days != '0' and int(days) == 1:
             table = 'volume_template_{days}_days_mv'.format(days=days)
 
-        total_result = session.execute(
+        total_result = execute_sql(
+            session,
             'SELECT COUNT(1) AS total_results '
             'FROM {table} tb '
             'WHERE TRUE {collection_clause} AND tb.collection NOT IN ('
@@ -612,7 +630,8 @@ def get_template_table(days, collection, limit, offset):
             }
         ).first()
 
-        template_results = session.execute(
+        template_results = execute_sql(
+            session,
             'SELECT wax_volume, usd_volume, '
             '(SELECT wax_volume FROM volume_template_1_days_mv WHERE template_id = t.template_id) AS volume_1_day, '
             '(SELECT wax_volume FROM volume_template_2_days_mv WHERE template_id = t.template_id) AS volume_2_days, '
@@ -682,7 +701,8 @@ def get_template_table(days, collection, limit, offset):
 def get_top_sales_table(days, collection, template_id, limit, offset):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT wax_price, usd_price, buyer, seller, ct.transaction_id AS buy_transaction_id, t.collection, '
             'cn.name, ci.image as collection_image, CASE WHEN taker IS NULL THEN market ELSE taker END AS market, '
             'ROW_NUMBER() OVER (ORDER BY usd_price DESC) AS rank, '
@@ -745,17 +765,21 @@ def get_top_sales_table(days, collection, template_id, limit, offset):
 def get_attribute_asset_analytics_schema(asset_id, collection, schema):
     session = create_session()
     try:
-        res = session.execute(
-            'SELECT asu.total, asu.total_schema, af.*, att.*, t.idata, c.name AS display_name, a.rank, a.rarity_score, '
-            'c.image AS collection_image, t.template_id, t.category '
+        res = execute_sql(
+            session,
+            'SELECT asu.total, asu.total_schema, af.*, att.*, td.data AS idata, cn.name AS display_name, a.rank, '
+            'a.rarity_score, ci.image AS collection_image, t.template_id, t.schema '
             'FROM pfp_assets a '
             'LEFT JOIN templates t USING (template_id) '
+            'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
             'LEFT JOIN collections c ON t.collection = c.collection '
-            'INNER JOIN attribute_summaries asu ON attribute_id = ANY(a.attribute_ids) '
+            'LEFT JOIN names cn ON c.name_id = cn.name_id '
+            'LEFT JOIN images ci ON c.image_id = ci.image_id '
+            'INNER JOIN attribute_stats asu ON attribute_id = ANY(a.attribute_ids) '
             'LEFT JOIN attribute_floors_mv af USING(attribute_id) '
             'LEFT JOIN attributes att USING(attribute_id) '
             'WHERE a.collection = :collection AND a.schema = :schema {asset_clause}'.format(
-                asset_clause=' AND a.asset_id = :asset_id' if asset_id else ' AND a.asset_id = (SELECT asset_id FROM attribute_assets WHERE author = :collection AND schema = :schema AND rank = 1 LIMIT 1) '
+                asset_clause=' AND a.asset_id = :asset_id' if asset_id else ' AND a.asset_id = (SELECT asset_id FROM pfp_assets WHERE author = :collection AND schema = :schema AND rank = 1 LIMIT 1) '
             ), {'collection': collection, 'schema': schema, 'asset_id': asset_id}
         )
 
@@ -808,7 +832,8 @@ def get_pfp_asset_analytics(asset_id, template_id):
     if not asset_id and not template_id:
         return None
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT ast.total, ast.total_schema, af.*, att.*, td.data, cn.name AS display_name, a.rank, a.rarity_score,'
             'ci.image AS collection_image, t.template_id, t.schema '
             'FROM pfp_assets a '
@@ -898,7 +923,8 @@ def get_similar_collections(collection):
             'ORDER BY 4 DESC LIMIT 9'
         )
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             sql, {
                 'collection': collection
             }
@@ -926,7 +952,8 @@ def get_similar_collections(collection):
 def get_attribute_analytics(template_id):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT asu.total, asu.total_schema, af.*, a.*, t.*, c.name AS display_name, c.image AS collection_image '
             'FROM templates t '
             'LEFT JOIN collections c ON t.author = c.collection_name '
@@ -982,7 +1009,8 @@ def get_attribute_analytics(template_id):
 def get_floor(template_id):
     session = create_session()
     try:
-        total_res = session.execute(
+        total_res = execute_sql(
+            session,
             'SELECT COUNT(1) AS total, td.data, t.attribute_ids '
             'FROM templates t '
             'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
@@ -992,7 +1020,8 @@ def get_floor(template_id):
 
         template_data = _parse_data_object(json.loads(total_res['data']))
 
-        template = session.execute(
+        template = execute_sql(
+            session,
             'SELECT td.data, template_id, t.schema, tb.collection, cn.name, ci.image, floor_price '
             'FROM template_floor_prices_mv tb '
             'INNER JOIN collections c USING (collection) '
@@ -1038,7 +1067,8 @@ def get_volume(collection=None, days=1, type=None):
         table = 'volume_collection_{}_days_mv'.format(days)
 
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume '
             'FROM ('
             '   SELECT wax_volume, usd_volume '
@@ -1078,7 +1108,8 @@ def get_buy_volume(user, days=1, type=None):
         table = 'volume_buyer_{}_days_mv'.format(days)
 
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales '
             'FROM {table} '
             'WHERE TRUE {type_clause}{collection_clause} '.format(
@@ -1116,7 +1147,8 @@ def get_sell_volume(user, days=1, type=None):
         table = 'volume_seller_{}_days_mv'.format(days)
 
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, SUM(sales) AS sales '
             'FROM {table} '
             'WHERE TRUE {type_clause}{collection_clause} '.format(
@@ -1148,7 +1180,8 @@ def get_change(collection=None, type=None):
     session = create_session()
 
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT SUM(wax_volume_1_day) AS wax_volume_1_day, '
             'SUM(wax_volume_2_days) - SUM(wax_volume_1_day) AS prev_wax_volume '
             'FROM ('
@@ -1186,7 +1219,8 @@ def get_market_cap(collection):
     session = create_session()
 
     try:
-        mcap = session.execute(
+        mcap = execute_sql(
+            session,
             'SELECT SUM(wax_market_cap) AS wax_market_cap, SUM(usd_market_cap) AS usd_market_cap '
             'FROM collection_market_cap_mv WHERE TRUE {collection_clause}'.format(
                 collection_clause=' AND collection = :collection ' if collection and collection != '*' else ''
@@ -1233,7 +1267,8 @@ def get_top_template_sales(days, template_id, limit, offset):
             'WHERE template_id = :template_id LIMIT 1'
         )
 
-        total_res = session.execute(
+        total_res = execute_sql(
+            session,
             total_sql,
             {'template_id': template_id}
         )
@@ -1264,7 +1299,7 @@ def get_top_template_sales(days, template_id, limit, offset):
             )
         )
 
-        res = session.execute(sql, {
+        res = execute_sql(session, sql, {
             'interval': '{} days'.format(days), 'limit': limit, 'offset': offset,
             'template_id': template_id, 'attribute_id': attribute_id
         })
@@ -1316,7 +1351,8 @@ def get_top_template_sales(days, template_id, limit, offset):
 def get_top_sales_table(days, collection, limit, offset):
     session = create_session()
     try:
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT wax_price, usd_price, buyer, seller, ct.transaction_id AS buy_transaction_id, t.collection, '
             'cn.name AS display_name, '
             'ci.image AS collection_image, '
@@ -1454,7 +1490,8 @@ def get_market_table(days, collection, type):
             )
         )
 
-        market_results = session.execute(
+        market_results = execute_sql(
+            session,
             sql, {
                 'type': type,
                 'collection': collection
@@ -1498,7 +1535,8 @@ def get_collection_volume_graph(days, topx, type, collection):
     try:
         collections = {}
 
-        top_collections = session.execute(
+        top_collections = execute_sql(
+            session,
             'SELECT a.collection, n.name AS collection_name '
             'FROM collection_sales_by_date_mv a '
             'LEFT JOIN collections c USING (collection) '
@@ -1532,7 +1570,8 @@ def get_collection_volume_graph(days, topx, type, collection):
         if len(top_x_collections) == 0:
             return volumes
 
-        res = session.execute(
+        res = execute_sql(
+            session,
             'SELECT SUM(wax_volume) AS wax_volume, SUM(usd_volume) AS usd_volume, to_date AS date, '
             'CASE WHEN t.collection NOT IN :top THEN \'others\' ELSE t.collection END as collection '
             'FROM collection_sales_by_date_mv t '
@@ -1649,7 +1688,8 @@ def get_collection_table(days, type, term, verified):
             )
         )
 
-        collection_results = session.execute(
+        collection_results = execute_sql(
+            session,
             sql, {
                 'full_interval': '{} days'.format(int(days) * 2),
                 'interval': '{} days'.format(days),
@@ -1704,7 +1744,8 @@ def get_number_of_assets(user, collection):
     session = create_session()
     table = 'collection_assets_mv'
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT SUM(num_assets) AS num_assets, SUM(wax_value) AS wax_value, SUM(usd_value) AS usd_value '
             'FROM collection_users_mv '
             'WHERE TRUE {collection_clause} {user_clause}'.format(
@@ -1730,7 +1771,8 @@ def get_number_of_assets(user, collection):
 def get_number_of_users(collection):
     session = create_session()
     try:
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT COUNT(1) AS num_users FROM collection_users_mv '
             'WHERE collection = :collection',
             {'collection': collection}
@@ -1755,7 +1797,8 @@ def get_price_history(asset_id=None, template_id=None):
     session = create_session()
     try:
         if asset_id:
-            template_res = session.execute(
+            template_res = execute_sql(
+                session,
                 'SELECT template_id FROM assets WHERE asset_id = :asset_id', {
                     'asset_id': asset_id
                 }
@@ -1766,7 +1809,8 @@ def get_price_history(asset_id=None, template_id=None):
             else:
                 return {'priceHistory': []}
 
-        result = session.execute(
+        result = execute_sql(
+            session,
             'SELECT wax_volume / sales as wax_price, usd_volume / sales as usd_price, sales, to_date '
             'FROM template_collection_sales_by_date_mv t '
             'WHERE {template_clause} '
@@ -1849,7 +1893,8 @@ def get_newest_sales():
             'ORDER BY t.seq DESC limit 10'
         )
 
-        sales_results = session.execute(
+        sales_results = execute_sql(
+            session,
             sql
         )
 
