@@ -431,6 +431,73 @@ def collection_fee(collection):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/api/auctions')
+@catch_and_respond()
+def auctions():
+    term = request.args.get('term')
+    owner = request.args.get('seller')
+    market = request.args.get('market')
+    collection = request.args.get('collection')
+    schema = request.args.get('schema')
+    limit = int(request.args.get('limit', 40))
+    offset = int(request.args.get('offset', 0))
+    min_mint = int(request.args.get('min_mint', 0))
+    max_mint = int(request.args.get('max_mint', 0))
+    min_price = int(request.args.get('min_price', 0))
+    max_price = int(request.args.get('max_price', 0))
+    recently_sold = request.args.get('recent')
+    verified = request.args.get('verified', 'verified')
+    favorites = request.args.get('favorites', 'false') == 'true'
+    contract = request.args.get('contract')
+    user = request.args.get('user', '')
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
+    exact_search = request.args.get('exact_search') == 'true'
+    search_type = request.args.get('search_type') if request.args.get('search_type') else ''
+    attributes = request.args.get('attributes', None)
+    only = request.args.get('only', None)
+    rwax_symbol = request.args.get('rwax_symbol', None)
+    rwax_contract = request.args.get('rwax_contract', None)
+
+    if collection:
+        collection = _format_collection(collection)
+
+    if min_price:
+        try:
+            min_price = float(min_price)
+        except Exception as err:
+            min_price = None
+    if max_price:
+        try:
+            max_price = float(max_price)
+        except Exception as err:
+            max_price = None
+    if min_mint:
+        try:
+            min_mint = int(min_mint)
+        except Exception as err:
+            min_mint = None
+    if max_mint:
+        try:
+            max_mint = int(max_mint)
+        except Exception as err:
+            max_mint = None
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 100
+    else:
+        limit = 100
+
+    search_res = logic.auctions(
+        term, owner, market, collection, schema, limit, order_by,
+        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
+        user, favorites, recently_sold, attributes, only, rwax_symbol, rwax_contract
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/listings')
 @catch_and_respond()
 def listings():

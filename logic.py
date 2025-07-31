@@ -2150,7 +2150,7 @@ def auctions(
             'SELECT au.sale_id, au.market, au.seller, au.timestamp, au.listing_id, au.currency, col.verified, '
             'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, array_agg(asset_ids) AS assets '
             'FROM auctions au '
-            'LEFT JOIN listings_helper_mv h USING (sale_id) '
+            'LEFT JOIN auctions_helper_mv h USING (auction_id) '
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
@@ -2170,9 +2170,9 @@ def auctions(
         )
 
         source_clause = (
-            'filtered_listings l2 '
-            'INNER JOIN listings l USING (sale_id) '
-            'LEFT JOIN listings_helper_mv h USING (sale_id) '
+            'filtered_auctions l2 '
+            'INNER JOIN auctions au USING (auction_id) '
+            'LEFT JOIN auctions_helper_mv h USING (auction_id) '
             'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
@@ -2195,30 +2195,16 @@ def auctions(
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
         )
         columns_clause = (
-            'l.market, l.seller, l.timestamp AS timestamp, l.listing_id, l.currency, l.sale_id, col.verified, '
-            'col.blacklisted, l.maker, l.collection, l.price, ci.image as collection_image, cn.name AS display_name, '
-            '(SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
+            'au.market, au.seller, au.timestamp AS timestamp, au.listing_id, au.currency, au.auction_id, '
+            'col.verified, col.blacklisted, au.maker, au.collection, au.price, ci.image as collection_image, '
+            'cn.name AS display_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
             '{badges_object}, {tags_obj}, {assets_object} '.format(
-                badges_object=_get_badges_object('l.'),
-                tags_obj=_get_tags_object('l.'),
+                badges_object=_get_badges_object('au.'),
+                tags_obj=_get_tags_object('au.'),
                 assets_object=_get_assets_object()
             )
         )
         group_clause = ' '
-        if search_type == 'packs':
-            search_clause += (
-                ' AND EXISTS (SELECT template_id FROM packs p WHERE template_id = a.template_id) '
-            )
-        elif search_type == 'below_average':
-            search_clause += (
-                ' AND ts.avg_wax_price IS NOT NULL and l.estimated_wax_price < ts.avg_wax_price ')
-        elif search_type == 'below_last_sold':
-            search_clause += (
-                ' AND ts.last_sold_wax IS NOT NULL and l.estimated_wax_price < ts.last_sold_wax ')
-        elif search_type == 'floor':
-            search_clause += (
-                ' AND l.estimated_wax_price = fp.floor_price '
-            )
 
         if verified == 'verified':
             search_clause += ' AND col.verified '
@@ -2280,9 +2266,7 @@ def auctions(
             )
             format_dict['max_price'] = max_price
         if user:
-            if search_type == 'bulk_buy':
-                search_clause += ' AND l.seller != :user '
-            elif search_type in ['missing', 'floor_missing']:
+            if search_type in ['missing', 'floor_missing']:
                 with_clause = (
                     ', my_assets AS ( '
                     'SELECT template_id FROM '
@@ -2298,10 +2282,11 @@ def auctions(
                     '   WHERE staker = :user AND NOT burned AND a.template_id > 0'
                     ') a '
                     'GROUP BY 1) '
-                    ', filtered_listings AS ('
-                    'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
-                    'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
-                    'FROM listings l '
+                    ', filtered_auctions AS ('
+                    'SELECT au.auction_id, au.market, au.seller, au.timestamp, au.currency, col.verified, '
+                    'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, l.collection, '
+                    'array_agg(asset_ids) AS assets '
+                    'FROM auctions au '
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
                     '{join_clause} '
@@ -2310,7 +2295,7 @@ def auctions(
                     'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
-                    'LEFT JOIN collections col ON (col.collection = l.collection) '
+                    'LEFT JOIN collections col ON (col.collection = au.collection) '
                     'LEFT JOIN templates t ON (t.template_id = a.template_id) '
                     'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
                     'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '

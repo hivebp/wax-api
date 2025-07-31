@@ -1389,7 +1389,7 @@ def load_atomic_market_auct(session, transaction):
     new_sale['market'] = 'atomicmarket'
     new_sale['start_bid'] = float(data['starting_bid'].split(' ')[0])
     new_sale['end_time'] = datetime.datetime.fromtimestamp(data['end_time'], tz=pytz.UTC)
-    new_sale['current_bid'] = float(0)
+    new_sale['current_bid'] = new_sale['start_bid']
     new_sale['currency'] = data['starting_bid'].split(' ')[1]
     new_sale['maker'] = data['maker_marketplace'] if data['maker_marketplace'] else None
 
@@ -1398,14 +1398,16 @@ def load_atomic_market_auct(session, transaction):
         'INSERT INTO auction_logs  '
         'SELECT :auction_id, :asset_ids, :seller, :end_time, :start_bid, :current_bid, :currency, :maker, :market, '
         'FALSE, :seq, :block_num, :timestamp '
-        'WHERE NOT EXISTS (SELECT seq FROM auction_logs WHERE seq = :seq)', new_sale
+        'WHERE NOT EXISTS (SELECT seq FROM auction_logs WHERE seq = :seq)',
+        new_sale
     )
 
     session_execute_logged(
         session,
         'INSERT INTO auctions  '
         'SELECT * FROM auction_logs WHERE seq = :seq '
-        'AND NOT EXISTS (SELECT seq FROM auctions WHERE seq = :seq)', new_sale
+        'AND NOT EXISTS (SELECT seq FROM auctions WHERE seq = :seq)',
+        new_sale
     )
 
 
