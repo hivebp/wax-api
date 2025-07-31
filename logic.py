@@ -2067,7 +2067,7 @@ def listings(
 
 
 def auctions(
-    term=None, owner=None, market=None, collection=None, schema=None, limit=100, order_by='name_asc',
+    term=None, owner=None, bidder=None, collection=None, schema=None, limit=100, order_by='name_asc',
     exact_search=False, search_type='listings', min_price=None, max_price=None, min_mint=None, max_mint=None,
     contract=None, offset=0, verified='verified', user='', favorites=False, recently_sold=None,
     attributes=None, only=False, rwax_symbol=None, rwax_contract=None
@@ -2147,25 +2147,25 @@ def auctions(
 
         with_clause += (
             ', filtered_auctions AS ('
-            'SELECT au.sale_id, au.market, au.seller, au.timestamp, au.listing_id, au.currency, col.verified, '
+            'SELECT au.auction_id, au.bidder, au.seller, au.timestamp, au.currency, col.verified, '
             'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, array_agg(asset_ids) AS assets '
             'FROM auctions au '
             'LEFT JOIN auctions_helper_mv h USING (auction_id) '
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
-            'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
-            'LEFT JOIN collections col ON (col.collection = l.collection) '
+            'LEFT JOIN collections col ON (col.collection = a.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
             'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) ' 
             'WHERE TRUE {search_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, estimated_wax_price '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 '
             '{group_clause} {order_clause} {limit_clause}) '
         )
 
@@ -2177,9 +2177,9 @@ def auctions(
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
-            'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
-            'LEFT JOIN collections col ON (col.collection = l.collection) '
+            'LEFT JOIN collections col ON (col.collection = a.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
@@ -2195,7 +2195,7 @@ def auctions(
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
         )
         columns_clause = (
-            'au.market, au.seller, au.timestamp AS timestamp, au.listing_id, au.currency, au.auction_id, '
+            'au.bidder, au.seller, au.timestamp AS timestamp, au.listing_id, au.currency, au.auction_id, '
             'col.verified, col.blacklisted, au.maker, au.collection, au.price, ci.image as collection_image, '
             'cn.name AS display_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
             '{badges_object}, {tags_obj}, {assets_object} '.format(
@@ -2251,18 +2251,18 @@ def auctions(
 
         if min_price and max_price:
             search_clause += (
-                ' AND estimated_wax_price BETWEEN :min_price AND :max_price '
+                ' AND au.current_bid BETWEEN :min_price AND :max_price '
             )
             format_dict['min_price'] = min_price
             format_dict['max_price'] = max_price
         elif min_price:
             search_clause += (
-                ' AND estimated_wax_price >= :min_price '
+                ' AND au.current_bid >= :min_price '
             )
             format_dict['min_price'] = min_price
         elif max_price:
             search_clause += (
-                ' AND estimated_wax_price <= :max_price '
+                ' AND au.current_bid <= :max_price '
             )
             format_dict['max_price'] = max_price
         if user:
@@ -2283,7 +2283,7 @@ def auctions(
                     ') a '
                     'GROUP BY 1) '
                     ', filtered_auctions AS ('
-                    'SELECT au.auction_id, au.market, au.seller, au.timestamp, au.currency, col.verified, '
+                    'SELECT au.auction_id, au.bidder, au.seller, au.timestamp, au.currency, col.verified, '
                     'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, l.collection, '
                     'array_agg(asset_ids) AS assets '
                     'FROM auctions au '
@@ -2302,7 +2302,7 @@ def auctions(
                     'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
                     'LEFT JOIN names n ON (a.name_id = n.name_id) '
                     'WHERE a.template_id > 0 AND ma.template_id IS NULL '
-                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
+                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 '
                     '{group_clause} {order_clause} {limit_clause}) '
                 )
 
@@ -2310,75 +2310,25 @@ def auctions(
                     'LEFT JOIN my_assets ma ON a.template_id = ma.template_id '
                 )
                 if search_type == 'floor_missing':
-                    search_clause += ' AND fp.floor_price = estimated_wax_price '
-            elif search_type == 'owned_lower_mints':
-                with_clause = (
-                    ', my_assets AS ( '
-                    '    SELECT template_id, MIN(mint) AS mint FROM '
-                    '    ('
-                    '        SELECT a1.template_id, MIN(mint) AS mint FROM assets a1 '
-                    '        WHERE owner = :user AND a1.template_id IS NOT NULL AND a1.mint IS NOT NULl '
-                    '        AND NOT burned GROUP BY 1 '
-                    '        UNION '
-                    '        SELECT a2.template_id, MIN(a2.mint) AS mint FROM listings a1 '
-                    '        INNER JOIN assets a2 ON asset_id = asset_ids[1] '
-                    '        WHERE seller = :user AND a2.template_id IS NOT NULL AND a2.mint IS NOT NULL '
-                    '        AND NOT burned GROUP BY 1 ' 
-                    '        UNION '
-                    '        SELECT a1.template_id, MIN(mint) AS mint FROM stakes rs '
-                    '        INNER JOIN assets a1 USING(asset_id) '
-                    '        WHERE staker = :user AND a1.template_id IS NOT NULL AND a1.mint IS NOT NULL '
-                    '        AND NOT burned GROUP BY 1 '
-                    '   ) a '
-                    'GROUP BY 1 ORDER BY 1 ASC) '
-                    ', filtered_listings AS ('
-                    'SELECT l.sale_id, l.market, l.seller, l.timestamp, l.listing_id, l.currency, col.verified, '
-                    'col.blacklisted, l.maker, l.collection, l.price, l.collection, array_agg(asset_ids) AS assets '
-                    'FROM listings l '
-                    'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
-                    'LEFT JOIN my_assets ma USING (template_id) '
-                    '{join_clause} '
-                    'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
-                    'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
-                    'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
-                    'LEFT JOIN collections col ON (col.collection = l.collection) '
-                    'LEFT JOIN templates t ON (t.template_id = a.template_id) '
-                    'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
-                    'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
-                    'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
-                    'LEFT JOIN names n ON (a.name_id = n.name_id) '
-                    'WHERE a.mint < ma.mint {search_clause} '
-                    'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, estimated_wax_price '
-                    '{group_clause} {order_clause} {limit_clause}) '
-                )
-        if market:
-            format_dict['market'] = '{}'.format(market.lower().strip())
-            search_clause += ' AND l.market = :market '
+                    search_clause += ' AND fp.floor_price => au.current_bid '
         if owner:
             format_dict['owner'] = '{}'.format(owner.lower().strip())
             if search_type == 'my_exp_auctions':
                 search_clause += ' AND a.owner = \'atomicmarket\' AND au.seller = :owner AND au.bidder IS NULL '
             elif search_type == 'my_auctions':
-                search_clause += (
-                    ' AND (a1.asset_id, a1.listing_id, a1.transaction_id) IN ('
-                    '     SELECT asset_id, listing_id, transaction_id FROM auctions WHERE '
-                    '     asset_id = a1.asset_id AND (bidder = :owner OR seller = :owner) '
-                    ' ) '
-                )
-                search_clause += ' AND a1.mint = max_mint'
+                search_clause += ' AND bidder = :owner OR seller = :owner '
             else:
-                search_clause += ' AND l.seller = :owner '
+                search_clause += ' AND au.seller = :owner '
 
         if order_by == 'rarity_score':
-            order_clause = 'ORDER BY l.collection, h.schema, h.rarity_score {}'.format(order_dir)
-            group_clause += ', l.collection, h.schema, h.rarity_score '
+            order_clause = 'ORDER BY au.collection, h.schema, h.rarity_score {}'.format(order_dir)
+            group_clause += ', au.collection, h.schema, h.rarity_score '
             search_clause += ' AND h.rarity_score IS NOT NULL '
         elif order_by == 'date':
-            order_clause = 'ORDER BY l.seq {}'.format(order_dir)
-            group_clause += ', l.seq '
+            order_clause = 'ORDER BY au.seq {}'.format(order_dir)
+            group_clause += ', au.seq '
         elif order_by == 'price':
-            order_clause = 'ORDER BY estimated_wax_price {}'.format(order_dir)
-            group_clause += ', estimated_wax_price '
+            order_clause = 'ORDER BY current_bid {}'.format(order_dir)
         elif order_by == 'mint':
             group_clause += ', h.mint '
             search_clause += ' AND h.mint > 0 '
@@ -2392,7 +2342,7 @@ def auctions(
             group_clause += ', h.template_id '
         elif order_by == 'collection':
             order_clause = (
-                'ORDER BY l.collection {}'
+                'ORDER BY au.collection {}'
             ).format(order_dir)
         elif order_by == 'floor':
             search_clause += ' AND h.floor_price IS NOT NULL '
@@ -2417,7 +2367,7 @@ def auctions(
             'FROM {source_clause} '
             '{join_clause} '
             '{personal_blacklist_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, l.timestamp, f.user_name {group_clause}'
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, au.timestamp, f.user_name {group_clause}'
             '{order_clause}'.format(
                 with_clause=with_clause,
                 columns_clause=columns_clause,

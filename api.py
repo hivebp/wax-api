@@ -436,7 +436,7 @@ def collection_fee(collection):
 def auctions():
     term = request.args.get('term')
     owner = request.args.get('seller')
-    market = request.args.get('market')
+    bidder = request.args.get('bidder')
     collection = request.args.get('collection')
     schema = request.args.get('schema')
     limit = int(request.args.get('limit', 40))
@@ -490,7 +490,7 @@ def auctions():
         limit = 100
 
     search_res = logic.auctions(
-        term, owner, market, collection, schema, limit, order_by,
+        term, owner, bidder, collection, schema, limit, order_by,
         exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
         user, favorites, recently_sold, attributes, only, rwax_symbol, rwax_contract
     )
