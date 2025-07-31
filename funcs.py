@@ -1669,7 +1669,7 @@ def load_atomic_market_sale_start(session, transaction):
         '   asset_ids, collection, seller, market, maker, price, currency, listing_id, seq, block_num, timestamp, '
         '   estimated_wax_price '
         ') '
-        'SELECT asset_ids[:99], collection, seller, \'atomicmarket\', maker, price, currency, listing_id, s.seq, '
+        'SELECT asset_ids[\:99], collection, seller, \'atomicmarket\', maker, price, currency, listing_id, s.seq, '
         's.block_num, s.timestamp, CASE WHEN currency = \'WAX\' THEN price ELSE '
         '(price / (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1)) END '
         'FROM atomicmarket_sale_starts s '
