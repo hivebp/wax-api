@@ -37,9 +37,9 @@ cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 db = SQLAlchemy(app, session_options={'autocommit': False})
 
-import logic
 import stats_v3
 import legacy
+import logic
 import verify
 import pfps
 
