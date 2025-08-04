@@ -615,7 +615,7 @@ def _format_auctions(item):
         'endTime': datetime.datetime.timestamp(item['end_time']),
         'usdWax': item['usd_wax'], 'currency': item['currency'], 'market': item['market'],
         'maker': item['maker'], 'seller': item['seller'], 'auctionId': item['auction_id'],
-        'bids': _format_bids(item['bids']) if item['bids'] else [],
+        'bidder': item['bidder'], 'bids': _format_bids(item['bids']) if item['bids'] else [],
         'collection': {
             'collectionName': item['collection'],
             'displayName': item['display_name'],
@@ -2011,14 +2011,6 @@ def listings(
             format_dict['owner'] = '{}'.format(owner.lower().strip())
             if search_type == 'my_exp_auctions':
                 search_clause += ' AND a.owner = \'atomicmarket\' AND au.seller = :owner AND au.bidder IS NULL '
-            elif search_type == 'my_auctions':
-                search_clause += (
-                    ' AND (a1.asset_id, a1.listing_id, a1.transaction_id) IN ('
-                    '     SELECT asset_id, listing_id, transaction_id FROM auctions WHERE '
-                    '     asset_id = a1.asset_id AND (bidder = :owner OR seller = :owner) '
-                    ' ) '
-                )
-                search_clause += ' AND a1.mint = max_mint'
             else:
                 search_clause += ' AND l.seller = :owner '
 
@@ -2357,7 +2349,13 @@ def auctions(
                     ' AND au.bidder IS NULL AND au.end_time < NOW() '
                 )
             elif search_type == 'my_auctions':
-                search_clause += ' AND bidder = :owner OR seller = :owner '
+                search_clause += (
+                    ' AND ('
+                    '   bidder = :owner '
+                    '   OR (seller = :owner AND au.end_time < NOW() AND bidder IS NULL) '
+                    '   OR (seller = :owner AND au.end_time > NOW())'
+                    ') '
+                )
             else:
                 search_clause += ' AND au.seller = :owner '
 

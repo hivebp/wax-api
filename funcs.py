@@ -1434,7 +1434,7 @@ def load_atomic_market_claim_auct(session, transaction):
     session_execute_logged(
         session,
         'INSERT INTO claimed_auctions '
-        'SELECT auction_id, asset_ids, seller, claimer, market, maker, taker, MAX(bid) AS final_bid, '
+        'SELECT auction_id, asset_ids, seller, claimer, market, maker, taker, MAX(new_bid) AS final_bid, '
         'au.currency, ac.seq, ac.block_num, ac.timestamp '
         'FROM auction_claims ac '
         'LEFT JOIN auction_logs au USING (auction_id, market) '

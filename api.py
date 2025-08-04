@@ -435,7 +435,7 @@ def collection_fee(collection):
 @catch_and_respond()
 def auctions():
     term = request.args.get('term')
-    owner = request.args.get('seller')
+    owner = request.args.get('owner')
     bidder = request.args.get('bidder')
     collection = request.args.get('collection')
     schema = request.args.get('schema')
