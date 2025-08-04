@@ -1369,7 +1369,7 @@ def load_atomic_market_auct_bid(session, transaction):
 
     session_execute_logged(
         session,
-        'UPDATE auctions SET current_bid = :bid, bidder = :biider, currency = :currency '
+        'UPDATE auctions SET current_bid = :bid, bidder = :bidder, currency = :currency '
         'WHERE auction_id = :auction_id AND market = \'atomicmarket\'',
         new_sale
     )
