@@ -155,8 +155,9 @@ def _get_assets_object():
 
 def _get_auction_bids_object():
     return (
-        '(SELECT array_agg(json_build_object(\'bidder\', ab.bidder, \'bid\', bid, \'currency\', ab.currency, '
-        '\'taker\', taker, \'timestamp\', ab.timestamp)) FROM auction_bids ab WHERE auction_id = au.auction_id) AS bids'
+        '(SELECT array_agg(json_build_object(\'bidder\', ab.new_bidder, \'bid\', new_bid, \'currency\', '
+        'ab.new_currency, \'taker\', taker, \'timestamp\', ab.timestamp)) FROM auction_bids ab '
+        'WHERE auction_id = au.auction_id) AS bids'
     )
 
 

@@ -1363,7 +1363,7 @@ def load_atomic_market_auct_bid(session, transaction):
         session,
         'INSERT INTO auction_bids '
         'SELECT :auction_id, :bidder, bidder, :bid, current_bid, :currency, currency, :taker, \'atomicmarket\', :seq, '
-        ':block_num, :timestamp FROM auctions WHERE auction_id = :auction_id ',
+        ':block_num, :timestamp FROM auctions WHERE auction_id = :auction_id '
         'WHERE NOT EXISTS (SELECT seq FROM auction_bids WHERE seq = :seq)', new_sale
     )
 
