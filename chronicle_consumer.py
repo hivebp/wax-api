@@ -113,6 +113,25 @@ def handle_atomicassets_updates_reversed(session, block_num):
             raise err
 
 
+def handle_auction_bids_reversed(session, block_num):
+    reverse_trxs = session.execute(
+        'SELECT * FROM auction_bids_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        session.execute(
+            'UPDATE auctions SET bidder = :old_bidder, current_bid = :old_bid, currency = :old_currency '
+            'WHERE auction_id = :auction_id',
+            {
+                'auction_id': trx['auction_id'],
+                'old_bidder': trx['old_bidder'],
+                'old_bid': trx['old_bid'],
+                'old_currency': trx['old_currency']
+            }
+        )
+
+
 def handle_craft_erase_updates_reversed(session, block_num):
     reverse_trxs = session.execute(
         'SELECT * FROM craft_erase_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
@@ -572,6 +591,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         handle_atomicassets_burns_reversed(session, block_num)
         handle_atomicassets_updates_reversed(session, block_num)
+        handle_auction_bids_reversed(session, block_num)
         handle_craft_erase_updates_reversed(session, block_num)
         handle_craft_ready_updates_reversed(session, block_num)
         handle_craft_times_updates_reversed(session, block_num)
