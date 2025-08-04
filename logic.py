@@ -153,17 +153,24 @@ def _get_assets_object():
     )
 
 
+def _get_auction_bids_object():
+    return (
+        '(SELECT array_agg(json_build_object(\'bidder\', ab.bidder, \'bid\', bid, \'currency\', ab.currency, '
+        '\'taker\', taker, \'timestamp\', ab.timestamp)) FROM auction_bids ab WHERE auction_id = au.auction_id) AS bids'
+    )
+
+
 def _get_badges_object(prefix='a.'):
     return (
         '(SELECT array_agg(json_build_object(\'name\', b.name, \'level\', b.level, \'value\', b.value, '
-        '\'timestamp\', b.timestamp)) FROM badges b WHERE collection = {}collection) AS badges '.format(prefix)
+        '\'timestamp\', b.timestamp)) FROM badges b WHERE collection = {}collection) AS badges'.format(prefix)
     )
 
 
 def _get_tags_object(prefix='a.'):
     return (
         '(SELECT array_agg(json_build_object(\'tag_id\', tg.tag_id, \'tag_name\', tg.tag_name)) '
-        'FROM tags_mv tg WHERE collection = {}collection) AS tags '.format(prefix)
+        'FROM tags_mv tg WHERE collection = {}collection) AS tags'.format(prefix)
     )
 
 
@@ -176,7 +183,7 @@ def _get_attributes_object():
         'FROM assets '
         'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
         'LEFT JOIN attribute_stats USING(attribute_id) '
-        'WHERE asset_id = a.asset_id) '
+        'WHERE asset_id = a.asset_id)'
     )
 
 
@@ -587,6 +594,36 @@ def _format_assets_object(items):
             assets.append(asset)
 
     return assets
+
+
+def _format_bids(items):
+    bids = []
+
+    for item in items:
+        if item['bidder']:
+            bids.append(item)
+
+    return bids
+
+
+def _format_auctions(item):
+    return {
+        'date': item['timestamp'].strftime(DATE_FORMAT_STRING),
+        'timestamp': datetime.datetime.timestamp(item['timestamp']),
+        'startBid': item['start_bid'], 'currentBid': item['current_bid'],
+        'endTime': datetime.datetime.timestamp(item['end_time']),
+        'usdWax': item['usd_wax'], 'currency': item['currency'], 'market': item['market'],
+        'maker': item['maker'], 'seller': item['seller'], 'auctionId': item['auction_id'],
+        'bids': _format_bids(item['bids']) if item['bids'] else [],
+        'collection': {
+            'collectionName': item['collection'],
+            'displayName': item['display_name'],
+            'collectionImage': item['collection_image'],
+            'verification': item['verified'],
+            'blacklisted': item['blacklisted']
+        },
+        'assets': _format_assets_object(item['assets'])
+    }
 
 
 def _format_listings(item):
@@ -2147,25 +2184,25 @@ def auctions(
 
         with_clause += (
             ', filtered_auctions AS ('
-            'SELECT au.auction_id, au.bidder, au.seller, au.timestamp, au.currency, col.verified, '
+            'SELECT au.auction_id, au.bidder, au.seller, au.timestamp, au.currency, col.verified, au.end_time, '
             'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, array_agg(asset_ids) AS assets '
             'FROM auctions au '
             'LEFT JOIN auctions_helper_mv h USING (auction_id) '
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
-            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (au.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
             '{join_clause}'
-            'LEFT JOIN collections col ON (col.collection = a.collection) '
+            'LEFT JOIN collections col ON (col.collection = au.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
             'LEFT JOIN template_floor_prices_mv fp ON (fp.template_id = a.template_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) ' 
             'WHERE TRUE {search_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 '
             '{group_clause} {order_clause} {limit_clause}) '
         )
 
@@ -2177,9 +2214,9 @@ def auctions(
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
-            'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
+            'LEFT JOIN rwax_tokens rt ON (au.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
-            'LEFT JOIN collections col ON (col.collection = a.collection) '
+            'LEFT JOIN collections col ON (col.collection = au.collection) '
             'LEFT JOIN templates t ON (t.template_id = a.template_id) '
             'LEFT JOIN template_stats_mv ts ON (a.template_id = ts.template_id) '
             'LEFT JOIN templates_minted_mv tm ON (a.template_id = tm.template_id) '
@@ -2195,13 +2232,15 @@ def auctions(
             'LEFT JOIN data td ON (t.immutable_data_id = td.data_id) '
         )
         columns_clause = (
-            'au.bidder, au.seller, au.timestamp AS timestamp, au.listing_id, au.currency, au.auction_id, '
-            'col.verified, col.blacklisted, au.maker, au.collection, au.price, ci.image as collection_image, '
-            'cn.name AS display_name, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
-            '{badges_object}, {tags_obj}, {assets_object} '.format(
+            'au.bidder, au.seller, au.timestamp AS timestamp, au.currency, au.auction_id, au.market, '
+            'col.verified, col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, au.end_time, '
+            'ci.image as collection_image, cn.name AS display_name, '
+            '(SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
+            '{badges_object}, {tags_obj}, {assets_object}, {auction_bids_object}'.format(
                 badges_object=_get_badges_object('au.'),
                 tags_obj=_get_tags_object('au.'),
-                assets_object=_get_assets_object()
+                assets_object=_get_assets_object(),
+                auction_bids_object=_get_auction_bids_object()
             )
         )
         group_clause = ' '
@@ -2239,8 +2278,6 @@ def auctions(
                 format_dict['rwax_symbol'] = rwax_symbol
         elif only == 'backed':
             search_clause += ' AND ba.amount IS NOT NULL '
-
-        source_clause = source_clause
 
         if contract:
             format_dict['contract'] = contract
@@ -2284,7 +2321,7 @@ def auctions(
                     'GROUP BY 1) '
                     ', filtered_auctions AS ('
                     'SELECT au.auction_id, au.bidder, au.seller, au.timestamp, au.currency, col.verified, '
-                    'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, l.collection, '
+                    'col.blacklisted, au.maker, au.collection, au.start_bid, au.current_bid, au.collection, '
                     'array_agg(asset_ids) AS assets '
                     'FROM auctions au '
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
@@ -2314,11 +2351,17 @@ def auctions(
         if owner:
             format_dict['owner'] = '{}'.format(owner.lower().strip())
             if search_type == 'my_exp_auctions':
-                search_clause += ' AND a.owner = \'atomicmarket\' AND au.seller = :owner AND au.bidder IS NULL '
+                search_clause += (
+                    ' AND a.owner = \'atomicmarket\' AND au.seller = :owner'
+                    ' AND au.bidder IS NULL AND au.end_time < NOW() '
+                )
             elif search_type == 'my_auctions':
                 search_clause += ' AND bidder = :owner OR seller = :owner '
             else:
                 search_clause += ' AND au.seller = :owner '
+
+        if search_type == 'auctions':
+            search_clause += ' AND au.end_time > NOW() '
 
         if order_by == 'rarity_score':
             order_clause = 'ORDER BY au.collection, h.schema, h.rarity_score {}'.format(order_dir)
@@ -2350,6 +2393,10 @@ def auctions(
                 'ORDER BY h.floor_price {}'
             ).format(order_dir)
             group_clause += ', h.floor_price '
+        elif order_by == 'end':
+            order_clause = (
+                'ORDER BY au.end_time {}'
+            ).format(order_dir)
 
         with_clause = with_clause.format(
             search_clause=search_clause,
@@ -2367,8 +2414,8 @@ def auctions(
             'FROM {source_clause} '
             '{join_clause} '
             '{personal_blacklist_clause} '
-            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, au.timestamp, f.user_name {group_clause}'
-            '{order_clause}'.format(
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, f.user_name {group_clause}'
+            '{order_clause} '.format(
                 with_clause=with_clause,
                 columns_clause=columns_clause,
                 source_clause=source_clause,
@@ -2377,7 +2424,8 @@ def auctions(
                 limit_clause=limit_clause,
                 join_clause=join_clause,
                 personal_blacklist_clause=personal_blacklist_clause
-            ))
+            )
+        )
 
         print(sql)
         res = execute_sql(session, sql, format_dict)
@@ -2386,7 +2434,7 @@ def auctions(
 
         for row in res:
             try:
-                result = _format_listings(row)
+                result = _format_auctions(row)
 
                 results.append(result)
             except Exception as e:
