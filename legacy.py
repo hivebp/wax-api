@@ -1553,6 +1553,33 @@ def get_minimal_auction(market, auction_id):
         session.remove()
 
 
+def get_active_sales(sales):
+    session = create_session()
+    try:
+        sale_ids = tuple(map(lambda a: int(a), list(sales)))
+        result = execute_sql(session,
+            'SELECT sale_id FROM listings '
+            'WHERE {sale_id_clause}'.format(
+                sale_id_clause='sale_id IN :sale_ids' if len(sales) > 1 else (
+                    'sale_id = :sale_ids ' if len(sales) == 1 else ''
+                )
+            ),
+            {'sale_ids': sale_ids if len(sale_ids) > 1 else (sale_ids[0] if len(sale_ids) == 1 else '')}
+        )
+
+        available_ids = []
+        for res in result:
+            available_ids.append(res['sale_id'])
+
+        return available_ids
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def get_all_owned(asset_id):
     session = create_session()
     try:

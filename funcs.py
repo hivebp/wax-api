@@ -1786,6 +1786,16 @@ def load_atomic_market_fulfill_template_buyo(session, transaction):
 
     session_execute_logged(
         session,
+        'INSERT INTO sales SELECT array[asset_id], s.collection, seller, buyer, f.price, '
+        'f.price * (SELECT usd FROM usd_prices WHERE timestamp < f.timestamp LIMIT 1), '
+        'f.currency, buyoffer_id, \'atomicmarket\', maker, f.taker, f.seq, f.block_num, f.timestamp '
+        'FROM atomicmarket_fulfill_template_buy_offers f '
+        'INNER JOIN atomicmarket_template_buy_offers s USING (buyoffer_id) '
+        'WHERE f.seq = :seq AND NOT EXISTS (SELECT seq FROM sales WHERE seq = :seq)',
+    )
+
+    session_execute_logged(
+        session,
         'DELETE FROM atomicmarket_template_buy_offers '
         'WHERE buyoffer_id = :buyoffer_id',
         new_sale

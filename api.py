@@ -1411,6 +1411,19 @@ def get_all_owned(asset_id):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+
+@app.route('/legacy/active-sales')
+def get_active_sales():
+    try:
+        sale_ids = request.args.get('sales', None)
+        if sale_ids:
+            sale_ids = sale_ids.split(',')
+        return flaskify(oto_response.Response(legacy.get_active_sales(sale_ids)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
 @app.route('/legacy/collection-crafts/<collection>')
 def get_collection_crafts(collection):
     try:
