@@ -1792,6 +1792,7 @@ def load_atomic_market_fulfill_template_buyo(session, transaction):
         'FROM atomicmarket_fulfill_template_buy_offers f '
         'INNER JOIN atomicmarket_template_buy_offers s USING (buyoffer_id) '
         'WHERE f.seq = :seq AND NOT EXISTS (SELECT seq FROM sales WHERE seq = :seq)',
+        new_sale
     )
 
     session_execute_logged(
