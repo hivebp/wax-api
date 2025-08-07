@@ -914,6 +914,8 @@ def handle_transaction(action, block_num, timestamp, session):
                     'createtoken', 'logtokenize', 'redeem', 'erasetoken', 'setfactors', 'setmaxassets'
                 ]) or (account == 'waxdaobacker' and name in [
                     'logbackasset'
+                ]) or (account == 'nfthivevault' and name in [
+                    'addreward'
                 ])
 
                 if insert_transaction:

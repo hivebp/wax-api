@@ -1459,6 +1459,9 @@ def parse_action(session, action):
         elif account == 'waxdaobacker':
             if name == 'logbackasset':
                 funcs.insert_waxdao_back_action(session, action)
+        elif account == 'nfthivevault':
+            if name == 'addreward':
+                funcs.load_nfthivevault_addreward(session, action)
     except SQLAlchemyError as err:
         log_error('parse_action {}: {}'.format(name, err))
         session.rollback()

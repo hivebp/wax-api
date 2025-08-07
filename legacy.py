@@ -626,6 +626,274 @@ def get_num_crafts(collection):
         session.remove()
 
 
+def get_collection_clause(author, prefix=''):
+    author_clause = ''
+    if author and author != '*':
+        if isinstance(author, tuple):
+            author_clause = ' AND {}collection IN :collection '.format(prefix)
+        else:
+            author_clause = ' AND {}collection = :collection '.format(prefix)
+    return author_clause
+
+
+def get_collection_drops(collection, limit, offset, include_erased):
+    session = create_session()
+    try:
+        author_clause = get_collection_clause(collection, 'd2.')
+
+        search_dict = {'limit': limit, 'offset': offset}
+
+        if collection and collection != '*':
+            search_dict['collection'] = collection
+
+        res = execute_sql(session,
+            'WITH usd_rate AS (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) '
+            'SELECT drop_id, price, currency, fee, '
+            'extract(epoch from start_time AT time zone \'Europe/Berlin\')::bigint AS start_time, '
+            'extract(epoch from end_time AT time zone \'Europe/Berlin\')::bigint AS end_time, '
+            'd2.timestamp, account_limit, is_hidden, '
+            'account_limit_cooldown, max_claimable, '
+            '('
+            '   SELECT SUM(amount) FROM drop_actions da '
+            '   WHERE da.drop_id = d2.drop_id AND da.contract = d2.contract'
+            ') AS num_claimed, c.verified, display_data, '
+            '(SELECT usd FROM usd_rate) as wax_usd, contract, cn.name as collection_name, t.collection, auth_required, '
+            'pd.drop_id AS is_pfp, json_agg(json_build_object('
+            '\'template_id\', template_id, \'schema\', t.schema, \'name\', tn.name, \'image\', ti.image, '
+            '\'max_supply\', t.max_supply, \'idata\', td.data)) templates_to_mint '
+            'FROM drops d2 '
+            'INNER JOIN templates t ON (t.template_id = ANY(d2.templates_to_mint)) '
+            'LEFT JOIN names tn ON t.name_id = tn.name_id '
+            'LEFT JOIN images ti ON t.image_id = ti.image_id '
+            'LEFT JOIN data td ON t.immutable_data_id = td.data_id '
+            'LEFT JOIN pfp_drop_data pd USING(drop_id, contract) '
+            'INNER JOIN collections c ON (d2.collection = c.collection) '
+            'LEFT JOIN names cn ON (cn.name_id = c.name_id) '
+            'WHERE {erased_clause} {author_clause} AND contract = \'nfthivedrops\' '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 '
+            'ORDER BY d2.timestamp DESC LIMIT :limit OFFSET :offset '.format(
+                author_clause=author_clause,
+                erased_clause='NOT erased' if not include_erased else 'TRUE'
+            ),
+            search_dict
+        )
+
+        drops = []
+
+        for drop in res:
+            drops.append(_format_response(drop))
+
+        return drops
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_collection_total_drops(collection):
+    session = create_session()
+    try:
+        author_clause = get_collection_clause(collection, 'd2.')
+
+        search_dict = {}
+
+        if collection and collection != '*':
+            search_dict['collection'] = collection
+
+        res = execute_sql(session,
+            'SELECT COUNT(1) as cnt '
+            'FROM drops d2 '
+            'WHERE NOT erased {author_clause} '
+            'AND contract = \'nfthivedrops\' '.format(author_clause=author_clause),
+            search_dict
+        ).first()
+
+        return {'total': res['cnt']}
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_collection_crafts(collection, limit, offset, include_erased):
+    session = create_session()
+    try:
+        author_clause = get_collection_clause(collection, 'b.')
+
+        search_dict = {'limit': limit, 'offset': offset}
+
+        if collection and collection != '*':
+            search_dict['collection'] = collection
+
+        res = execute_sql(session,
+            'SELECT b.*, b2.outcomes, b2.recipe FROM ('
+            'SELECT craft_id, extract(epoch from unlock_time AT time zone \'Europe/Berlin\')::bigint AS unlock_time, '
+            'b.timestamp, num_crafted, total, display_data, c.verified, '
+            'ci.image AS collection_image, cn.name AS collection_name, b.collection, b.ready, '
+            'array_agg(json_build_object(\'template_id\', outcome_template_id, \'collection\', t1.collection, '
+            '\'image\', t1i.image, \'video\', t1v.video, \'schema\', t1.schema)) AS outcome_templates, '
+            'array_agg(json_build_object(\'template_id\', recipe_template_id, \'collection\', t2.collection, '
+            '\'image\', t2i.image, \'video\', t2v.video, \'schema\', t2.schema)) AS recipe_templates ' 
+            'FROM ('
+            '    SELECT craft_id, unlock_time, timestamp, display_data, collection, ready, (SELECT COUNT(1) '
+            '    FROM craft_actions WHERE craft_id = b.craft_id) AS num_crafted, total, '
+            '    CAST(json_array_elements(outcomes->\'outcomes\')->>\'template_id\' AS bigint) AS outcome_template_id, '
+            '    CAST(json_array_elements(recipe->\'ingredients\')->>\'template_id\' AS bigint) AS recipe_template_id, '
+            '    json_array_elements(outcomes->\'token_outcomes\') AS token_outcomes, '
+            '    json_array_elements(recipe->\'ingredients\')AS token_ingredients '
+            '    FROM crafts b WHERE {erased_clause} {author_clause}'
+            ') b '
+            'LEFT JOIN collections c ON (c.collection = b.collection) '
+            'LEFT JOIN names cn ON (cn.name_id = c.name_id) '
+            'LEFT JOIN images ci ON (ci.image_id = c.image_id) '
+            'LEFT JOIN templates t1 ON (outcome_template_id = t1.template_id) '
+            'LEFT JOIN videos t1v ON (t1v.video_id = t1.video_id) '
+            'LEFT JOIN images t1i ON (t1i.image_id = t1.image_id) '
+            'LEFT JOIN templates t2 ON (recipe_template_id = t2.template_id) '
+            'LEFT JOIN videos t2v ON (t2v.video_id = t2.video_id) '
+            'LEFT JOIN images t2i ON (t2i.image_id = t2.image_id) '
+            'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 '
+            'ORDER BY b.timestamp DESC '
+            'LIMIT :limit OFFSET :offset'
+            ') b LEFT JOIN crafts b2 USING(craft_id)'
+            'ORDER BY b.timestamp DESC '.format(
+                author_clause=author_clause,
+                erased_clause='NOT erased' if not include_erased else 'TRUE'
+            ),
+            search_dict
+        )
+
+        drops = []
+
+        for drop in res:
+            drops.append(_format_response(drop))
+
+        return drops
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_minting_state(drop_id):
+    session = create_session()
+    try:
+        drop = execute_sql(session,
+            'SELECT COUNT(1) AS num_claimed, '
+            'SUM(CASE when ipfs IS NOT NULL THEN 1 ELSE 0 END) AS rendered, '
+            '(SELECT COUNT(1) FROM pfp_mints WHERE drop_id = :drop_id) as minted '
+            'FROM pfp_results WHERE drop_id = :drop_id ',
+            {'drop_id': drop_id}).first()
+
+        if drop:
+            return {'numClaimed': drop['num_claimed'], 'numRendered': drop['rendered'], 'numMinted': drop['minted']}
+        return {'numClaimed': 0, 'numRendered': 0, 'numMinted': 0}
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_minting_state_craft(craft_id):
+    session = create_session()
+    try:
+        drop = execute_sql(session,
+            'SELECT COUNT(1) AS num_claimed, SUM(CASE when mm.ipfs IS NOT NULL THEN 1 ELSE 0 END) AS rendered, '
+            'SUM(CASE when mm.ipfs IS NOT NULL THEN 1 ELSE 0 END) as minted '
+            'FROM mirror_results mr '
+            'LEFT JOIN mirror_mints mm ON (CAST(mr.result_id AS varchar) = mm.result_id) '
+            'WHERE craft_id = :craft_id ',
+            {'craft_id': craft_id}).first()
+
+        if drop:
+            return {'numClaimed': drop['num_claimed'], 'numRendered': drop['rendered'], 'numMinted': drop['minted']}
+        return {'numClaimed': 0, 'numRendered': 0, 'numMinted': 0}
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_schema_templates(collection, schema):
+    session = create_session()
+    try:
+        templates = []
+        res = execute_sql(
+            session,
+            'SELECT t.template_id, ti.image, tn.name, t.burnable, t.transferable, '
+            '   coalesce(sup.num_minted, 0) AS issued_supply, t.max_supply '
+            'FROM templates t '
+            'LEFT JOIN images ti ON ti.image_id = t.image_id '
+            'LEFT JOIN names tn ON tn.name_id = t.name_id '
+            'LEFT JOIN templates_minted_mv sup USING(template_id) '
+            'WHERE t.collection = :collection '
+            'AND t.schema = :schema '
+            'ORDER BY t.template_id DESC', {
+                'collection': collection,
+                'schema': schema
+            }
+        )
+
+        if res:
+            for row in res:
+                templates.append({
+                    'templateId': row['template_id'],
+                    'image': row['image'],
+                    'name': row['name'],
+                    'burnable': row['burnable'],
+                    'transferable': row['transferable'],
+                    'issuedSupply': int(row['issued_supply']),
+                    'maxSupply': int(row['max_supply'])
+                })
+        return templates
+
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        return []
+    finally:
+        session.remove()
+
+
+def get_buy_offer_assets(seller, buyoffer_id):
+    session = create_session()
+    try:
+        res = execute_sql(session,
+            'SELECT asset_id, mint '
+            'FROM assets WHERE owner = :seller AND (collection, template_id) = ('
+            'SELECT collection, template_id FROM atomicmarket_template_buy_offers '
+            'WHERE buyoffer_id = :buyoffer_id) '
+            'AND NOT burned AND contract = \'atomicassets\'',
+            {'buyoffer_id': buyoffer_id, 'seller': seller}
+        )
+
+        assets = []
+
+        for asset in res:
+            assets.append({
+                'assetId': asset['asset_id'],
+                'mint': asset['mint'],
+            })
+
+        return assets
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def get_pfps(collection):
     session = create_session()
     try:
@@ -1247,6 +1515,75 @@ def get_minimal_asset(asset_id):
     finally:
         end = time.time()
         print(end - start)
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_minimal_auction(market, auction_id):
+    session = create_session()
+    try:
+        params = {'auction_id': auction_id, 'market': market}
+
+        result = execute_sql(session,
+            'SELECT current_bid, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, '
+            'currency, seller, market, an.name, a.collection, ai.image, a.template_id, '
+            'ci.image as collection_image, cn.name as collection_name, auction_id '
+            'FROM auction_logs s1 '
+            'LEFT JOIN assets a ON (s1.asset_ids[1] = a.asset_id) '
+            'LEFT JOIN names an ON a.name_id = an.name_id '
+            'LEFT JOIN images ai ON a.image_id = ai.image_id '
+            'LEFT JOIN collections c ON (a.collection = c.collection) '
+            'LEFT JOIN names cn ON (c.name_id = cn.name_id) '
+            'LEFT JOIN images ci ON (c.image_id = ci.image_id) '
+            'WHERE s1.auction_id = :auction_id AND s1.market = :market',
+            params
+        )
+
+        listings = []
+
+        for sale in result:
+            listings.append(_format_response(sale))
+
+        return listings
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_all_owned(asset_id):
+    session = create_session()
+    try:
+        if not str(asset_id).isnumeric():
+            logging.error('Tried loading assetId {}. Asset: {}'.format(asset_id, 'get_asset'))
+            return []
+        result = execute_sql(
+            session,
+            'WITH my_asset AS (SELECT template_id, owner FROM assets WHERE asset_id = :asset_id LIMIT 1) '
+            'SELECT asset_id, contract, '
+            'FROM assets a LEFT JOIN listings s ON asset_id = ANY(asset_ids) '
+            'WHERE owner = (SELECT owner FROM my_asset) '
+            'AND s.sale_id IS NULL AND NOT burned AND a.template_id IS NOT NULL '
+            'AND a.template_id = (SELECT template_id FROM my_asset)',
+            {'asset_id': asset_id}
+        )
+
+        if not result or result.rowcount == 0:
+            return []
+
+        assets = []
+
+        for asset in result:
+            assets.append(_format_response(asset))
+
+        return assets
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
         session.remove()
 
 

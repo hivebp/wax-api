@@ -1123,6 +1123,20 @@ def load_add_reward(session, transfer):
 
 
 @catch_and_log()
+def load_nfthivevault_addreward(session, transaction):
+    data = _get_data(transaction)
+    new_action = load_transaction_basics(transaction)
+    new_action['user'] = data['user']
+    new_action['amount'] = float(data['amount'].split(' ')[0])
+
+    session_execute_logged(
+        session,
+        'INSERT INTO honey_updates VALUES(FALSE, :user, :amount, :seq, :block_num, :timestamp) ',
+        new_action
+    )
+
+
+@catch_and_log()
 def load_mint_pfp(session, mint):
     data = _get_data(mint)
     result_id = data['result_id']
@@ -1761,7 +1775,7 @@ def load_atomic_market_fulfill_template_buyo(session, transaction):
         session,
         'INSERT INTO sold_atomicmarket_template_buy_offers '
         'SELECT buyoffer_id, buyer, price, currency, template_id, maker, :taker_marketplace, collection, '
-        'collection_fee, seq, block_num, timestamp '
+        'collection_fee, seq, block_num, timestamp, :seq, :block_num, :timestamp '
         'FROM atomicmarket_template_buy_offers '
         'WHERE buyoffer_id = :buyoffer_id '
         'AND NOT EXISTS ('
@@ -1815,7 +1829,9 @@ def load_atomic_market_lognew_template_buyo(session, transaction):
         'SELECT * FROM atomicmarket_template_buy_offer_listings '
         'WHERE seq = :seq '
         'AND NOT EXISTS (SELECT buyoffer_id FROM atomicmarket_template_buy_offers WHERE buyoffer_id = :buyoffer_id) '
-        'AND NOT EXISTS (SELECT buyoffer_id FROM removed_atomicmarket_template_buy_offers WHERE buyoffer_id = :buyoffer_id) ',
+        'AND NOT EXISTS ('
+        '   SELECT buyoffer_id FROM removed_atomicmarket_template_buy_offers WHERE buyoffer_id = :buyoffer_id'
+        ') ',
         new_sale
     )
 

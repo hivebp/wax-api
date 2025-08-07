@@ -431,11 +431,49 @@ def collection_fee(collection):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/api/buyoffers')
+@catch_and_respond()
+def buyoffers():
+    term = request.args.get('term')
+    buyer = request.args.get('buyer')
+    collection = request.args.get('collection')
+    schema = request.args.get('schema')
+    limit = int(request.args.get('limit', 40))
+    offset = int(request.args.get('offset', 0))
+    verified = request.args.get('verified', 'verified')
+    contract = request.args.get('contract')
+    user = request.args.get('user', '')
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
+    exact_search = request.args.get('exact_search') == 'true'
+    search_type = request.args.get('search_type') if request.args.get('search_type') else ''
+    attributes = request.args.get('attributes', None)
+    buyoffer_id = request.args.get('buyoffer_id', None)
+
+    if collection:
+        collection = _format_collection(collection)
+
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 100
+    else:
+        limit = 100
+
+    search_res = logic.buyoffers(
+        buyoffer_id, term, buyer, collection, schema, limit, offset, order_by,
+        exact_search, search_type, contract, verified,
+        user, attributes
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/auctions')
 @catch_and_respond()
 def auctions():
     term = request.args.get('term')
-    owner = request.args.get('owner')
+    seller = request.args.get('seller')
     bidder = request.args.get('bidder')
     collection = request.args.get('collection')
     schema = request.args.get('schema')
@@ -448,6 +486,83 @@ def auctions():
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
     favorites = request.args.get('favorites', 'false') == 'true'
+    contract = request.args.get('contract')
+    user = request.args.get('user', '')
+    order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
+    exact_search = request.args.get('exact_search') == 'true'
+    search_type = request.args.get('search_type') if request.args.get('search_type') else ''
+    attributes = request.args.get('attributes', None)
+    only = request.args.get('only', None)
+    rwax_symbol = request.args.get('rwax_symbol', None)
+    rwax_contract = request.args.get('rwax_contract', None)
+    auction_id = request.args.get('auction_id', None)
+    market = request.args.get('market', None)
+
+    if collection:
+        collection = _format_collection(collection)
+
+    if min_price:
+        try:
+            min_price = float(min_price)
+        except Exception as err:
+            min_price = None
+    if max_price:
+        try:
+            max_price = float(max_price)
+        except Exception as err:
+            max_price = None
+    if min_mint:
+        try:
+            min_mint = int(min_mint)
+        except Exception as err:
+            min_mint = None
+    if max_mint:
+        try:
+            max_mint = int(max_mint)
+        except Exception as err:
+            max_mint = None
+    if limit:
+        try:
+            limit = int(limit)
+        except Exception as err:
+            limit = 100
+    else:
+        limit = 100
+
+    search_res = logic.auctions(
+        auction_id, market, term, seller, bidder, collection, schema, limit, order_by,
+        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
+        user, favorites, recently_sold, attributes, only, rwax_symbol, rwax_contract
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
+@app.route('/api/auction-bids')
+@catch_and_respond()
+def get_bids():
+    auction_id = request.args.get('auction_id', '')
+    market = request.args.get('market', '')
+    return flaskify(oto_response.Response(logic.get_bids(auction_id, market)))
+
+
+@app.route('/api/sales')
+@catch_and_respond()
+def sales():
+    term = request.args.get('term')
+    seller = request.args.get('seller')
+    buyer = request.args.get('buyer')
+    market = request.args.get('market')
+    collection = request.args.get('collection')
+    schema = request.args.get('schema')
+    limit = int(request.args.get('limit', 40))
+    offset = int(request.args.get('offset', 0))
+    min_mint = int(request.args.get('min_mint', 0))
+    max_mint = int(request.args.get('max_mint', 0))
+    min_price = int(request.args.get('min_price', 0))
+    max_price = int(request.args.get('max_price', 0))
+    recently_sold = request.args.get('recent')
+    verified = request.args.get('verified', 'verified')
     contract = request.args.get('contract')
     user = request.args.get('user', '')
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
@@ -489,10 +604,10 @@ def auctions():
     else:
         limit = 100
 
-    search_res = logic.auctions(
-        term, owner, bidder, collection, schema, limit, order_by,
-        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
-        user, favorites, recently_sold, attributes, only, rwax_symbol, rwax_contract
+    search_res = logic.sales(
+        term, seller, buyer, market, collection, schema, limit, offset, order_by,
+        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, verified,
+        user, recently_sold, attributes, only, rwax_symbol, rwax_contract
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -514,7 +629,7 @@ def listings():
     max_price = int(request.args.get('max_price', 0))
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
-    favorites = request.args.get('favorites', 'false') == 'true'
+    listing_id = request.args.get('listing_id', None)
     contract = request.args.get('contract')
     user = request.args.get('user', '')
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'date_desc'
@@ -557,19 +672,51 @@ def listings():
         limit = 100
 
     search_res = logic.listings(
-        term, owner, market, collection, schema, limit, order_by,
-        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, offset, verified,
-        user, favorites, recently_sold, attributes, only, rwax_symbol, rwax_contract
+        term, owner, market, collection, schema, limit, offset, order_by,
+        exact_search, search_type, min_price, max_price, min_mint, max_mint, contract, verified,
+        user, listing_id, recently_sold, attributes, only, rwax_symbol, rwax_contract
     )
 
     return flaskify(oto_response.Response(search_res))
 
 
-@app.route('/api/collections/<collection>')
+@app.route('/api/listing/<market>/<listing_id>')
+@catch_and_respond()
+def listing(market, listing_id):
+    result = logic.listings(
+        market=market, listing_id=listing_id, verified='all'
+    )
+
+    if result:
+        return flaskify(oto_response.Response(result[0]))
+    elif market == 'atomicmarket':
+        result = logic.listings(
+            market=market, listing_id=listing_id, verified='all', listings_table='removed_atomic_listings'
+        )
+        if result:
+            return flaskify(oto_response.Response(result[0]))
+
+    return flaskify(oto_response.Response({}))
+
+
+@app.route('/api/collection/<collection>')
+@catch_and_respond()
+def get_collection(collection):
+    result = logic.get_collections_overview(
+        collection, None, None, 'all', None, None, None, None,
+        None, None, None
+    )
+
+    if result:
+        return flaskify(oto_response.Response(result[0]))
+
+    return flaskify(oto_response.Response({}))
+
+
 @app.route('/api/collections')
 @catch_and_respond()
-def get_collections(collection='*'):
-    collection = request.args.get('collection', collection)
+def get_collections():
+    collection = request.args.get('collection', '*')
     collection = _format_collection(collection)
     type = request.args.get('type')
     tag_id = request.args.get('tag_id')
@@ -577,13 +724,13 @@ def get_collections(collection='*'):
     offset = request.args.get('offset', 0)
     verified = request.args.get('verified', 'verified')
     trending = request.args.get('trending', 'false') == 'true'
-
+    authorized_account = request.args.get('authorized_account')
     market = request.args.get('market')
     owner = request.args.get('owner')
     only = request.args.get('only')
 
     return flaskify(oto_response.Response(logic.get_collections_overview(
-        collection, type, tag_id, verified, trending, market, owner, only, limit, offset)))
+        collection, type, tag_id, verified, trending, authorized_account, market, owner, only, limit, offset)))
 
 
 @app.route('/api/crafts')
@@ -708,6 +855,12 @@ def get_collection_schemas(collection):
 @catch_and_respond()
 def get_tags(collection):
     return flaskify(oto_response.Response(logic.get_tags(collection)))
+
+
+@app.route('/api/user-country/<user>')
+@catch_and_respond()
+def get_user_country(user):
+    return flaskify(oto_response.Response(logic.get_user_country(user)))
 
 
 @app.route('/api/missing-tags/<collection>')
@@ -1197,6 +1350,108 @@ def get_collection_table(verified=True):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/legacy/schema-templates/<collection>/<schema>')
+def get_schema_templates(collection, schema):
+    try:
+        return flaskify(oto_response.Response(legacy.get_schema_templates(collection, schema)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/collection-drops/<collection>')
+def get_collection_drops(collection):
+    try:
+        offset = request.args.get('offset', 0)
+        limit = request.args.get('limit', 40)
+        include_erased = request.args.get('include_erased', 'false') == 'true'
+
+        collection = _format_collection(collection)
+
+        if limit:
+            try:
+                limit = int(limit)
+            except Exception as err:
+                limit = 40
+        else:
+            limit = 40
+
+        search_res = legacy.get_collection_drops(
+            collection, limit, offset if isinstance(offset, int) or (isinstance(offset, str) and offset.isnumeric()) else 0,
+            include_erased
+        )
+
+        return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/collection-total-drops/<collection>')
+def get_collection_total_drops(collection):
+    try:
+        collection = _format_collection(collection)
+
+        search_res = legacy.get_collection_total_drops(
+            collection
+        )
+
+        return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-all-owned/<asset_id>')
+def get_all_owned(asset_id):
+    try:
+        return flaskify(oto_response.Response(legacy.get_all_owned(asset_id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/collection-crafts/<collection>')
+def get_collection_crafts(collection):
+    try:
+        offset = request.args.get('offset', 0)
+        limit = request.args.get('limit', 40)
+        include_erased = request.args.get('include_erased', 'false') == 'true'
+
+        collection = _format_collection(collection)
+
+        if limit:
+            try:
+                limit = int(limit)
+            except Exception as err:
+                limit = 40
+        else:
+            limit = 40
+
+        search_res = legacy.get_collection_crafts(
+            collection, limit,
+            offset if isinstance(offset, int) or (isinstance(offset, str) and offset.isnumeric()) else 0,
+            include_erased
+        )
+
+        return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-minting-state/<contract>/<id>')
+def get_minting_state_api1(contract, id):
+    try:
+        if contract == 'nfthivedrops':
+            return flaskify(oto_response.Response(legacy.get_minting_state(id)))
+        else:
+            return flaskify(oto_response.Response(legacy.get_minting_state_craft(id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
 @app.route('/legacy/drops-data/<contract>')
 def get_drops_data(contract):
     try:
@@ -1248,6 +1503,17 @@ def get_crafts_data():
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/legacy/buy-offer-assets')
+def get_buy_offer_assets():
+    seller = request.args.get('seller')
+    offer_id = request.args.get('offer_id')
+    try:
+        return flaskify(oto_response.Response(legacy.get_buy_offer_assets(seller, offer_id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
 @app.route('/legacy/get-wax-tokens')
 def get_wax_tokens():
     try:
@@ -1273,6 +1539,15 @@ def get_currencies():
 @catch_and_respond()
 def get_collection_minimal(collection):
     return flaskify(oto_response.Response(legacy.get_collection(collection)))
+
+
+@app.route('/legacy/auction-minimal/<market>/<auction_id>')
+def minimal_auction(market, auction_id):
+    try:
+        return flaskify(oto_response.Response(legacy.get_minimal_auction(market, auction_id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
 @app.route('/legacy/asset-minimal/<asset_id>')
