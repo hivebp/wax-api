@@ -2028,7 +2028,7 @@ def sales(
     term=None, seller=None, buyer=None, market=None, collection=None, schema=None, limit=100, offset=0,
     order_by='name_asc', exact_search=False, search_type='listings', min_price=None, max_price=None, min_mint=None,
     max_mint=None, contract=None, verified='verified', user='', recently_sold=None,
-    attributes=None, only=False, rwax_symbol=None, rwax_contract=None
+    attributes=None, only=False, rwax_symbol=None, rwax_contract=None, listing_id=None,
 ):
     session = create_session()
 
@@ -2222,6 +2222,9 @@ def sales(
         if market:
             format_dict['market'] = '{}'.format(market.lower().strip())
             search_clause += ' AND s.market = :market '
+        if listing_id:
+            format_dict['listing_id'] = '{}'.format(listing_id)
+            search_clause += ' AND s.listing_id = :listing_id '
         if seller:
             format_dict['seller'] = '{}'.format(seller.lower().strip())
             search_clause += ' AND s.seller = :seller '

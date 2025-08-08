@@ -613,6 +613,19 @@ def sales():
     return flaskify(oto_response.Response(search_res))
 
 
+@app.route('/api/sale/<market>/<listing_id>')
+@catch_and_respond()
+def sale(market, listing_id):
+    result = logic.sales(
+        market=market, listing_id=listing_id, verified='all'
+    )
+
+    if result:
+        return flaskify(oto_response.Response(result[0]))
+
+    return flaskify(oto_response.Response({}))
+
+
 @app.route('/api/listings')
 @catch_and_respond()
 def listings():
