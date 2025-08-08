@@ -236,7 +236,8 @@ def construct_category_clause(
     if attributes:
         attr_arr = attributes.split(',')
         for attr in attr_arr:
-            key = attr.split(':')[0].replace(' ', '_')
+            attribute_name = attr.split(':')[0]
+            key = attribute_name.replace(' ', '_')
             value = attr.split(':')[1]
             attr_sql = 'SELECT schema, attribute_id FROM attributes WHERE collection = :collection '
 
@@ -251,7 +252,7 @@ def construct_category_clause(
                 attr_dict['schema'] = schema
                 attr_sql += ' AND schema = :schema'
 
-            attr_dict['attribute_name'] = key
+            attr_dict['attribute_name'] = attribute_name
 
             use_range = False
             val1 = value
