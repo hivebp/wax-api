@@ -882,6 +882,69 @@ def get_schema_templates(collection, schema):
 
 
 @cache.memoize(timeout=300)
+def quick_search(term):
+    session = create_session()
+    try:
+        res = execute_sql(session,
+            'SELECT name, type '
+            'FROM search_names_mv '
+            'LEFT JOIN collection_volumes_mv USING(author) '
+            'WHERE name ilike :term '
+            'ORDER BY volume_168h DESC NULLS LAST, type DESC, name ASC LIMIT 10',
+            {'term': '%{}%'.format(term)}
+        )
+        names = []
+        for item in res:
+            names.append({'label': item['name'], 'type': item['type']})
+        return names
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def search_term(term, name):
+    #if name == 'assets':
+    #    if _is_asset_name(term) or _is_asset(term) or _is_template(term):
+    #        return {'assets': search_assets(term)}
+    #    else:
+    #        return {'assets': []}
+    #if name == 'sales':
+    #    if _is_asset_name(term) or _is_asset(term) or _is_template(term):
+    #        return {'sales': search_sales(term)}
+    #    else:
+    #        return {'sales': []}
+    #if name == 'collections':
+    #    if _is_asset(term) or _is_template(term):
+    #        return {'collections': []}
+    #    else:
+    #        return {'collections': search_collections(term)}
+    #if name == 'schemas':
+    #    if _is_asset(term) or _is_template(term):
+    #        return {'schemas': []}
+    #    else:
+    #        return {'schemas': search_schemas(term)}
+    #if name == 'users':
+    #    if _is_asset(term) or _is_template(term):
+    #        return {'users': []}
+    #    else:
+    #        return {'users': get_users(None, term, 40)}
+    #if name == 'crafts':
+    #    if _is_asset(term) or _is_template(term):
+    #        return {'crafts': []}
+    #    else:
+    #        return {'crafts': get_craft_term(term)}
+    #if name == 'drops':
+    #    if _is_asset(term) or _is_template(term):
+    #        return {'drops': []}
+    #    else:
+    #        return {'drops': get_drops_term(term)}
+    return None
+
+
+@cache.memoize(timeout=300)
 def get_users(collection, term, limit):
     users = []
     session = create_session()
@@ -1324,7 +1387,7 @@ def get_collection_table(verified='verified', term='', market='', type='', owner
         search_dict['limit'] = 99
 
     if pfps_only or type == 'pfps':
-        join_clause = ' INNER JOIN pfp_schemas USING(collection) '
+        join_clause += ' INNER JOIN pfp_schemas USING(collection) '
 
     try:
         categories = {

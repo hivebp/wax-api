@@ -145,9 +145,9 @@ def _get_assets_object():
         '\'volume_usd\', ts.volume_usd, \'num_sales\', ts.num_sales, \'num_minted\', tm.num_minted, '
         '\'template_id\', t.template_id, \'image\', img.image, '
         '\'video\', vid.video, \'mint\', a.mint, \'mint_timestamp\', a.timestamp, \'mint_block_num\', a.block_num, '
-        '\'mint_seq\', a.seq, \'rarity_score\', p.rarity_score, \'num_traits\', p.num_traits, \'rank\', p.rank, '
-        '\'burnable\', a.burnable, \'transferable\', a.transferable, \'rwax_amount\', rtt.amount, '
-        '\'traits\', {attributes_obj})) AS assets '.format(
+        '\'mint_seq\', a.seq, \'rarity_score\', p.rarity_score, \'attributes_floor\', aaf.floor_wax, '
+        '\'num_traits\', p.num_traits, \'rank\', p.rank, \'burnable\', a.burnable, \'transferable\', a.transferable, '
+        '\'rwax_amount\', rtt.amount, \'traits\', {attributes_obj})) AS assets '.format(
             attributes_obj=_get_attributes_object()
         )
     )
@@ -549,6 +549,7 @@ def _format_asset(asset):
             }
         if asset['rarity_score']:
             asset_obj['rarityScore'] = asset['rarity_score']
+            asset_obj['attributesFloor'] = asset['attributes_floor']
             asset_obj['rank'] = asset['rank']
             asset_obj['numTraits'] = asset['num_traits']
         if 'rwax_symbol' in asset.keys() and asset['rwax_symbol']:
@@ -1605,13 +1606,13 @@ def assets(
             'last_sold_listing_id, ts.last_sold_timestamp AS last_sold_timestamp, fp.floor_price, ts.volume_wax, '
             'ts.volume_usd, ts.num_sales, tm.num_minted AS num_minted, img.image, vid.video, '
             'cn.name AS display_name, a.collection, ci.image as collection_image, a.timestamp AS mint_timestamp, '
-            'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, p.num_traits, p.rank, '
-            'rt.symbol AS rwax_symbol, rt.contract AS rwax_contract, rt.max_assets AS rwax_max_assets, '
-            'rt.trait_factors, rt.maximum_supply AS rwax_supply, rt.decimals AS rwax_decimals, '
-            'rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, a.transferable, a.burnable, '
-            'rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, col.verified, col.blacklisted, '
-            'pk.unpack_url, pk.pack_id, pk.contract AS pack_contract, {badges_object}, {tags_obj}, '
-            '{attributes_obj} AS traits, {listings_obj} AS listings'.format(
+            'a.block_num AS mint_block_num, a.seq AS mint_seq, p.rarity_score, aaf.floor_wax AS attributes_floor, '
+            'p.num_traits, p.rank, rt.symbol AS rwax_symbol, rt.contract AS rwax_contract, '
+            'rt.max_assets AS rwax_max_assets, rt.trait_factors, rt.maximum_supply AS rwax_supply, '
+            'rt.decimals AS rwax_decimals, rt.token_name AS rwax_token_name, rt.token_logo AS rwax_token_logo, '
+            'a.transferable, a.burnable, rt.token_logo_lg AS rwax_token_logo_lg, rtt.amount AS rwax_amount, '
+            'col.verified, col.blacklisted, pk.unpack_url, pk.pack_id, pk.contract AS pack_contract, {badges_object}, '
+            '{tags_obj}, {attributes_obj} AS traits, {listings_obj} AS listings'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(),
                 attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object()
             )
@@ -1824,6 +1825,7 @@ def assets(
             'LEFT JOIN rwax_assets ra ON (a.asset_id = ra.asset_id) ' 
             'LEFT JOIN collections col ON a.collection = col.collection '
             'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf ON (aaf.asset_id = p.asset_id) '
             'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
             'LEFT JOIN names n ON (a.name_id = n.name_id) '
@@ -2201,6 +2203,7 @@ def sales(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf USING (asset_id) '
             'LEFT JOIN rwax_tokens rt ON (s.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
@@ -2220,6 +2223,7 @@ def sales(
             'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
             'LEFT JOIN rwax_tokens rt ON (s.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
@@ -2466,6 +2470,7 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf USING (asset_id) '
             'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
@@ -2489,6 +2494,7 @@ def listings(
             'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
             'LEFT JOIN rwax_tokens rt ON (l.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
@@ -2618,6 +2624,7 @@ def listings(
                     'LEFT JOIN my_assets ma USING (template_id) '
                     'LEFT JOIN rwax_assets ra ON (ra.asset_id = a.asset_id) '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN pfp_asset_attribute_floors_mv aaf ON (aaf.asset_id = p.asset_id) '
                     'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
@@ -2664,6 +2671,7 @@ def listings(
                     'LEFT JOIN assets a ON (asset_id = asset_ids[1]) '
                     'LEFT JOIN my_assets ma USING (template_id) '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN pfp_asset_attribute_floors_mv aaf ON (aaf.asset_id = p.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN collections col ON (col.collection = l.collection) '
@@ -2893,6 +2901,7 @@ def auctions(
             'LEFT JOIN assets a ON (a.asset_id = asset_ids[1]) '
             'LEFT JOIN rwax_assets ra USING (asset_id) '
             'LEFT JOIN pfp_assets p USING(asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf USING (asset_id) '
             'LEFT JOIN rwax_tokens rt ON (au.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) ' 
@@ -2914,6 +2923,7 @@ def auctions(
             'LEFT JOIN assets a ON (a.asset_id = ANY(asset_ids)) '
             'LEFT JOIN rwax_assets ra USING(asset_id) '
             'LEFT JOIN pfp_assets p USING (asset_id) '
+            'LEFT JOIN pfp_asset_attribute_floors_mv aaf USING (asset_id) '
             'LEFT JOIN backed_assets ba USING (asset_id) '
             'LEFT JOIN rwax_tokens rt ON (au.collection = rt.collection AND a.schema = rt.schema) '
             'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
@@ -3026,6 +3036,7 @@ def auctions(
                     'LEFT JOIN my_assets ma USING (template_id) '
                     'LEFT JOIN rwax_assets ra ON (ra.asset_id = a.asset_id) '
                     'LEFT JOIN pfp_assets p ON (a.asset_id = p.asset_id) '
+                    'LEFT JOIN pfp_asset_attribute_floors_mv aaf ON (aaf.asset_id = p.asset_id) '
                     'LEFT JOIN rwax_tokens rt ON (a.collection = rt.collection AND a.schema = rt.schema) ' 
                     'LEFT JOIN rwax_redeemables rtt ON (a.asset_id = rtt.asset_id) '
                     'LEFT JOIN backed_assets ba ON (a.asset_id = ba.asset_id) '
@@ -3881,7 +3892,7 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
         order_clause = 'ua.cnt DESC'
         cnt_clause = ', ua.cnt'
 
-    if type in ['sales', 'bulk_edit', 'bulk_cancel'] and owner:
+    if type in ['listings', 'bulk_edit', 'bulk_cancel'] and owner:
         with_clause = (
             'WITH user_assets AS (SELECT collection, COUNT(1) AS cnt FROM listings WHERE seller = :owner GROUP BY 1)'
         )

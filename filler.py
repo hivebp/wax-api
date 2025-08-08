@@ -1565,7 +1565,9 @@ def update_floor_prices():
         session.commit()
         execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
         session.commit()
-        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY listings_helper_mv')
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY auctions_helper_mv')
+        session.commit()
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY pfp_asset_attribute_floors_mv')
         session.commit()
 
         return flaskify(oto_response.Response('Floor Prices Updated'))

@@ -1777,6 +1777,24 @@ def get_num_crafts(collection):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/legacy/quick-search/<term>')
+def quick_search(term):
+    try:
+        return flaskify(oto_response.Response(legacy.quick_search(term)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/search-term/<term>/<name>')
+def search_term(term, name):
+    try:
+        return flaskify(oto_response.Response(legacy.search_term(term, name)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
 if __name__ == '__main__':
     compress.init_app(app)
     logging.basicConfig(filename='app.err', level=logging.ERROR)
