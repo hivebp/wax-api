@@ -32,15 +32,17 @@ compress = Compress()
 app = Flask(__name__, static_folder='build', static_url_path='/')
 app.config.from_object(PostgresConfig)
 
-executor = Executor(app)
-app.config.from_mapping({
-    "CACHE_TYPE": "SimpleCache"
-})
+app.config["CACHE_TYPE"] = "simple"
 
 cache = Cache()
 cache.init_app(app)
 
+executor = Executor(app)
+
 db = SQLAlchemy(app, session_options={'autocommit': False})
+
+print(app.extensions["cache"])  # should not be empty
+print(list(app.extensions["cache"].keys()))
 
 import stats_v3
 import legacy
