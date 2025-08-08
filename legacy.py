@@ -502,7 +502,7 @@ def get_banners():
 
     random.shuffle(banners)
     if len(banners) > 0:
-        return banners[0]
+        return banners
     else:
         return {}
 
