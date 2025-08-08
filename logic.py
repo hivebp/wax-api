@@ -236,7 +236,7 @@ def construct_category_clause(
     if attributes:
         attr_arr = attributes.split(',')
         for attr in attr_arr:
-            key = attr.split(':')[0]
+            key = attr.split(':')[0].replace(' ', '_')
             value = attr.split(':')[1]
             attr_sql = 'SELECT schema, attribute_id FROM attributes WHERE collection = :collection '
 
@@ -1002,6 +1002,102 @@ def get_health():
         return {
             'success': 'false'
         }
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def filter_attributes_simple(collection, schema=None, templates=None, only=None):
+    session = create_session()
+
+    try:
+        search_dict = {
+            'collection': collection
+        }
+
+        schema_clause = ''
+        if schema:
+            schema_clause += ' AND a.schema = :schema'
+            search_dict['schema'] = schema
+
+        if templates:
+            schema_clause += ' AND t.template_id IN :templates '
+            search_dict['templates'] = tuple(templates.split(','))
+
+        join_clause = ''
+        if only == 'rwax':
+            join_clause = 'INNER JOIN rwax_tokens USING(collection, schema) '
+
+        sql = (
+            'SELECT attribute_name, string_value, bool_value, MIN(int_value) AS min_int_value, '
+            'MAX(int_value) AS max_int_value, MIN(float_value) AS min_float_value, MAX(float_value) AS max_float_value '
+            'FROM attributes a '
+            '{join_clause} '
+            'WHERE a.collection = :collection '
+            '{schema_clause} '
+            'GROUP BY 1, 2, 3 '
+            'ORDER BY attribute_name ASC, string_value ASC'.format(
+                schema_clause=schema_clause, join_clause=join_clause
+            )
+        )
+
+        res = execute_sql(
+            session,
+            sql,
+            search_dict
+        )
+
+        attributes = {}
+
+        for attribute in res:
+            value = attribute['string_value']
+
+            attribute_type = None
+            min_value = 0
+            max_value = 0
+
+            if value:
+                attribute_type = 'string'
+            else:
+                min_value = attribute['min_int_value']
+                max_value = attribute['max_int_value']
+                if min_value or max_value or max_value == 0:
+                    attribute_type = 'integer'
+                else:
+                    min_value = attribute['min_float_value']
+                    max_value = attribute['max_float_value']
+                    if min_value or max_value or max_value == 0.0:
+                        attribute_type = 'float'
+            if not attribute_type:
+                value = attribute['bool_value']
+                attribute_type = 'boolean'
+
+            if value and attribute_type in ['string', 'boolean']:
+                if attribute['attribute_name'] in attributes.keys():
+                    attributes[attribute['attribute_name']]['values'].append(
+                        {
+                            'value': value
+                        }
+                    )
+                else:
+                    attributes[attribute['attribute_name']] = {
+                        'values': [{
+                            'value': value
+                        }],
+                        'type': attribute_type
+                    }
+            elif attribute_type in ['float', 'integer']:
+                attributes[attribute['attribute_name']] = {
+                    'minValue': float(min_value) if min_value else 0,
+                    'maxValue': float(max_value) if max_value else 0,
+                    'type': attribute_type
+                }
+
+        return attributes
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()

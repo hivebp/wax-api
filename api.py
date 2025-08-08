@@ -417,6 +417,22 @@ def filter_attributes(collection):
     return flaskify(oto_response.Response(search_res))
 
 
+@app.route('/api/filter-attributes-simple/<collection>')
+@catch_and_respond()
+def filter_attributes_simple(collection):
+    schema = request.args.get('schema')
+    templates = request.args.get('templates')
+    only = request.args.get('only')
+
+    collection = _format_collection(collection)
+
+    search_res = logic.filter_attributes_simple(
+        collection, schema, templates, only
+    )
+
+    return flaskify(oto_response.Response(search_res))
+
+
 @app.route('/api/collection-filters/<collection>')
 @catch_and_respond()
 def collection_filters(collection):

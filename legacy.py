@@ -1385,7 +1385,7 @@ def get_collection_table(verified='verified', term='', market='', type='', owner
                 collection_clause=collection_clause,
                 order_clause=order_clause,
                 cnt_clause=cnt_clause,
-                term_clause=' AND (c.collection_name ilike :term OR c.name ilike :term) ' if term else ''
+                term_clause=' AND (c.collection ilike :term OR cn.name ilike :term) ' if term else ''
             ), search_dict
         )
 
