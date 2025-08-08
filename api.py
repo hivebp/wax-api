@@ -268,7 +268,7 @@ def templates():
     attributes = request.args.get('attributes', None)
 
     template_ids = request.args.get('template_ids')
-    template_ids = template_ids.split(',') if template_ids and ',' in template_ids else [template_ids]
+    template_ids = template_ids.split(',') if template_ids and ',' in template_ids else ([template_ids] if template_ids else [])
 
     if collection:
         collection = _format_collection(collection)
@@ -333,7 +333,7 @@ def assets():
     rwax_contract = request.args.get('rwax_contract', None)
 
     asset_ids = request.args.get('asset_ids')
-    asset_ids = asset_ids.split(',') if asset_ids and ',' in asset_ids else [asset_ids]
+    asset_ids = asset_ids.split(',') if asset_ids and ',' in asset_ids else ([asset_ids] if asset_ids else [])
 
     if collection:
         collection = _format_collection(collection)
@@ -1350,6 +1350,15 @@ def get_collection_table(verified=True):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/legacy/usd-wax')
+def usd_wax():
+    try:
+        return flaskify(oto_response.Response(legacy.get_usd_wax()))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
 @app.route('/legacy/schema-templates/<collection>/<schema>')
 def get_schema_templates(collection, schema):
     try:
@@ -1411,6 +1420,23 @@ def get_all_owned(asset_id):
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
 
 
+@app.route('/legacy/get-all-for-sale/<template_id>')
+def get_all_for_sale(template_id):
+    try:
+        return flaskify(oto_response.Response(legacy.get_all_for_sale(template_id)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/top-honey-earner/<days>')
+def get_top_honey_earner(days):
+    try:
+        return flaskify(oto_response.Response(legacy.get_top_honey_earner(days)))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
 
 @app.route('/legacy/active-sales')
 def get_active_sales():
@@ -1469,13 +1495,25 @@ def get_minting_state_api1(contract, id):
 def get_drops_data(contract):
     try:
         drop_ids = request.args.get('drop_ids')
-        drop_ids = drop_ids.split(',') if drop_ids and ',' in drop_ids else [drop_ids]
+        drop_ids = drop_ids.split(',') if drop_ids and ',' in drop_ids else ([drop_ids] if drop_ids else [])
 
         search_res = logic.get_drops(
             drop_ids=drop_ids, market=contract, limit=len(drop_ids)
         )
 
         return flaskify(oto_response.Response(search_res))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/get-users')
+def get_users():
+    try:
+        collection = request.args.get('collection', None)
+        limit = request.args.get('limit', 40)
+        term = request.args.get('term', None)
+        return flaskify(oto_response.Response(legacy.get_users(collection, term, limit)))
     except Exception as err:
         logging.error(err)
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
@@ -1504,7 +1542,7 @@ def get_claimable_packs():
 def get_crafts_data():
     try:
         craft_ids = request.args.get('craft_ids')
-        craft_ids = craft_ids.split(',') if craft_ids and ',' in craft_ids else [craft_ids]
+        craft_ids = craft_ids.split(',') if craft_ids and ',' in craft_ids else ([craft_ids] if craft_ids else [])
 
         search_res = logic.get_crafts(
             craft_ids=craft_ids, limit=len(craft_ids)

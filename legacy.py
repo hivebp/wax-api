@@ -297,7 +297,7 @@ def _format_response(item, size=240, blacklisted=False):
         elif key == 'aasset_id' and item['aasset_id']:
             response['aAssetId'] = item['aasset_id']
         elif key == 'listing_id' and item['listing_id']:
-            response['orderId'] = item['listing_id']
+            response['listingId'] = item['listing_id']
         elif key == 'mint' and item['mint']:
             response['mint'] = item['mint']
         elif key == 'my_mint' and item['my_mint']:
@@ -584,9 +584,9 @@ def get_num_auctions(collection):
     try:
         res = execute_sql(session,
             'SELECT COUNT(1) AS num_auctions '
-            'FROM auctions '
+            'FROM auctions au '
             'LEFT JOIN assets ON asset_id = asset_ids[1] '
-            'WHERE active AND collection = :collection ', {
+            'WHERE au.collection = :collection AND au.end_time > NOW() ', {
                 'collection': collection
             }
         ).first()
@@ -824,6 +824,22 @@ def get_minting_state_craft(craft_id):
         session.remove()
 
 
+def get_usd_wax():
+    session = create_session()
+    try:
+        result = execute_sql(session,
+            'SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1'
+        ).first()
+
+        return {'usd_wax': result['usd']}
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
 def get_schema_templates(collection, schema):
     session = create_session()
     try:
@@ -857,6 +873,93 @@ def get_schema_templates(collection, schema):
                 })
         return templates
 
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        return []
+    finally:
+        session.remove()
+
+
+@cache.memoize(timeout=300)
+def get_users(collection, term, limit):
+    users = []
+    session = create_session()
+    try:
+        if term and len(term) > 12:
+            return users
+        if term:
+            if collection and collection != '*':
+                res = execute_sql(
+                    session,
+                    'SELECT owner, image, num_assets, wax_value, usd_value '
+                    'FROM collection_users_mv u '
+                    'LEFT JOIN user_pictures_mv p ON (owner = user_name) '
+                    'WHERE collection = :collection {owner_term} '
+                    'ORDER BY usd_value DESC NULLS LAST LIMIT :limit'.format(
+                        owner_term=' AND owner = :term ' if term else ''), {
+                        'collection': collection, 'limit': 1, 'term': term
+                    }
+                ).first()
+            else:
+                res = execute_sql(
+                    session,
+                    'SELECT owner, image, num_assets, wax_value, usd_value '
+                    'FROM users_mv u '
+                    'LEFT JOIN user_pictures_mv p ON (owner = user_name) '
+                    'WHERE TRUE {owner_term} '
+                    'ORDER BY usd_value DESC NULLS LAST LIMIT :limit'.format(
+                        owner_term=' AND owner = :term ' if term else ''), {
+                        'limit': limit, 'term': term
+                    }
+                ).first()
+
+            if res:
+                users.append({
+                    'user': res['owner'],
+                    'image': res['image'],
+                    'numAssets': int(res['num_assets']) if res['num_assets'] else 0,
+                    'value': float(res['wax_value']) if res['wax_value'] else 0,
+                    'usdValue': float(res['usd_value']) if res['usd_value'] else 0
+                })
+                return users
+
+        if collection and collection != '*':
+            res = execute_sql(
+                session,
+                'SELECT owner, image, num_assets, wax_value, usd_value '
+                'FROM collection_users_mv u '
+                'LEFT JOIN user_pictures_mv p ON (owner = user_name) '
+                'WHERE collection = :collection {owner_term} '
+                'ORDER BY usd_value DESC NULLS LAST LIMIT :limit'.format(
+                    owner_term=' AND owner like :term' if term else ''), {
+                    'collection': collection, 'limit': limit, 'term': '{}%'.format(term)
+                }
+            )
+        else:
+            res = execute_sql(
+                session,
+                'SELECT owner, image, num_assets, wax_value, usd_value '
+                'FROM users_mv u '
+                'LEFT JOIN user_pictures_mv p ON (owner = user_name) '
+                'WHERE TRUE {owner_term} '
+                'ORDER BY usd_value DESC NULLS LAST LIMIT :limit'.format(
+                    owner_term=' AND owner like :term' if term else ''), {
+                    'limit': limit, 'term': '{}%'.format(term)
+                }
+            )
+
+        if res:
+            for row in res:
+                users.append({
+                    'user': row['owner'],
+                    'image': row['image'],
+                    'numAssets': int(row['num_assets']) if row['num_assets'] else 0,
+                    'value': float(row['wax_value']) if row['wax_value'] else 0,
+                    'usdValue': float(row['usd_value']) if row['usd_value'] else 0
+                })
+
+        return users
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()
@@ -1606,6 +1709,67 @@ def get_all_owned(asset_id):
             assets.append(_format_response(asset))
 
         return assets
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_all_for_sale(template_id):
+    session = create_session()
+    try:
+        result = execute_sql(
+            session,
+            'WITH my_template AS ('
+            '   SELECT template_id, collection FROM templates WHERE template_id = :template_id LIMIT 1'
+            ') '
+            'SELECT a.contract, s2.market, s2.listing_id, a.asset_id, '
+            's2.price, (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) AS usd_wax, s2.currency, '
+            's2.estimated_wax_price '
+            'FROM listings s2 '
+            'LEFT JOIN assets a ON asset_id = asset_ids[1] '
+            'WHERE s2.collection = (SELECT collection FROM my_template) '
+            'AND array_length(asset_ids, 1) = 1 AND a.template_id = (SELECT template_id FROM my_template) '
+            'ORDER BY s2.estimated_wax_price ASC LIMIT 100',
+            {'template_id': template_id}
+        )
+
+        if not result or result.rowcount == 0:
+            return []
+
+        sales = []
+
+        for sale in result:
+            sales.append(_format_response(sale))
+
+        return sales
+    except SQLAlchemyError as e:
+        logging.error(e)
+        session.rollback()
+        raise e
+    finally:
+        session.remove()
+
+
+def get_top_honey_earner(days):
+    session = create_session()
+    try:
+
+        result = execute_sql(
+            session,
+            'SELECT CASE WHEN seller IS NOT null then seller else buyer END AS earner, SUM(price) / 100 AS honey '
+            'FROM honey_rewards '
+            'WHERE timestamp > NOW () AT time zone \'utc\' - INTERVAL \':days days\''
+            'AND NOT washtrade '
+            'GROUP BY 1 ORDER BY 2 DESC LIMIT 1', {'days': int(days)}
+        ).first()
+
+        if result:
+            return {'earner': result['earner'], 'amount': result['honey']}
+        else:
+            return {'earner': None, 'amount': 0}
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()
