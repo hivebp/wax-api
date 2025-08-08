@@ -33,7 +33,12 @@ app = Flask(__name__, static_folder='build', static_url_path='/')
 app.config.from_object(PostgresConfig)
 
 executor = Executor(app)
-cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
+app.config.from_mapping({
+    "CACHE_TYPE": "SimpleCache"
+})
+
+cache = Cache()
+cache.init_app(app)
 
 db = SQLAlchemy(app, session_options={'autocommit': False})
 
