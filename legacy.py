@@ -886,16 +886,16 @@ def quick_search(term):
     session = create_session()
     try:
         res = execute_sql(session,
-            'SELECT name, type '
+            'SELECT name, type, collection, id, image, video '
             'FROM search_names_mv '
-            'LEFT JOIN collection_volumes_mv USING(author) '
             'WHERE name ilike :term '
-            'ORDER BY volume_168h DESC NULLS LAST, type DESC, name ASC LIMIT 10',
+            'ORDER BY wax_volume DESC NULLS LAST, type DESC, name ASC '
+            'LIMIT 10',
             {'term': '%{}%'.format(term)}
         )
         names = []
         for item in res:
-            names.append({'label': item['name'], 'type': item['type']})
+            names.append({'label': item['name'], 'collection': item['collection'], 'type': item['type'], 'id': item['id'], 'image': item['image'], 'video': item['video']})
         return names
     except SQLAlchemyError as e:
         logging.error(e)

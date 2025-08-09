@@ -1698,6 +1698,8 @@ def create_volume_day_views():
             )
 
             session.commit()
+
+        execute_sql(session, 'REFRESH MATERIALIZED VIEW CONCURRENTLY search_names_mv');
     return flaskify(oto_response.Response('Volumes Created'))
 
 
