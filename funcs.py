@@ -2337,41 +2337,7 @@ def apply_simple_updates(session):
 
 
 @catch_and_log()
-def calc_atomic_mints(session):
-    forked = session.execute('SELECT * FROM handle_fork').first()
-    if forked['forked'] and forked['block_num']:
-        raise RuntimeError('Fork')
-
-    res = session_execute_logged(
-        session,
-        'SELECT * FROM atomicassets_updates WHERE NOT applied ORDER BY seq ASC'
-    )
-
-    session.commit()
-
-    forked = session.execute('SELECT * FROM handle_fork').first()
-    if forked['forked'] and forked['block_num']:
-        raise RuntimeError('Fork')
-
-    res = session_execute_logged(
-        session,
-        'UPDATE assets a SET mint = am.mint '
-        'FROM ('
-        '   SELECT asset_id, m.mint '
-        '   FROM asset_mints m '
-        '   INNER JOIN assets a2 USING(asset_id) '
-        '   WHERE a2.mint IS NULL LIMIT 10000'
-        ') am '
-        'WHERE a.asset_id = am.asset_id'
-    )
-
-    session.commit()
-
-    return res.rowcount
-
-
-@catch_and_log()
-def calc_atomic_mints(session):
+def insert_atomic_mints(session):
     forked = session.execute('SELECT * FROM handle_fork').first()
     if forked['forked'] and forked['block_num']:
         raise RuntimeError('Fork')
@@ -2389,6 +2355,13 @@ def calc_atomic_mints(session):
 
     session.commit()
 
+
+@catch_and_log()
+def calc_atomic_mints(session):
+    forked = session.execute('SELECT * FROM handle_fork').first()
+    if forked['forked'] and forked['block_num']:
+        raise RuntimeError('Fork')
+
     res = session_execute_logged(
         session,
         'UPDATE assets a SET mint = am.mint '
@@ -2396,9 +2369,17 @@ def calc_atomic_mints(session):
         '   SELECT asset_id, m.mint '
         '   FROM asset_mints m '
         '   INNER JOIN assets a2 USING(asset_id) '
-        '   WHERE a2.mint IS NULL LIMIT 10000'
+        '   WHERE m.applied_mint IS NULL LIMIT 10000'
         ') am '
         'WHERE a.asset_id = am.asset_id'
+    )
+
+    session.commit()
+
+    session_execute_logged(
+        session,
+        'UPDATE asset_mints m SET applied_mint = a.mint '
+        'FROM assets a WHERE applied_mint IS NULL AND a.asset_id = m.asset_id'
     )
 
     session.commit()

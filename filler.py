@@ -38,6 +38,7 @@ isLoadingChronicleTx = False
 isLoadingUSD = False
 isVacuuming = False
 isUpdatingAtomicAssets = False
+isInsertingAtomicAssets = False
 isUpdatingAssetsData = False
 isLoadingPFPAttributes = False
 isUpdatingRWAXAssets = False
@@ -2395,6 +2396,7 @@ def load_usd_rate_till_stopped():
 @app.route('/loader/status')
 def status():
     global isUpdatingAtomicAssets
+    global isInsertingAtomicAssets
     global isLoadingUSD
     global isStopped
     global action_measure_god
@@ -2403,6 +2405,7 @@ def status():
         'stopped': isStopped,
         'loading': isLoading,
         'isUpdatingAtomicAssets': isUpdatingAtomicAssets,
+        'isInsertingAtomicAssets': isInsertingAtomicAssets,
         'isLoadingUSD': isLoadingUSD,
         'measureGod': action_measure_god
     }))
@@ -2459,6 +2462,33 @@ def keep_updating_assets():
         isUpdatingAssetsData = False
 
 
+@app.route('/loader/insert-atomic-mints')
+def keep_inserting_atomic_mints():
+    global isStopped
+    global isInsertingAtomicAssets
+    isStopped = False
+    try:
+        isInsertingAtomicAssets = True
+        while not isStopped:
+            session = create_session()
+            try:
+                funcs.insert_atomic_mints(session)
+            except SQLAlchemyError as err:
+                log_error('keep_inserting_atomic_mints: {}'.format(err))
+                session.rollback()
+            except RuntimeError as err:
+                log_error('keep_inserting_atomic_mints: {}'.format(err))
+                session.rollback()
+                time.sleep(30)
+            finally:
+                session.remove()
+    except Exception as err:
+        log_error('keep_updating_atomic_mints: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        isInsertingAtomicAssets = False
+
+
 @app.route('/loader/update-atomic-mints')
 def keep_updating_atomic_mints():
     global isStopped
@@ -2494,11 +2524,11 @@ def start():
     global isLoadingChronicleTx
     global isLoadingUSD
     global isStopped
-    if not isStopped or isLoadingChronicleTx or isUpdatingAtomicAssets or isLoadingUSD:
+    if not isStopped or isLoadingChronicleTx or isUpdatingAtomicAssets or isLoadingUSD or isInsertingAtomicAssets:
         return flaskify(oto_response.Response('Already processing request', status=102))
     try:
         isStopped = False
-        #_thread.start_new_thread(load_chronicle_transactions, ())
+        _thread.start_new_thread(keep_inserting_atomic_mints, ())
         _thread.start_new_thread(keep_updating_atomic_mints, ())
         _thread.start_new_thread(load_usd_rate_till_stopped, ())
         _thread.start_new_thread(keep_updating_assets, ())
