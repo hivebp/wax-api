@@ -338,6 +338,7 @@ def assets():
     only = request.args.get('only', None)
     rwax_symbol = request.args.get('rwax_symbol', None)
     rwax_contract = request.args.get('rwax_contract', None)
+    exclude_listings = request.args.get('exclude_listings', 'false') == 'true'
 
     asset_ids = request.args.get('asset_ids')
     asset_ids = asset_ids.split(',') if asset_ids and ',' in asset_ids else ([asset_ids] if asset_ids else [])
@@ -366,7 +367,8 @@ def assets():
     search_res = logic.assets(
         term, owner, collection, schema, tags, limit, order_by,
         exact_search, search_type, min_average, max_average, min_mint, max_mint, contract, offset, verified,
-        user, favorites, backed, recently_sold, attributes, only, rwax_symbol, rwax_contract, asset_ids
+        user, favorites, backed, recently_sold, attributes, only, rwax_symbol, rwax_contract, 'not_burned',
+        asset_ids, not exclude_listings
     )
 
     return flaskify(oto_response.Response(search_res))

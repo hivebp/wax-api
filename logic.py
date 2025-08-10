@@ -188,22 +188,18 @@ def _get_attributes_object():
     )
 
 
-def _get_listings_object():
-    return (
-        '(SELECT array_agg(json_build_object(\'listing_id\', listing_id, \'market\', market, ' 
-        '\'asset_ids\', asset_ids, \'price\', price, \'currency\', currency, \'seller\', seller)) '
-        'FROM listings l '
-        'WHERE l.collection = a.collection AND seller = owner AND a.asset_id = ANY(asset_ids) ) '
-    )
-
-
-def _get_listings_object():
-    return (
-        '(SELECT array_agg(json_build_object(\'listing_id\', listing_id, \'market\', market, ' 
-        '\'asset_ids\', asset_ids, \'price\', price, \'currency\', currency, \'seller\', seller)) '
-        'FROM listings l '
-        'WHERE l.collection = a.collection AND seller = owner AND a.asset_id = ANY(asset_ids) ) '
-    )
+def _get_listings_object(owner, add_listings):
+    if add_listings:
+        return (
+            '(SELECT array_agg(json_build_object(\'listing_id\', listing_id, \'market\', market, ' 
+            '\'asset_ids\', asset_ids, \'price\', price, \'currency\', currency, \'seller\', seller)) '
+            'FROM listings l '
+            'WHERE l.collection = a.collection{owner_clause} AND a.asset_id = ANY(asset_ids) ) '.format(
+                owner_clause=' AND seller = :owner' if owner else ' AND seller = owner'
+            )
+        )
+    else:
+        return 'NULL'
 
 
 def _get_template_attributes_object(prefix='t.'):
@@ -1524,7 +1520,8 @@ def assets(
     term=None, owner=None, collection=None, schema=None, tags=None, limit=100, order_by='date_desc',
     exact_search=False, search_type='assets', min_average=None, max_average=None, min_mint=None, max_mint=None,
     contract=None, offset=0, verified='verified', user='', favorites=False, backed=False, recently_sold=None,
-    attributes=None, only=None, rwax_symbol=None, rwax_contract=None, burned='not_burned', asset_ids=None
+    attributes=None, only=None, rwax_symbol=None, rwax_contract=None, burned='not_burned', asset_ids=None,
+    add_listings=True
 ):
     session = create_session()
 
@@ -1614,7 +1611,7 @@ def assets(
             'col.verified, col.blacklisted, pk.unpack_url, pk.pack_id, pk.contract AS pack_contract, {badges_object}, '
             '{tags_obj}, {attributes_obj} AS traits, {listings_obj} AS listings'.format(
                 badges_object=_get_badges_object(), tags_obj=_get_tags_object(),
-                attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object()
+                attributes_obj=_get_attributes_object(), listings_obj=_get_listings_object(owner, add_listings)
             )
         )
         if only == 'packs':
