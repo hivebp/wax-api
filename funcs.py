@@ -2378,8 +2378,13 @@ def calc_atomic_mints(session):
 
     session_execute_logged(
         session,
-        'UPDATE asset_mints m SET applied_mint = a.mint '
-        'FROM assets a WHERE applied_mint IS NULL AND a.asset_id = m.asset_id'
+        'UPDATE asset_mints m SET applied_mint = a.mint FROM ('
+        '   SELECT a.asset_id, a.mint '
+        '   FROM assets a '
+        '   INNER JOIN asset_mints m2 USING(asset_id) '
+        '   WHERE applied_mint IS NULL AND a.asset_id = m2.asset_id LIMIT 10000'
+        ') a '
+        'WHERE a.asset_id = m.asset_id'
     )
 
     session.commit()

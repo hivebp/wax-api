@@ -1755,7 +1755,7 @@ def get_all_owned(asset_id):
         result = execute_sql(
             session,
             'WITH my_asset AS (SELECT template_id, owner FROM assets WHERE asset_id = :asset_id LIMIT 1) '
-            'SELECT asset_id, contract, '
+            'SELECT asset_id, contract '
             'FROM assets a LEFT JOIN listings s ON asset_id = ANY(asset_ids) '
             'WHERE owner = (SELECT owner FROM my_asset) '
             'AND s.sale_id IS NULL AND NOT burned AND a.template_id IS NOT NULL '
