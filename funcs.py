@@ -109,7 +109,9 @@ def session_execute_logged(session, sql, args={}):
             'average': elapsed
         }
 
-    return res.mappings()
+    mappings = res.mappings()
+    mappings.rowcount = res.rowcount
+    return mappings
 
 
 def parse_attributes(session, collection, schema, data):
