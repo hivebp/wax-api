@@ -1953,6 +1953,7 @@ def buyoffers(
             'col.blacklisted, bo.maker, bo.collection, bo.price '
             'FROM atomicmarket_template_buy_offers bo '
             'LEFT JOIN templates t ON (t.template_id = bo.template_id) '
+            'LEFT JOIN names tn ON (t.name_id = tn.name_id) '
             'LEFT JOIN collections col ON (col.collection = bo.collection) '
             'LEFT JOIN template_stats_mv ts ON (bo.template_id = ts.template_id) '
             'LEFT JOIN templates_minted_mv tm ON (bo.template_id = tm.template_id) '
