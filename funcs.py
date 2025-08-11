@@ -2338,7 +2338,7 @@ def apply_simple_updates(session):
 
 @catch_and_log()
 def insert_atomic_mints(session):
-    forked = session.execute('SELECT * FROM handle_fork').first()
+    forked = session_execute_logged(session, 'SELECT * FROM handle_fork').first()
     if forked['forked'] and forked['block_num']:
         raise RuntimeError('Fork')
 
@@ -2358,7 +2358,7 @@ def insert_atomic_mints(session):
 
 @catch_and_log()
 def calc_atomic_mints(session):
-    forked = session.execute('SELECT * FROM handle_fork').first()
+    forked = session_execute_logged(session, 'SELECT * FROM handle_fork').first()
     if forked['forked'] and forked['block_num']:
         raise RuntimeError('Fork')
 
