@@ -4279,11 +4279,11 @@ def get_drops(
             )
             search_dict['currency'] = currency.upper()
 
-        if upcoming:
+        if upcoming and not drop_id and (not drop_ids or len(drop_ids) == 0):
             search_clause += (
                 ' AND start_time > NOW() '
             )
-        else:
+        elif not drop_id and (not drop_ids or len(drop_ids) == 0):
             search_clause += (
                 'AND (d2.start_time IS NULL OR d2.start_time < NOW()) '
             )
