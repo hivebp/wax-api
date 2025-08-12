@@ -2371,7 +2371,7 @@ def calc_atomic_mints(session):
         '   SELECT asset_id, m.mint '
         '   FROM asset_mints m '
         '   INNER JOIN assets a2 USING(asset_id) '
-        '   WHERE m.applied_mint IS NULL LIMIT 10000'
+        '   WHERE m.applied_mint IS NULL LIMIT 1000000'
         ') am '
         'WHERE a.asset_id = am.asset_id'
     )
