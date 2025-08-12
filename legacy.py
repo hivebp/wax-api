@@ -102,7 +102,9 @@ def _format_response(item, size=240, blacklisted=False):
         response['blacklisted'] = True
 
     for key in item.keys():
-        if key == 'collection_name':
+        if key == 'collection':
+            response['collection'] = item['collection']
+        elif key == 'collection_name':
             response['collectionName'] = item['collection_name']
         elif key == 'pfp_attributes':
             if item['pfp_attributes'] and item['pfp_attributes'][0]:
