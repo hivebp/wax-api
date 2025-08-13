@@ -4190,7 +4190,7 @@ def get_crafts(craft_id=None, collection=None, limit=40, order_by='craft_id_desc
 
 def get_drops(
     drop_id=None, collection=None, term=None, limit=40, order_by='drop_id_desc', offset=0, verified='all', market=None,
-    token=None, upcoming=False, user_name=None, currency=None, home=None, drop_ids=None
+    token=None, upcoming=False, pfpsonly=False, user_name=None, currency=None, home=None, drop_ids=None
 ):
     session = create_session()
     try:
@@ -4309,6 +4309,9 @@ def get_drops(
         if token:
             search_clause += ' AND currency ilike :token '
             search_dict['token'] = token
+
+        if pfpsonly:
+            search_clause += ' AND pd.drop_id IS NOT NULL '
 
         if user_name and (not collection or collection == '*'):
             search_clause += (

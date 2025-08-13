@@ -1748,7 +1748,7 @@ def load_atomic_market_fulfill_template_buyo(session, transaction):
     new_sale['currency'] = data['expected_price'].split(' ')[1]
     new_sale['seller'] = data['seller']
     new_sale['asset_id'] = data['asset_id']
-    new_sale['taker_marketplace'] = data['taker_marketplace']
+    new_sale['taker_marketplace'] = data['taker_marketplace'] if data['taker_marketplace'] else None
 
     session_execute_logged(
         session,

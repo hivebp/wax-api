@@ -860,6 +860,7 @@ def get_drops():
     token = request.args.get('token')
     home = request.args.get('home') == 'home'
     upcoming = request.args.get('upcoming') == 'true'
+    pfpsonly = request.args.get('pfpsonly') == 'true'
     user_name = request.args.get('user', None)
     currency = request.args.get('currency', None)
 
@@ -876,7 +877,7 @@ def get_drops():
 
     search_res = logic.get_drops(
         drop_id, collection, term, limit, order_by, offset, verified, market, token, upcoming,
-        user_name, currency, home
+        pfpsonly, user_name, currency, home
     )
 
     return flaskify(oto_response.Response(search_res))
