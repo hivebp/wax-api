@@ -2368,10 +2368,10 @@ def calc_atomic_mints(session):
         session,
         'UPDATE assets a SET mint = am.mint '
         'FROM ('
-        '   SELECT a.asset_id, a.mint FROM ('
-        '       SELECT asset_id FROM asset_mints m2 WHERE applied_mint IS NULL ORDER BY m2.asset_id ASC LIMIT 100000'
-        '   ) m2 '
-        '   LEFT JOIN assets a USING(asset_id) '
+        '   SELECT asset_id, m.mint '
+        '   FROM asset_mints m '
+        '   INNER JOIN assets a2 USING(asset_id) '
+        '   WHERE m.applied_mint IS NULL LIMIT 100000'
         ') am '
         'WHERE a.asset_id = am.asset_id'
     )
@@ -2381,10 +2381,10 @@ def calc_atomic_mints(session):
     session_execute_logged(
         session,
         'UPDATE asset_mints m SET applied_mint = a.mint FROM ('
-        '   SELECT a.asset_id, a.mint '
-        '   FROM assets a '
-        '   INNER JOIN asset_mints m2 USING(asset_id) '
-        '   WHERE applied_mint IS NULL AND a.asset_id = m2.asset_id LIMIT 10000'
+        '   SELECT a.asset_id, a.mint FROM ('
+        '       SELECT asset_id FROM asset_mints m2 WHERE applied_mint IS NULL ORDER BY m2.asset_id ASC LIMIT 100000'
+        '   ) m2 '
+        '   LEFT JOIN assets a USING(asset_id) '
         ') a '
         'WHERE a.asset_id = m.asset_id'
     )
