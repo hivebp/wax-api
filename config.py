@@ -76,7 +76,8 @@ contracts = [
     'wufclaimtool',  # Airdrop Contract, most likely not relevant
     'rwax',          # NFT Tokenization and Redemption
     'waxtokenbase',  # Token Registration
-    'waxdaobacker'   # Token Backing
+    'waxdaobacker',  # Token Backing
+    'nfthivevault'   # Honey Account
 ]
 
 parse_transactions = True
