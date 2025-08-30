@@ -1137,6 +1137,12 @@ def load_nfthivevault_addreward(session, transaction):
         new_action
     )
 
+    session_execute_logged(
+        session,
+        'UPDATE honey_rewards SET paid = TRUE WHERE NOT paid AND buy_seq < :seq AND :user IN (buyer, seller) ',
+        new_action
+    )
+
 
 @catch_and_log()
 def load_mint_pfp(session, mint):
