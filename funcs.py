@@ -93,7 +93,7 @@ def session_execute_logged(session, sql, args={}):
 
     start = time.time()
 
-    res = session_execute_logged(session,text(sql), args)
+    res = session.execute(text(sql), args)
 
     end = time.time()
 
