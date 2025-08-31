@@ -31,7 +31,7 @@ def log_error(e):
 
 
 def execute_sql(session, sql, args=None):
-    res = execute_sql(session,text(sql), args)
+    res = session.execute(text(sql), args)
     mappings = res.mappings()
     mappings.rowcount = res.rowcount
     return mappings
@@ -654,7 +654,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
                 )
         session.commit()
 
-        removed_tables = execute_sql(session,
+        removed_tables = execute_sql(
+            session,
             'SELECT table_name, \'SELECT \' || array_to_string(ARRAY(SELECT \' r\' || \'.\' || c.column_name '
             'FROM information_schema.columns c '
             'WHERE table_name = t.table_name AND c.column_name NOT IN(\'removed_seq\', \'removed_block_num\') '
