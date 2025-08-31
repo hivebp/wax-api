@@ -7,7 +7,6 @@ import time
 
 import _thread
 
-import pytz
 from flask import Flask, json, request
 from oto.adaptors.flask import flaskify
 from oto import response as oto_response

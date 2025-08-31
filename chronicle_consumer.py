@@ -14,6 +14,7 @@ import funcs
 import config
 from config import PostgresConsumerConfig
 from filler import parse_action
+from sqlalchemy import text
 
 logging.basicConfig(filename='consumer.err', level=logging.ERROR)
 
@@ -29,21 +30,28 @@ def log_error(e):
     logging.error(e)
 
 
+def execute_sql(session, sql, args=None):
+    res = execute_sql(session,text(sql), args)
+    mappings = res.mappings()
+    mappings.rowcount = res.rowcount
+    return mappings
+
+
 def handle_atomicassets_burns_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM atomicassets_burns_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE assets SET burned = FALSE, owner = :burner WHERE asset_id = :asset_id',
             {'asset_id': trx['asset_id'], 'burner': trx['burner']}
         )
 
 
 def handle_atomicassets_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM atomicassets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
@@ -52,7 +60,7 @@ def handle_atomicassets_updates_reversed(session, block_num):
 
     for trx in reverse_trxs:
         try:
-            update = session.execute(
+            update = execute_sql(session,
                 'SELECT a.collection, a.schema, a.asset_id, d1.data AS mdata, d2.data AS idata, d3.data AS tdata, '
                 'u.seq, old_mdata_id '
                 'FROM atomicassets_updates_reversed u '
@@ -87,7 +95,7 @@ def handle_atomicassets_updates_reversed(session, block_num):
                     new_asset['attribute_ids'] = funcs.parse_attributes(
                         session, update['collection'], update['schema'], data)
 
-                    session.execute(
+                    execute_sql(session,
                        'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
                        '{name_clause} {image_clause} {video_clause} '
                        'WHERE asset_id = :asset_id '.format(
@@ -114,13 +122,13 @@ def handle_atomicassets_updates_reversed(session, block_num):
 
 
 def handle_auction_bids_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM auction_bids_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE auctions SET bidder = :old_bidder, current_bid = :old_bid, currency = :old_currency '
             'WHERE auction_id = :auction_id',
             {
@@ -133,37 +141,37 @@ def handle_auction_bids_reversed(session, block_num):
 
 
 def handle_craft_erase_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM craft_erase_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE crafts SET erased = FALSE WHERE craft_id = :craft_id', {'craft_id': trx['craft_id']}
         )
 
 
 def handle_craft_ready_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM craft_ready_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE crafts SET ready = FALSE WHERE craft_id = :craft_id', {'craft_id': trx['craft_id']}
         )
 
 
 def handle_craft_times_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM craft_times_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE crafts SET unlock_time = :old_unlock_time, end_time = :old_end_time '
             'WHERE craft_id = :craft_id',
             {
@@ -175,13 +183,13 @@ def handle_craft_times_updates_reversed(session, block_num):
 
 
 def handle_craft_total_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM craft_total_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE crafts SET unlock_time = :old_unlock_time, end_time = :old_end_time '
             'WHERE craft_id = :craft_id',
             {
@@ -193,13 +201,13 @@ def handle_craft_total_updates_reversed(session, block_num):
 
 
 def handle_drop_auth_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_auth_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET auth_required = :old_auth_required '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -211,13 +219,13 @@ def handle_drop_auth_updates_reversed(session, block_num):
 
 
 def handle_drop_display_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_display_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET display_data = :old_display_data '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -229,13 +237,13 @@ def handle_drop_display_updates_reversed(session, block_num):
 
 
 def handle_drop_erase_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_erase_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET erased = FALSE '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -246,13 +254,13 @@ def handle_drop_erase_updates_reversed(session, block_num):
 
 
 def handle_drop_fee_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_fee_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET fee_rate = :old_fee_rate '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -264,13 +272,13 @@ def handle_drop_fee_updates_reversed(session, block_num):
 
 
 def handle_drop_hidden_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_hidden_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET is_hidden = :old_is_hidden '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -282,13 +290,13 @@ def handle_drop_hidden_updates_reversed(session, block_num):
 
 
 def handle_drop_limit_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_limit_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET account_limit = :old_account_limit, account_limit_cooldown = :old_account_limit_cooldown '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -301,13 +309,13 @@ def handle_drop_limit_updates_reversed(session, block_num):
 
 
 def handle_drop_max_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_max_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET max_claimable = :old_max_claimable '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -319,13 +327,13 @@ def handle_drop_max_updates_reversed(session, block_num):
 
 
 def handle_drop_price_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_price_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET price = :old_price, currency = :old_currency '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -338,13 +346,13 @@ def handle_drop_price_updates_reversed(session, block_num):
 
 
 def handle_drop_times_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM drop_times_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE drops SET start_time = :old_start_time, end_time = :old_end_time '
             'WHERE drop_id = :drop_id AND contract = :contract',
             {
@@ -357,21 +365,21 @@ def handle_drop_times_updates_reversed(session, block_num):
 
 
 def handle_simpleassets_burns_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM simpleassets_burns_reversed WHERE block_num >= :block_num GROUP BY 1, 2, 3, 4, 5 '
         'ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE assets SET burned = FALSE, owner = burner '
             'FROM simpleassets_burns_reversed s WHERE asset_id = ANY(asset_ids) AND s.seq = :seq', {'seq': trx['seq']}
         )
 
 
 def handle_simpleassets_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM simpleassets_updates_reversed WHERE block_num >= :block_num '
         'GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY seq ASC',
         {'block_num': block_num}
@@ -379,7 +387,7 @@ def handle_simpleassets_updates_reversed(session, block_num):
 
     for trx in reverse_trxs:
         try:
-            update = session.execute(
+            update = execute_sql(session,
                 'SELECT a.collection, a.schema, a.asset_id, d1.data AS mdata, d2.data AS idata, '
                 'u.seq, old_mdata_id '
                 'FROM simpleassets_updates_reversed u '
@@ -408,7 +416,7 @@ def handle_simpleassets_updates_reversed(session, block_num):
                     new_asset['attribute_ids'] = funcs.parse_attributes(
                         session, update['collection'], update['schema'], data)
 
-                    session.execute(
+                    execute_sql(session,
                        'UPDATE assets SET attribute_ids = :attribute_ids, mutable_data_id = :old_mdata_id '
                        '{name_clause} {image_clause} {video_clause} '
                        'WHERE asset_id = :asset_id '.format(
@@ -435,27 +443,27 @@ def handle_simpleassets_updates_reversed(session, block_num):
 
 
 def handle_transfers_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM transfers_reversed WHERE block_num >= :block_num '
         'GROUP BY 1, 2, 3, 4, 5, 6, 7, 8 ORDER BY seq ASC ',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE assets SET owner = sender '
             'FROM transfers_reversed s WHERE asset_id = ANY(asset_ids) AND s.seq = :seq', {'seq': trx['seq']}
         )
 
 
 def handle_pack_time_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM pack_time_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE packs SET unlock_time = :old_unlock_time '
             'WHERE pack_id = :pack_id AND contract = :contract',
             {
@@ -467,13 +475,13 @@ def handle_pack_time_updates_reversed(session, block_num):
 
 
 def handle_pack_display_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM pack_display_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE packs SET display_data = :old_display_data '
             'WHERE pack_id = :pack_id AND contract = :contract',
             {
@@ -485,13 +493,13 @@ def handle_pack_display_updates_reversed(session, block_num):
 
 
 def handle_pack_template_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM pack_template_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE packs SET template_id = :old_template_id '
             'WHERE pack_id = :pack_id AND contract = :contract',
             {
@@ -503,13 +511,13 @@ def handle_pack_template_updates_reversed(session, block_num):
 
 
 def handle_rwax_max_assets_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM rwax_max_assets_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE rwax_tokens r SET max_assets = :old_max_assets '
             'WHERE r.symbol = :symbol AND r.contract = :contract',
             {
@@ -521,13 +529,13 @@ def handle_rwax_max_assets_updates_reversed(session, block_num):
 
 
 def handle_rwax_trait_factor_updates_reversed(session, block_num):
-    reverse_trxs = session.execute(
+    reverse_trxs = execute_sql(session,
         'SELECT * FROM rwax_traitfactor_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
         {'block_num': block_num}
     )
 
     for trx in reverse_trxs:
-        session.execute(
+        execute_sql(session,
             'UPDATE rwax_tokens rt SET trait_factors = old_trait_factors '
             'FROM rwax_traitfactor_updates_reversed r '
             'WHERE r.seq = :seq AND r.symbol = :symbol AND r.contract = :contract',
@@ -547,12 +555,21 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
             'confirmed_block': confirmed_block
         }
 
-        session.execute('UPDATE handle_fork SET forked = TRUE, block_num = :block_num ', fork)
-        session.execute('INSERT INTO forks '
-                        'VALUES(:block_num, :unconfirmed_block, :confirmed_block, NOW() AT TIME ZONE \'utc\')', fork)
+        execute_sql(
+            session,
+            'UPDATE handle_fork SET forked = TRUE, block_num = :block_num ',
+            fork
+        )
+        execute_sql(
+            session,
+            'INSERT INTO forks '
+                'VALUES(:block_num, :unconfirmed_block, :confirmed_block, NOW() AT TIME ZONE \'utc\')'
+            , fork
+        )
 
         session.commit()
-        block_num_tables_reversed = session.execute(
+        block_num_tables_reversed = execute_sql(
+            session,
             'SELECT t1.table_name, t2.table_name AS reverse_table_name '
             'FROM tables_with_block_num t1 '
             'LEFT JOIN tables_with_block_num t2 ON (t2.table_name = CONCAT(t1.table_name, \'_reversed\')) '
@@ -563,7 +580,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         for tables in block_num_tables_reversed:
             if tables['reverse_table_name']:
-                session.execute(
+                execute_sql(
+                    session,
                     'INSERT INTO {reverse_table_name} '
                     'SELECT * FROM {table_name} WHERE block_num >= :block_num'.format(
                         reverse_table_name=tables['reverse_table_name'],
@@ -572,7 +590,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
                 )
         session.commit()
 
-        block_num_tables = session.execute(
+        block_num_tables = execute_sql(
+            session,
             'SELECT t1.table_name, t2.table_name AS reverse_table_name '
             'FROM tables_with_block_num t1 '
             'LEFT JOIN tables_with_block_num t2 ON (t2.table_name = CONCAT(t1.table_name, \'_reversed\')) '
@@ -581,7 +600,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         )
 
         for tables in block_num_tables:
-            session.execute(
+            execute_sql(
+                session,
                 'DELETE FROM {table_name} WHERE block_num >= :block_num'.format(
                     table_name=tables['table_name']
                 ), {'block_num': block_num}
@@ -616,7 +636,8 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         session.commit()
 
-        tables_reversed = session.execute(
+        tables_reversed = execute_sql(
+            session,
             'SELECT t1.table_name AS reverse_table_name '
             'FROM tables_with_block_num t1 '
             'WHERE t1.table_name LIKE \'%_reversed\' '
@@ -624,14 +645,16 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         for table in tables_reversed:
             if table['reverse_table_name']:
-                session.execute(
+                execute_sql(
+                    session,
                     'DELETE FROM {reverse_table_name} '
                     'WHERE block_num >= :block_num'.format(
                         reverse_table_name=table['reverse_table_name']
-                    ), {'block_num': block_num})
+                    ), {'block_num': block_num}
+                )
         session.commit()
 
-        removed_tables = session.execute(
+        removed_tables = execute_sql(session,
             'SELECT table_name, \'SELECT \' || array_to_string(ARRAY(SELECT \' r\' || \'.\' || c.column_name '
             'FROM information_schema.columns c '
             'WHERE table_name = t.table_name AND c.column_name NOT IN(\'removed_seq\', \'removed_block_num\') '
@@ -641,7 +664,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         )
 
         for tables in removed_tables:
-            session.execute(
+            execute_sql(session,
                 'INSERT INTO {table_name} {query} WHERE removed_block_num >= :block_num'.format(
                     table_name=tables['table_name'].replace(
                         'removed_atomic_listings', 'listings').replace(
@@ -653,7 +676,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
                     query=tables['query']
                 ), {'block_num': block_num}
             )
-            session.execute(
+            execute_sql(session,
                 'DELETE FROM {table_name} WHERE removed_block_num >= :block_num'.format(
                     table_name=tables['table_name'],
                 ), {'block_num': block_num}
@@ -661,7 +684,7 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
 
         session.commit()
 
-        session.execute('UPDATE handle_fork SET forked = FALSE')
+        execute_sql(session,'UPDATE handle_fork SET forked = FALSE')
 
         session.commit()
     except SQLAlchemyError as err:
@@ -920,7 +943,7 @@ def handle_transaction(action, block_num, timestamp, session):
 
                 if insert_transaction:
                     trace['data'] = json.dumps(trace['act']['data'])
-                    session.execute(
+                    execute_sql(session,
                         'INSERT INTO chronicle_transactions SELECT :transaction_id, :seq, :timestamp, :block_num, '
                         ':account, :name, :data, FALSE, :actor '
                         'WHERE NOT EXISTS (SELECT seq FROM chronicle_transactions WHERE seq = :seq)',
@@ -943,7 +966,7 @@ def handle_transaction(action, block_num, timestamp, session):
                         }
 
                         parse_action(session, action)
-                        session.execute(
+                        execute_sql(session,
                             'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq',
                             trace
                         )
