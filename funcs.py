@@ -93,7 +93,7 @@ def session_execute_logged(session, sql, args={}):
 
     start = time.time()
 
-    res = session.execute(text(sql), args)
+    res = session_execute_logged(session,text(sql), args)
 
     end = time.time()
 
@@ -2206,7 +2206,7 @@ def apply_atomic_updates(session):
         )
 
         for update in updates:
-            forked = session.execute('SELECT * FROM handle_fork').first()
+            forked = session_execute_logged(session,'SELECT * FROM handle_fork').first()
             if forked['forked'] and forked['block_num'] <= update['block_num']:
                 raise RuntimeError('Fork')
             try:
@@ -2283,7 +2283,7 @@ def apply_simple_updates(session):
         )
 
         for update in updates:
-            forked = session.execute('SELECT * FROM handle_fork').first()
+            forked = session_execute_logged(session,'SELECT * FROM handle_fork').first()
             if forked['forked'] and forked['block_num'] <= update['block_num']:
                 raise RuntimeError('Fork')
             try:
@@ -3196,7 +3196,8 @@ def load_claim(session, claim):
         new_transaction['asset_id'] = asset_id
         new_transaction['claimer'] = data['claimer']
 
-        session.execute(
+        session_execute_logged(
+            session,
             'INSERT INTO simpleassets_claims '
             '(asset_id, claimer, old_owner, seq, block_num, timestamp) '
             'SELECT asset_id, :claimer, owner, :seq, :block_num, :timestamp '
@@ -3209,7 +3210,8 @@ def load_claim(session, claim):
             new_transaction
         )
 
-        session.execute(
+        session_execute_logged(
+            session,
             'UPDATE assets SET  owner = :claimer '
             'WHERE asset_id = :asset_id ',
             new_transaction
@@ -3353,14 +3355,14 @@ def load_waxplorercom_buy(session, action):
     buy['market'] = 'waxplorercom'
     buy['buyer'] = data['buyer']
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO market_actions '
         'SELECT :sale_id, :market, :buyer, \'buy\', :seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM market_actions WHERE seq = :seq)',
         buy
     )
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO removed_waxplorercom_listings '
         'SELECT l.*, :seq, :block_num FROM listings l '
         'WHERE market = :market AND :sale_id = l.listing_id ',
@@ -3368,7 +3370,7 @@ def load_waxplorercom_buy(session, action):
     )
     session.commit()
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO sales '
         'SELECT l.asset_ids, a.collection, seller, :buyer, '
         'CASE WHEN currency = \'WAX\' THEN price ELSE price / ('
@@ -3383,7 +3385,7 @@ def load_waxplorercom_buy(session, action):
     )
     session.commit()
 
-    session.execute(
+    session_execute_logged(session,
         'DELETE FROM listings l WHERE sale_id IN ('
         '   SELECT sale_id FROM removed_waxplorercom_listings WHERE removed_seq = :seq'
         ')', buy
@@ -3407,7 +3409,7 @@ def load_waxplorercom_list(session, action):
     new_transaction['currency'] = 'WAX'
     new_transaction['seller'] = data['seller']
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO listings ('
         '   asset_ids, collection, seller, market, price, currency, listing_id, seq, block_num, '
         '   timestamp, estimated_wax_price '
@@ -3431,14 +3433,14 @@ def load_waxplorercom_unlist(session, action):
     buy['sale_id'] = data['sale_id']
     buy['market'] = 'waxplorercom'
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO market_actions '
         'SELECT :sale_id, :market, :actor, \'cancel\', :seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM market_actions WHERE seq = :seq)',
         buy
     )
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO removed_waxplorercom_listings '
         'SELECT l.*, :seq, :block_num FROM listings l '
         'WHERE market = :market AND :sale_id = l.listing_id ',
@@ -3446,7 +3448,7 @@ def load_waxplorercom_unlist(session, action):
     )
     session.commit()
 
-    session.execute(
+    session_execute_logged(session,
         'DELETE FROM listings l WHERE sale_id IN ('
         '   SELECT sale_id FROM removed_waxplorercom_listings WHERE removed_seq = :seq'
         ')',
@@ -3470,7 +3472,7 @@ def load_market_myth_buy(session, action):
     buy['currency'] = data['price'].split(' ')[1]
     buy['referral'] = data['referral'] if 'referral' in data and data['referral'] == 'waxplorerref' else None
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO market_myth_sales '
         'SELECT :asset_ids, :seller, :buyer, :price, :currency, :asset_id, :market, NULL, :referral, '
         ':seq, :block_num, :timestamp '
@@ -3498,7 +3500,7 @@ def load_simplemarket_update(session, action):
     transaction['offer_price'] = offer_price
     transaction['offer_currency'] = offer_currency
 
-    session.execute(
+    session_execute_logged(session,
         'INSERT INTO simplemarket_updates '
         'SELECT :sale_id, :seq, :block_num, :timestamp, :new_price, :currency, :offer_price, :offer_currency, '
         ':offer_time, price, currency '
@@ -3509,7 +3511,7 @@ def load_simplemarket_update(session, action):
     )
     session.commit()
 
-    session.execute(
+    session_execute_logged(session,
         'UPDATE listings SET price = new_price, currency = u.currency, '
         'estimated_wax_price = CASE WHEN  u.currency = \'WAX\' '
         'THEN new_price ELSE new_price / (SELECT usd FROM usd_prices ORDER BY timestamp DESC LIMIT 1) END '
