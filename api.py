@@ -37,7 +37,7 @@ app.config.from_object(PostgresConfig)
 #app.config["CACHE_TYPE"] = "simple"
 app.config['CACHE_TYPE'] = 'redis'
 app.config['CACHE_REDIS_HOST'] = 'localhost'
-app.config['CACHE_REDIS_PORT'] = 6380
+app.config['CACHE_REDIS_PORT'] = 6379
 app.config['CACHE_REDIS_DB'] = 0
 
 cache = Cache()
