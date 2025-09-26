@@ -33,14 +33,13 @@ app = Flask(__name__, static_folder='build', static_url_path='/')
 app.config.from_object(PostgresConfig)
 
 print(app.config)
+cache = Cache()
 
 #app.config["CACHE_TYPE"] = "simple"
 app.config['CACHE_TYPE'] = 'redis'
 app.config['CACHE_REDIS_HOST'] = '127.0.0.1'
 app.config['CACHE_REDIS_PORT'] = 6379
-app.config['CACHE_REDIS_DB'] = 0
 
-cache = Cache()
 cache.init_app(app)
 
 db.init_app(app)
@@ -164,7 +163,7 @@ def initial_listing_feed():
 
 announcer = MessageAnnouncer()
 
-redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+redis_client = redis.Redis(host='127.0.0.1', port=6379, decode_responses=True)
 
 @app.route('/test/cached-content')
 def cached_content():
