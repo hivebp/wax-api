@@ -14,10 +14,10 @@ from config import PostgresConfig
 import logging
 
 import time
-from flask_caching import Cache
 
 from flask_compress import Compress
 from db import db
+from cache import cache
 
 from ddtrace import patch_all
 
@@ -33,7 +33,6 @@ app = Flask(__name__, static_folder='build', static_url_path='/')
 app.config.from_object(PostgresConfig)
 
 print(app.config)
-cache = Cache()
 
 #app.config["CACHE_TYPE"] = "simple"
 app.config['CACHE_TYPE'] = 'redis'

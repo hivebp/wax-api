@@ -6,8 +6,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from api import logging
-from api import cache
-from api import db
+from cache import cache
+from db import db
 
 DATE_FORMAT_STRING = "%Y-%m-%d %H:%M:%S"
 DATE_FROM_STRING_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
