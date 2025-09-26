@@ -47,6 +47,8 @@ executor = Executor(app)
 
 db = SQLAlchemy(app, session_options={'autocommit': False})
 
+db.init_app(app)
+
 print(app.extensions["cache"])  # should not be empty
 print(list(app.extensions["cache"].keys()))
 
