@@ -982,9 +982,7 @@ def get_health():
     except SQLAlchemyError as e:
         logging.error(e)
         session.rollback()
-        raise e
-    finally:
-        session.remove()
+        return e
 
 
 @cache.memoize(timeout=300)

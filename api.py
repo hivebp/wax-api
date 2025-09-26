@@ -2,7 +2,7 @@ import json
 import os
 from functools import wraps
 
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 from oto.adaptors.flask import flaskify
 from oto import response as oto_response
 from flask_cors import CORS
@@ -18,6 +18,7 @@ import time
 from flask_caching import Cache
 
 from flask_compress import Compress
+from db import db
 
 from ddtrace import patch_all
 
@@ -34,16 +35,16 @@ app.config.from_object(PostgresConfig)
 
 print(app.config)
 
-app.config["CACHE_TYPE"] = "simple"
-#app.config['CACHE_TYPE'] = 'redis'
-#app.config['CACHE_REDIS_HOST'] = 'localhost'
-#app.config['CACHE_REDIS_PORT'] = 6379
-#app.config['CACHE_REDIS_DB'] = 0
+#app.config["CACHE_TYPE"] = "simple"
+app.config['CACHE_TYPE'] = 'redis'
+app.config['CACHE_REDIS_HOST'] = 'localhost'
+app.config['CACHE_REDIS_PORT'] = 6379
+app.config['CACHE_REDIS_DB'] = 0
 
 cache = Cache()
 cache.init_app(app)
 
-db = SQLAlchemy(app, session_options={'autocommit': False})
+db.init_app(app)
 
 print(app.extensions["cache"])  # should not be empty
 print(list(app.extensions["cache"].keys()))
@@ -218,9 +219,8 @@ def catch_and_respond():
             try:
                 return f(*args, **kwargs)
             except Exception as err:
-                logging.error(err)
-                return flaskify(oto_response.Response(
-                    {'error': 'An unexpected Error occured: {}'.format(err)}, errors=err, status=500))
+                logging.exception("Unhandled error in %s", f.__name__)
+                return jsonify(error=str(err)), 500
         return decorated_function
     return decorator
 
