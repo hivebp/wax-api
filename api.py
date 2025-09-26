@@ -172,6 +172,7 @@ redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
 @app.route('/test/cached-content')
 def cached_content():
     try:
+        cached_keys = redis_client.keys('*')
         return flaskify(oto_response.Response(cached_keys))
     except Exception as err:
         logging.error(err)
