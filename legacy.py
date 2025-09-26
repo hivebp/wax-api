@@ -1,7 +1,11 @@
+import base64
 import datetime
 import json
+import os
 import random
 import time
+
+from dotenv import load_dotenv
 
 from api import logging
 from api import cache
@@ -507,6 +511,73 @@ def get_banners():
         return banners
     else:
         return {}
+
+
+def add_token(symbol, contract):
+    load_dotenv()
+    pw = os.getenv('cpupw')
+    cleos = os.getenv('cleos')
+    logging.error(pw)
+    logging.error(cleos)
+    logging.error('{} wallet unlock -n nfthivecpu4u --password {}'.format(cleos, pw))
+    os.system('{} wallet unlock -n nfthivecpu4u --password {}'.format(cleos, pw))
+
+    os.system(
+        '{cleos} -u https://api3.hivebp.io push action nfthivecraft addtoken '
+        '\'["{contract}", "{symbol}"]\' -p nfthivecraft@deploy'.format(
+            cleos=cleos,
+            contract=contract,
+            symbol=symbol
+        )
+    )
+
+    os.system(
+        '{cleos} -u https://api3.hivebp.io push action nfthivepacks addtoken '
+        '\'["{contract}", "{symbol}"]\' -p nfthivepacks@deploy'.format(
+            cleos=cleos,
+            contract=contract,
+            symbol=symbol
+        )
+    )
+
+    logging.error(
+        '{cleos} -u https://api3.hivebp.io push action nfthivedrops addconftoken '
+        '\'["{contract}", "{symbol}"]\' -p nfthivedrops@deploy'.format(
+            cleos=cleos,
+            contract=contract,
+            symbol=symbol
+        )
+    )
+
+    os.system(
+        '{cleos} -u https://api3.hivebp.io push action nfthivedrops addconftoken '
+        '\'["{contract}", "{symbol}"]\' -p nfthivedrops@deploy'.format(
+            cleos=cleos,
+            contract=contract,
+            symbol=symbol
+        )
+    )
+
+
+def check_password(token):
+    stuff = base64.b64decode(token).decode('utf-8')
+    if ':' in stuff:
+        session = create_session()
+        try:
+            user = stuff.split(':')[0]
+            pwd = stuff.split(':')[1]
+            res = execute_sql(session, 'SELECT * FROM admin_passwords WHERE user_name = :user AND password = :pwd', {
+                'user': user, 'pwd': pwd
+            })
+
+            return res.rowcount == 1
+        except SQLAlchemyError as e:
+            logging.error(e)
+            session.rollback()
+            raise e
+        finally:
+            session.remove()
+    return False
 
 
 def get_wuffi_airdrop(airdrop_id, username):

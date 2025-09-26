@@ -1,6 +1,8 @@
+import json
 import os
 from functools import wraps
 
+import redis
 from flask import Flask, request, Response
 from oto.adaptors.flask import flaskify
 from oto import response as oto_response
@@ -32,7 +34,11 @@ compress = Compress()
 app = Flask(__name__, static_folder='build', static_url_path='/')
 app.config.from_object(PostgresConfig)
 
-app.config["CACHE_TYPE"] = "simple"
+#app.config["CACHE_TYPE"] = "simple"
+app.config['CACHE_TYPE'] = 'redis'
+app.config['CACHE_REDIS_HOST'] = 'localhost'
+app.config['CACHE_REDIS_PORT'] = 6380
+app.config['CACHE_REDIS_DB'] = 0
 
 cache = Cache()
 cache.init_app(app)
@@ -735,6 +741,19 @@ def listing(market, listing_id):
             return flaskify(oto_response.Response(result[0]))
 
     return flaskify(oto_response.Response({}))
+
+redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+
+
+@app.route('/test/cached-content')
+def cached_content():
+    try:
+        cached_keys = redis_client.keys('*')
+        cached_data = {key: redis_client.get(key) for key in cached_keys}
+        return flaskify(oto_response.Response(cached_data))
+    except Exception as err:
+        logging.error(err)
+        return flaskify(oto_response.Response('Error retrieving Redis cache', errors=err, status=500))
 
 
 @app.route('/api/collection/<collection>')
@@ -1796,6 +1815,40 @@ def search_term(term, name):
     except Exception as err:
         logging.error(err)
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+
+
+@app.route('/legacy/add-token', methods=['POST'])
+def add_token():
+    auth_check_res = check_authorization(request)
+    if auth_check_res is not None:
+        return auth_check_res
+    data = json.loads(request.data.decode('utf-8'))
+    symbol = data['symbol'] if 'symbol' in data.keys() else None
+    contract = data['contract'] if 'contract' in data.keys() else None
+    try:
+        legacy.add_token(symbol, contract)
+        return flaskify(oto_response.Response('Banner Created', status=200))
+    except Exception as err:
+        print(err)
+        return flaskify(oto_response.Response("An unexpected Error occured", status=500))
+
+
+def check_authorization(request):
+    auth_header = request.headers.get('Authorization')
+    try:
+        if not auth_header:
+            return flaskify(oto_response.Response("Permission Denied", status=401))
+        split = auth_header.split(' ')
+        [bearer, token] = split[0], ' '.join(split[1:])
+        if bearer != 'Bearer':
+            return flaskify(oto_response.Response("Permission Denied", status=401))
+        if not legacy.check_password(token):
+            return flaskify(oto_response.Response("Permission Denied", status=401))
+
+        return None
+    except Exception as err:
+        print(err)
+        return flaskify(oto_response.Response("An unexpected Error occured", status=500))
 
 
 if __name__ == '__main__':

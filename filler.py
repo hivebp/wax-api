@@ -7,6 +7,7 @@ import time
 
 import _thread
 
+import pytz
 from flask import Flask, json, request
 from oto.adaptors.flask import flaskify
 from oto import response as oto_response
@@ -294,6 +295,67 @@ def execute_sql(session, sql, args=None):
     mappings = res.mappings()
     mappings.rowcount = res.rowcount
     return mappings
+
+
+def get_valid_response(url, start_date, end_date):
+    hyperion = get_url(0)
+    message = ''
+    actions = None
+
+    formatted_url = url.format(hyperion, start_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                               end_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ'))
+
+    response = requests.request("GET", formatted_url)
+    code = response.status_code
+    if response.status_code == 200:
+        message = response.content
+        actions = json.loads(response.content)
+        if 'actions' in actions.keys() and len(actions['actions']) > 0 or hyperion == hyperions[len(hyperions) - 1]:
+            return actions
+        elif 'atomicassets' in url or 'simpleassets' in url:
+            log_error('get_valid_response empty {} {}: {}'.format(formatted_url, response.status_code,
+                                                                  response.content))
+    else:
+        log_error('get_valid_response {} {}: {}'.format(formatted_url, response.status_code, response.content))
+
+    if code == 200 and actions:
+        return actions
+    raise Exception('No valid response: {} {}: {}'.format(code, formatted_url, message))
+
+
+@app.route('/loader/accounting')
+def get_receive_row():
+    start_date = datetime.datetime(2025, 7, 1, 0, 0, 0, tzinfo=pytz.utc)
+    end_date = datetime.datetime(2025, 8, 1, 0, 0, 0, tzinfo=pytz.utc)
+    trx = get_valid_response(
+        '{}/v2/history/get_actions?'
+        'account=waxhiveguild&filter=eosio.token:transfer&'
+        'skip=0&limit=1000&sort=asc&after={}&before={}&simple=false',
+        start_date, end_date
+    )
+
+    session = create_session()
+
+    dates = {}
+
+    while start_date <= end_date:
+        res = execute_sql(session,
+            'SELECT MIN(usd) AS usd FROM usd_prices WHERE timestamp BETWEEN :date AND :date + INTERVAL \'24 hours\' '
+            'ORDER BY MIN(timestamp) DESC LIMIT 1',
+            {'date': start_date}
+        ).first()
+        dates[start_date.strftime("%Y-%m-%d")] = res['usd']
+
+        start_date += datetime.timedelta(days=1)
+
+    for action in trx['actions']:
+        data = action['act']['data']
+        if data['to'] == 'waxhiveguild':
+            date_key = action['timestamp'][0:10]
+            usd = dates[date_key]
+            if data['amount'] > 100:
+                print(action['timestamp'] + ';' + str(data['amount']) + ';' + str(usd) + ';' + ';' + ';' + data[
+                    'from'] + ';' + 'https://waxblock.io/transaction/' + action['trx_id'])
 
 
 @app.route('/loader/vacuum')

@@ -1567,6 +1567,11 @@ def assets(
                 )
             search_clause += search_category_clause
 
+        if search_type == 'bulk_transfer':
+            search_clause += (
+                ' AND a.transferable '
+            )
+
         if name:
             if exact_search:
                 search_clause += (
