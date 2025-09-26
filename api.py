@@ -34,6 +34,8 @@ compress = Compress()
 app = Flask(__name__, static_folder='build', static_url_path='/')
 app.config.from_object(PostgresConfig)
 
+print(app.config)
+
 app.config["CACHE_TYPE"] = "simple"
 #app.config['CACHE_TYPE'] = 'redis'
 #app.config['CACHE_REDIS_HOST'] = 'localhost'
@@ -46,8 +48,6 @@ cache.init_app(app)
 executor = Executor(app)
 
 db = SQLAlchemy(app, session_options={'autocommit': False})
-
-db.init_app(app)
 
 print(app.extensions["cache"])  # should not be empty
 print(list(app.extensions["cache"].keys()))
