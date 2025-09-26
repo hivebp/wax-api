@@ -172,9 +172,7 @@ redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
 @app.route('/test/cached-content')
 def cached_content():
     try:
-        cached_keys = redis_client.keys('*')
-        cached_data = {key: redis_client.get(key) for key in cached_keys}
-        return flaskify(oto_response.Response(cached_data))
+        return flaskify(oto_response.Response(cached_keys))
     except Exception as err:
         logging.error(err)
         return flaskify(oto_response.Response('Error retrieving Redis cache', errors=err, status=500))
