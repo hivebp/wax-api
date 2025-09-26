@@ -8,8 +8,6 @@ from oto.adaptors.flask import flaskify
 from oto import response as oto_response
 from flask_cors import CORS
 
-from flask_sqlalchemy import SQLAlchemy
-
 from app_runner import run_app
 from config import PostgresConfig
 
@@ -38,7 +36,7 @@ print(app.config)
 
 #app.config["CACHE_TYPE"] = "simple"
 app.config['CACHE_TYPE'] = 'redis'
-app.config['CACHE_REDIS_HOST'] = 'localhost'
+app.config['CACHE_REDIS_HOST'] = '127.0.0.1'
 app.config['CACHE_REDIS_PORT'] = 6379
 app.config['CACHE_REDIS_DB'] = 0
 
@@ -165,7 +163,6 @@ def initial_listing_feed():
 
 
 announcer = MessageAnnouncer()
-
 
 redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
@@ -752,9 +749,6 @@ def listing(market, listing_id):
             return flaskify(oto_response.Response(result[0]))
 
     return flaskify(oto_response.Response({}))
-
-#redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
-
 
 
 @app.route('/api/collection/<collection>')
