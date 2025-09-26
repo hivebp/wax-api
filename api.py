@@ -2,7 +2,6 @@ import json
 import os
 from functools import wraps
 
-import redis
 from flask import Flask, request, Response
 from oto.adaptors.flask import flaskify
 from oto import response as oto_response
@@ -744,18 +743,8 @@ def listing(market, listing_id):
 
     return flaskify(oto_response.Response({}))
 
-redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+#redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
-
-@app.route('/test/cached-content')
-def cached_content():
-    try:
-        cached_keys = redis_client.keys('*')
-        cached_data = {key: redis_client.get(key) for key in cached_keys}
-        return flaskify(oto_response.Response(cached_data))
-    except Exception as err:
-        logging.error(err)
-        return flaskify(oto_response.Response('Error retrieving Redis cache', errors=err, status=500))
 
 
 @app.route('/api/collection/<collection>')
