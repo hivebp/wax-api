@@ -7,7 +7,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from api import logging
 from api import cache
-from api import executor
 from api import db
 
 DATE_FORMAT_STRING = "%Y-%m-%d %H:%M:%S"
@@ -797,26 +796,6 @@ def _get_recently_sold_filter(recently_sold):
             ') '.format(table=table)
         )
     return search_clause
-
-
-def parallel(requests):
-    """Execute requests in parallel.
-
-    Provided a dict of requests, execute them with the provided id and kwargs.
-    Return the results of these requests in a dict keyed by keys in the
-    requests parameter.
-    """
-    futures = {
-        executor.submit(
-            request['func'],
-            *request['args']
-        ): key for (key, request) in requests.items()
-    }
-    concurrent.futures.wait(futures)
-    output = dict(map(lambda f: (futures[f], f.result()), futures))
-
-    # Format the responses for errors, return as oto response
-    return output
 
 
 def newest_listings(collection, schema, template_id):

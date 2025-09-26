@@ -7,7 +7,6 @@ from oto.adaptors.flask import flaskify
 from oto import response as oto_response
 from flask_cors import CORS
 
-from flask_executor import Executor
 from flask_sqlalchemy import SQLAlchemy
 
 from app_runner import run_app
@@ -43,8 +42,6 @@ app.config["CACHE_TYPE"] = "simple"
 
 cache = Cache()
 cache.init_app(app)
-
-executor = Executor(app)
 
 db = SQLAlchemy(app, session_options={'autocommit': False})
 
