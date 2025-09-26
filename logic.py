@@ -983,6 +983,8 @@ def get_health():
         logging.error(e)
         session.rollback()
         return e
+    finally:
+        session.remove()
 
 
 @cache.memoize(timeout=300)
