@@ -4000,7 +4000,7 @@ def get_collection_filter(verified='verified', term='', market='', type='', owne
         session.remove()
 
 
-def get_crafts(craft_id=None, collection=None, limit=40, order_by='craft_id_desc', offset=0, verified='all', craft_ids=None):
+def get_crafts(craft_id=None, collection=None, limit=40, order_by='craft_id_desc', offset=0, verified='all', show_hidden=False, craft_ids=None):
     session = create_session()
     try:
         order_dir = 'DESC'
@@ -4031,6 +4031,9 @@ def get_crafts(craft_id=None, collection=None, limit=40, order_by='craft_id_desc
             order_clause = 'ORDER BY c.timestamp {dir} NULLS LAST, craft_id {dir}'.format(dir=order_dir)
 
         search_clause = ''
+
+        if not show_hidden:
+            search_clause = ' AND NOT is_hidden '
 
         if verified == 'verified':
             search_clause += ' AND verified '
@@ -4091,7 +4094,7 @@ def get_crafts(craft_id=None, collection=None, limit=40, order_by='craft_id_desc
             '       SELECT craft_id, unlock_time, c.timestamp, display_data, collection '
             '       FROM crafts c '
             '       LEFT JOIN collections col USING(collection) '
-            '       WHERE NOT erased AND ready AND NOT is_hidden {collection_clause} {search_clause} {order_clause} '
+            '       WHERE NOT erased AND ready {collection_clause} {search_clause} {order_clause} '
             '       LIMIT :limit OFFSET :offset '
             '   ) c INNER JOIN crafts c2 USING (craft_id) '
             ') c '

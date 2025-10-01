@@ -792,6 +792,7 @@ def get_crafts():
     limit = request.args.get('limit', 40)
     order_by = request.args.get('order_by') if request.args.get('order_by') else 'craft_id_desc'
     verified = request.args.get('verified', 'verified')
+    show_hidden = request.args.get('show_hidden', 'false') == 'true'
 
     if collection:
         collection = _format_collection(collection)
@@ -813,7 +814,7 @@ def get_crafts():
         offset = 0
 
     search_res = logic.get_crafts(
-        craft_id, collection, limit, order_by, offset, verified
+        craft_id, collection, limit, order_by, offset, verified, show_hidden
     )
 
     return flaskify(oto_response.Response(search_res))
@@ -1596,7 +1597,7 @@ def get_crafts_data():
         craft_ids = craft_ids.split(',') if craft_ids and ',' in craft_ids else ([craft_ids] if craft_ids else [])
 
         search_res = logic.get_crafts(
-            craft_ids=craft_ids, limit=len(craft_ids)
+            craft_ids=craft_ids, limit=len(craft_ids), show_hidden=True
         )
 
         return flaskify(oto_response.Response(search_res))

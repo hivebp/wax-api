@@ -4619,6 +4619,7 @@ def load_craft(session, update, contract):
     new_drop['collection'] = data['collection_name']
     new_drop['collection_name'] = data['collection_name']
     new_drop['display_data'] = data['display_data'] if 'display_data' in data else None
+    new_drop['is_hidden'] = data['is_hidden'] if 'is_hidden' in data else False
 
     new_drop['unlock_time'] = datetime.datetime.fromtimestamp(data['unlock_time']) if 'unlock_time' in data and data['unlock_time'] else None
     new_drop['num_crafted'] = 0
@@ -4636,9 +4637,9 @@ def load_craft(session, update, contract):
     session_execute_logged(
         session,
         'INSERT INTO crafts (craft_id, collection, display_data, unlock_time, num_crafted, erased, contract, '
-        'ready, recipe, outcomes, total, seq, block_num, timestamp) '
+        'ready, is_hidden, recipe, outcomes, total, seq, block_num, timestamp) '
         'SELECT :craft_id, :collection, :display_data, :unlock_time, 0, FALSE, :contract, '
-        'TRUE, :recipe, :outcomes, :total, :seq, :block_num, :timestamp '
+        'TRUE, :is_hidden, :recipe, :outcomes, :total, :seq, :block_num, :timestamp '
         'WHERE NOT EXISTS (SELECT seq FROM crafts WHERE seq = :seq) ', new_drop
     )
     session.commit()
