@@ -2460,7 +2460,8 @@ def load_usd_rate_till_stopped():
 
 @app.route('/loader/status')
 def status():
-    global isUpdatingAtomicAssets
+    global isUpdatingAtomicAssetsData
+    global isUpdatingAtomicAssetsMints
     global isInsertingAtomicAssets
     global isLoadingUSD
     global isStopped
@@ -2469,7 +2470,8 @@ def status():
     return flaskify(oto_response.Response({
         'stopped': isStopped,
         'loading': isLoading,
-        'isUpdatingAtomicAssets': isUpdatingAtomicAssets,
+        'isUpdatingAtomicAssetsData': isUpdatingAtomicAssetsData,
+        'isUpdatingAtomicAssetsMints': isUpdatingAtomicAssetsMints,
         'isInsertingAtomicAssets': isInsertingAtomicAssets,
         'isLoadingUSD': isLoadingUSD,
         'measureGod': action_measure_god
@@ -2583,10 +2585,10 @@ def keep_inserting_atomic_mints():
 @app.route('/loader/update-atomic-mints')
 def keep_updating_atomic_mints():
     global isStopped
-    global isUpdatingAtomicAssets
+    global isUpdatingAtomicAssetsMints
     isStopped = False
     try:
-        isUpdatingAtomicAssets = True
+        isUpdatingAtomicAssetsMints = True
         while not isStopped:
             session = create_session()
             try:
@@ -2606,16 +2608,18 @@ def keep_updating_atomic_mints():
         log_error('keep_updating_atomic_mints: {}'.format(err))
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
-        isUpdatingAtomicAssets = False
+        isUpdatingAtomicAssetsMints = False
 
 
 @app.route('/loader/start/')
 def start():
-    global isUpdatingAtomicAssets
+    global isUpdatingAtomicAssetsMints
+    global isUpdatingAtomicAssetsData
     global isLoadingChronicleTx
     global isLoadingUSD
     global isStopped
-    if not isStopped or isLoadingChronicleTx or isUpdatingAtomicAssets or isLoadingUSD or isInsertingAtomicAssets:
+    if not isStopped or isLoadingChronicleTx or isUpdatingAtomicAssetsMints or isLoadingUSD or isInsertingAtomicAssets\
+            or isUpdatingAtomicAssetsData:
         return flaskify(oto_response.Response('Already processing request', status=102))
     try:
         isStopped = False
