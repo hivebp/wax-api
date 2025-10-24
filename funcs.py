@@ -2256,14 +2256,14 @@ def apply_atomic_updates(session):
             )
         session.commit()
     except SQLAlchemyError as err:
-        log_error('apply_simple_updates: {}'.format(err))
+        log_error('apply_atomic_updates: {}'.format(err))
         raise err
     except RuntimeError as err:
-        time.sleep(30)
-        log_error('apply_simple_updates: {}'.format(err))
+        time.sleep(1)
+        log_error('apply_atomic_updates: {}'.format(err))
         raise err
     except Exception as err:
-        log_error('apply_simple_updates: {}'.format(err))
+        log_error('apply_atomic_updates: {}'.format(err))
         raise err
 
 

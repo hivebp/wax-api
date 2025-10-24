@@ -2345,7 +2345,6 @@ def refresh_recently_sold():
 @app.route('/loader/load-chronicle-transactions')
 def load_chronicle_transactions():
     global isStopped
-    isStopped = False
     global isLoadingChronicleTx
     global isForked
     global action_measure_god
@@ -2429,7 +2428,6 @@ def load_chronicle_transactions():
         except SQLAlchemyError as err:
             log_error('SQLAlchemyError load_chronicle_transactions: {}'.format(err))
             session.rollback()
-            isStopped = True
         except Exception as err:
             log_error('load_chronicle_transactions: {}'.format(err))
             execute_sql(session, 
@@ -2437,25 +2435,25 @@ def load_chronicle_transactions():
                 {'seq': max_seq}
             )
             session.commit()
-            isStopped = True
         finally:
             session.remove()
     isLoadingChronicleTx = False
 
 
 def load_usd_rate_till_stopped():
-    global isStopped
-    global isLoadingUSD
-    try:
-        isLoadingUSD = True
-        while not isStopped:
-            load_usd_rate()
-            time.sleep(30)
-    except Exception as err:
-        log_error('load_usd_rate_till_stopped: {}'.format(err))
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        isLoadingUSD = False
+    with app.app_context():
+        global isStopped
+        global isLoadingUSD
+        try:
+            isLoadingUSD = True
+            while not isStopped:
+                load_usd_rate()
+                time.sleep(30)
+        except Exception as err:
+            log_error('load_usd_rate_till_stopped: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+        finally:
+            isLoadingUSD = False
 
 
 @app.route('/loader/status')
@@ -2504,111 +2502,111 @@ def load_usd_rate():
 
 @app.route('/loader/update-atomic-assets')
 def keep_updating_atomicassets():
-    global isStopped
-    global isUpdatingAtomicAssetsData
-    isStopped = False
-    try:
-        isUpdatingAtomicAssetsData = True
-        while not isStopped:
-            session = create_session()
-            try:
-                funcs.apply_atomic_updates(session)
-            except SQLAlchemyError as err:
-                log_error('keep_updating_assets: {}'.format(err))
-                session.rollback()
-            except RuntimeError as err:
-                log_error('keep_updating_assets: {}'.format(err))
-                session.rollback()
-                time.sleep(30)
-            finally:
-                session.remove()
-    except Exception as err:
-        log_error('keep_updating_assets: {}'.format(err))
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        isUpdatingAtomicAssetsData = False
+    with app.app_context():
+        global isStopped
+        global isUpdatingAtomicAssetsData
+        try:
+            isUpdatingAtomicAssetsData = True
+            while not isStopped:
+                session = create_session()
+                try:
+                    funcs.apply_atomic_updates(session)
+                except SQLAlchemyError as err:
+                    log_error('keep_updating_assets: {}'.format(err))
+                    session.rollback()
+                except RuntimeError as err:
+                    log_error('keep_updating_assets: {}'.format(err))
+                    session.rollback()
+                    time.sleep(30)
+                finally:
+                    session.remove()
+        except Exception as err:
+            log_error('keep_updating_assets: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+        finally:
+            isUpdatingAtomicAssetsData = False
 
 
 def keep_updating_simpleassets():
-    global isStopped
-    global isUpdatingSimpleAssetsData
-    isStopped = False
-    try:
-        isUpdatingSimpleAssetsData = True
-        while not isStopped:
-            session = create_session()
-            try:
-                funcs.apply_simple_updates(session)
-            except SQLAlchemyError as err:
-                log_error('keep_updating_assets: {}'.format(err))
-                session.rollback()
-            except RuntimeError as err:
-                log_error('keep_updating_assets: {}'.format(err))
-                session.rollback()
-                time.sleep(30)
-            finally:
-                session.remove()
-    except Exception as err:
-        log_error('keep_updating_assets: {}'.format(err))
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        isUpdatingSimpleAssetsData = False
+    with app.app_context():
+        global isStopped
+        global isUpdatingSimpleAssetsData
+        try:
+            isUpdatingSimpleAssetsData = True
+            while not isStopped:
+                session = create_session()
+                try:
+                    funcs.apply_simple_updates(session)
+                except SQLAlchemyError as err:
+                    log_error('keep_updating_assets: {}'.format(err))
+                    session.rollback()
+                except RuntimeError as err:
+                    log_error('keep_updating_assets: {}'.format(err))
+                    session.rollback()
+                    time.sleep(30)
+                finally:
+                    session.remove()
+        except Exception as err:
+            log_error('keep_updating_assets: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+        finally:
+            isUpdatingSimpleAssetsData = False
 
 
 @app.route('/loader/insert-atomic-mints')
 def keep_inserting_atomic_mints():
-    global isStopped
-    global isInsertingAtomicAssets
-    isStopped = False
-    try:
-        isInsertingAtomicAssets = True
-        while not isStopped:
-            session = create_session()
-            try:
-                funcs.insert_atomic_mints(session)
-            except SQLAlchemyError as err:
-                log_error('keep_inserting_atomic_mints: {}'.format(err))
-                session.rollback()
-            except RuntimeError as err:
-                log_error('keep_inserting_atomic_mints: {}'.format(err))
-                session.rollback()
-                time.sleep(30)
-            finally:
-                session.remove()
-    except Exception as err:
-        log_error('keep_updating_atomic_mints: {}'.format(err))
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    with app.app_context():
+        global isStopped
+        global isInsertingAtomicAssets
+        try:
+            isInsertingAtomicAssets = True
+            while not isStopped:
+                session = create_session()
+                try:
+                    funcs.insert_atomic_mints(session)
+                except SQLAlchemyError as err:
+                    log_error('keep_inserting_atomic_mints: {}'.format(err))
+                    session.rollback()
+                except RuntimeError as err:
+                    log_error('keep_inserting_atomic_mints: {}'.format(err))
+                    session.rollback()
+                    time.sleep(30)
+                finally:
+                    session.remove()
+        except Exception as err:
+            log_error('keep_updating_atomic_mints: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
         isInsertingAtomicAssets = False
 
 
 @app.route('/loader/update-atomic-mints')
 def keep_updating_atomic_mints():
-    global isStopped
-    global isUpdatingAtomicAssetsMints
-    isStopped = False
-    try:
-        isUpdatingAtomicAssetsMints = True
-        while not isStopped:
-            session = create_session()
-            try:
-                rowcnt = funcs.calc_atomic_mints(session)
-                if rowcnt < 1:
-                    time.sleep(5)
-            except SQLAlchemyError as err:
-                log_error('keep_updating_atomic_mints: {}'.format(err))
-                session.rollback()
-            except RuntimeError as err:
-                log_error('keep_updating_atomic_mints: {}'.format(err))
-                session.rollback()
-                time.sleep(30)
-            finally:
-                session.remove()
-    except Exception as err:
-        log_error('keep_updating_atomic_mints: {}'.format(err))
-        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        isUpdatingAtomicAssetsMints = False
+    with app.app_context():
+        global isStopped
+        global isUpdatingAtomicAssetsMints
+        try:
+            isUpdatingAtomicAssetsMints = True
+            while not isStopped:
+                session = create_session()
+                try:
+                    rowcnt = funcs.calc_atomic_mints(session)
+                    if rowcnt < 1:
+                        time.sleep(5)
+                except SQLAlchemyError as err:
+                    log_error('keep_updating_atomic_mints: {}'.format(err))
+                    session.rollback()
+                except RuntimeError as err:
+                    log_error('keep_updating_atomic_mints: {}'.format(err))
+                    session.rollback()
+                    time.sleep(30)
+                finally:
+                    session.remove()
+        except Exception as err:
+            log_error('keep_updating_atomic_mints: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+        finally:
+            isUpdatingAtomicAssetsMints = False
 
 
 @app.route('/loader/start/')
