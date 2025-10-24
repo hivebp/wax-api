@@ -37,7 +37,9 @@ isLoading = False
 isLoadingChronicleTx = False
 isLoadingUSD = False
 isVacuuming = False
-isUpdatingAtomicAssets = False
+isUpdatingAtomicAssetsMints = False
+isUpdatingAtomicAssetsData = False
+isUpdatingSimpleAssetsData = False
 isInsertingAtomicAssets = False
 isUpdatingAssetsData = False
 isLoadingPFPAttributes = False
@@ -2498,16 +2500,42 @@ def load_usd_rate():
     return flaskify(oto_response.Response('USD prices loaded'))
 
 
-def keep_updating_assets():
+@app.route('/loader/update-atomic-assets')
+def keep_updating_atomicassets():
     global isStopped
-    global isUpdatingAssetsData
+    global isUpdatingAtomicAssetsData
     isStopped = False
     try:
-        isUpdatingAssetsData = True
+        isUpdatingAtomicAssetsData = True
         while not isStopped:
             session = create_session()
             try:
                 funcs.apply_atomic_updates(session)
+            except SQLAlchemyError as err:
+                log_error('keep_updating_assets: {}'.format(err))
+                session.rollback()
+            except RuntimeError as err:
+                log_error('keep_updating_assets: {}'.format(err))
+                session.rollback()
+                time.sleep(30)
+            finally:
+                session.remove()
+    except Exception as err:
+        log_error('keep_updating_assets: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        isUpdatingAtomicAssetsData = False
+
+
+def keep_updating_simpleassets():
+    global isStopped
+    global isUpdatingSimpleAssetsData
+    isStopped = False
+    try:
+        isUpdatingSimpleAssetsData = True
+        while not isStopped:
+            session = create_session()
+            try:
                 funcs.apply_simple_updates(session)
             except SQLAlchemyError as err:
                 log_error('keep_updating_assets: {}'.format(err))
@@ -2522,7 +2550,7 @@ def keep_updating_assets():
         log_error('keep_updating_assets: {}'.format(err))
         return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
     finally:
-        isUpdatingAssetsData = False
+        isUpdatingSimpleAssetsData = False
 
 
 @app.route('/loader/insert-atomic-mints')
@@ -2594,7 +2622,8 @@ def start():
         _thread.start_new_thread(keep_inserting_atomic_mints, ())
         _thread.start_new_thread(keep_updating_atomic_mints, ())
         _thread.start_new_thread(load_usd_rate_till_stopped, ())
-        _thread.start_new_thread(keep_updating_assets, ())
+        _thread.start_new_thread(keep_updating_atomicassets, ())
+        _thread.start_new_thread(keep_updating_simpleassets, ())
         return flaskify(oto_response.Response({'Started'}))
     except Exception as err:
         log_error('start: {}'.format(err))

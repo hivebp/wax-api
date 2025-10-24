@@ -2210,7 +2210,7 @@ def apply_atomic_updates(session):
             if forked['forked'] and forked['block_num'] <= update['block_num']:
                 raise RuntimeError('Fork')
             try:
-                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] else {}
+                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] and update['idata'] != '[]' else {}
                 if 'mdata' in update.keys() and update['mdata']:
                     data.update(json.loads(update['mdata']))
             except Exception as err:
@@ -2287,7 +2287,7 @@ def apply_simple_updates(session):
             if forked['forked'] and forked['block_num'] <= update['block_num']:
                 raise RuntimeError('Fork')
             try:
-                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] else {}
+                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] and update['idata'] != '[]' else {}
                 if 'mdata' in update.keys() and update['mdata']:
                     data.update(json.loads(update['mdata']))
             except Exception as err:
