@@ -2576,8 +2576,8 @@ def keep_inserting_atomic_mints():
         except Exception as err:
             log_error('keep_updating_atomic_mints: {}'.format(err))
             return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
-    finally:
-        isInsertingAtomicAssets = False
+        finally:
+            isInsertingAtomicAssets = False
 
 
 @app.route('/loader/update-atomic-mints')
