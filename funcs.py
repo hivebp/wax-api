@@ -2194,13 +2194,16 @@ def apply_atomic_updates(session):
     try:
         updates = session_execute_logged(
             session,
-            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, new_mdata_id, '
-            'u.block_num '
+            'SELECT a.collection, a.schema, u.asset_id, d1.data AS mdata, d2.data AS idata, u.seq, '
+            'd3.data as tdata, new_mdata_id, u.block_num '
             'FROM atomicassets_updates u '
             'INNER JOIN assets a USING(asset_id) '
+            'LEFT JOIN templates t USING(template_id) '
             'LEFT JOIN data d1 ON (new_mdata_id = d1.data_id) '
             'LEFT JOIN data d2 ON (a.immutable_data_id = d2.data_id) '
+            'LEFT JOIN data d3 ON (t.immutable_data_id = d3.data_id) '
             'WHERE NOT applied AND u.timestamp < NOW() AT time zone \'UTC\' - INTERVAL \'3 minutes\' '
+            'AND u.seq = (SELECT MAX(seq) FROM atomicassets_updates WHERE NOT applied AND asset_id = u.asset_id) '
             'ORDER BY u.seq ASC '
             'LIMIT 100 '
         )
@@ -2210,9 +2213,13 @@ def apply_atomic_updates(session):
             if forked['forked'] and forked['block_num'] <= update['block_num']:
                 raise RuntimeError('Fork')
             try:
-                data = json.loads(update['idata']) if 'idata' in update.keys() and update['idata'] and update['idata'] != '[]' else {}
+                data = parse_data(
+                    json.loads(update['tdata'])
+                ) if 'tdata' in update.keys() and update['tdata'] else {}
+                if 'idata' in update.keys() and update['idata']:
+                    data.update(parse_data(json.loads(update['idata'])))
                 if 'mdata' in update.keys() and update['mdata']:
-                    data.update(json.loads(update['mdata']))
+                    data.update(parse_data(json.loads(update['mdata'])))
             except Exception as err:
                 continue
 
@@ -2225,7 +2232,7 @@ def apply_atomic_updates(session):
             new_asset['new_mdata_id'] = update['new_mdata_id']
             new_asset['asset_id'] = update['asset_id']
 
-            new_asset['attribute_ids'] = parse_simple_attributes(session, update['collection'], update['schema'], data)
+            new_asset['attribute_ids'] = parse_attributes(session, update['collection'], update['schema'], data)
 
             with_clause = construct_with_clause(new_asset)
 
@@ -2251,7 +2258,8 @@ def apply_atomic_updates(session):
                 ), new_asset)
             session_execute_logged(
                 session,
-                'UPDATE atomicassets_updates SET applied = TRUE WHERE seq = :seq',
+                'UPDATE atomicassets_updates SET applied = TRUE '
+                'WHERE seq <= :seq AND NOT applied AND asset_id = :asset_id',
                 new_asset
             )
         session.commit()

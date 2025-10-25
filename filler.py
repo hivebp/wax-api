@@ -2621,11 +2621,11 @@ def start():
         return flaskify(oto_response.Response('Already processing request', status=102))
     try:
         isStopped = False
-        _thread.start_new_thread(keep_inserting_atomic_mints, ())
-        _thread.start_new_thread(keep_updating_atomic_mints, ())
-        _thread.start_new_thread(load_usd_rate_till_stopped, ())
+        #_thread.start_new_thread(keep_inserting_atomic_mints, ())
+        #_thread.start_new_thread(keep_updating_atomic_mints, ())
+        #_thread.start_new_thread(load_usd_rate_till_stopped, ())
         _thread.start_new_thread(keep_updating_atomicassets, ())
-        _thread.start_new_thread(keep_updating_simpleassets, ())
+        #_thread.start_new_thread(keep_updating_simpleassets, ())
         return flaskify(oto_response.Response({'Started'}))
     except Exception as err:
         log_error('start: {}'.format(err))
