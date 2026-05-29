@@ -2465,10 +2465,11 @@ def keep_inserting_simple_mints(collection, schema):
         global isInsertingSimpleAssets
         try:
             isInsertingSimpleAssets = True
-            while not isStopped:
+            rowcount = 1
+            while not isStopped and rowcount > 0:
                 session = create_session()
                 try:
-                    funcs.insert_simple_mints(session, collection, schema)
+                    rowcount = funcs.insert_simple_mints(session, collection, schema)
                 except SQLAlchemyError as err:
                     log_error('keep_inserting_simple_mints: {}'.format(err))
                     session.rollback()

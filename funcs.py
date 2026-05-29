@@ -2354,9 +2354,10 @@ def apply_simple_updates(session):
 
 @catch_and_log()
 def insert_simple_mints(session, collection, schema):
-    session_execute_logged(
+    res = session_execute_logged(
         session,
-        'INSERT INTO simpleassets_mints SELECT asset_id, name_id, image_id, COALESCE((SELECT MAX(mint) '
+        'INSERT INTO simpleassets_mints SELECT asset_id, name_id, image_id, COALESCE((SELECT MAX(mint), NULL, '
+        'collection, schema '
         'FROM simpleassets_mints WHERE name_id = a.name_id AND image_id = a.image_id), 0) + 1 '
         'FROM assets a '
         'WHERE collection = :collection AND schema = :schema AND contract = \'simpleassets\' '
@@ -2366,6 +2367,8 @@ def insert_simple_mints(session, collection, schema):
     )
 
     session.commit()
+
+    return res.rowcount
 
 
 @catch_and_log()
