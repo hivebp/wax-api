@@ -2360,8 +2360,7 @@ def insert_simple_mints(session, collection, schema):
         'FROM simpleassets_mints WHERE name_id = a.name_id AND image_id = a.image_id), 0) + 1 '
         'FROM assets a '
         'WHERE collection = :collection AND schema = :schema AND contract = \'simpleassets\' '
-        'AND asset_id > (SELECT MAX(asset_id) FROM simpleassets_mints '
-        'LEFT JOIN assets USING(asset_id) WHERE collection=:collection AND schema=:schema) '
+        'AND asset_id > (SELECT MAX(asset_id) FROM simpleassets_mints WHERE collection=:collection AND schema=:schema) '
         'ORDER BY asset_id ASC LIMIT 1',
         {'collection': collection, 'schema': schema}
     )
