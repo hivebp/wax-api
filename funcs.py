@@ -2353,14 +2353,15 @@ def apply_simple_updates(session):
 
 
 @catch_and_log()
-def insert_simple_mints(session):
+def insert_simple_mints(session, collection, schema):
     session_execute_logged(
         session,
         'INSERT INTO simpleassets_mints SELECT asset_id, name_id, image_id, COALESCE((SELECT MAX(mint) '
         'FROM simpleassets_mints WHERE name_id = a.name_id AND image_id = a.image_id), 0) + 1 '
         'FROM assets a '
-        'WHERE collection = \'gpk.topps\' AND schema = \'series1\' AND contract = \'simpleassets\' '
-        'AND asset_id > (SELECT MAX(asset_id) FROM simpleassets_mints) ORDER BY asset_id ASC LIMIT 1'
+        'WHERE collection = :collection AND schema = :schema AND contract = \'simpleassets\' '
+        'AND asset_id > (SELECT MAX(asset_id) FROM simpleassets_mints) ORDER BY asset_id ASC LIMIT 1',
+        {'collection': collection, 'schema': schema}
     )
 
     session.commit()

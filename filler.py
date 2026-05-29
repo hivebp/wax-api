@@ -78,79 +78,13 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://apiwax.3dkrender.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://hyperion-wax.a-dex.xyz',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://hyperion.oiac.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api-wax.tacocrypto.io/hyperion',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://apiwax.3dkrender.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api.wax.alohaeos.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://wax.eosusa.io',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
     },
     {
-        'url': 'https://wax.eu.eosamsterdam.net',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://wax.eosphere.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://wax.greymass.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api-wax.eosauthority.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://apiwax.3dkrender.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://waxapi.ledgerwise.io',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -168,25 +102,7 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://wax.dapplica.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://history-wax-mainnet.wecan.dev',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://wax.eosrio.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api.waxeastern.cn',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -198,25 +114,13 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://hyperion.wax.detroitledger.tech',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api.wax.liquidstudios.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://api.waxsweden.org',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
     },
     {
-        'url': 'https://wax-hyperion.alcor.exchange',
+        'url': 'https://wax.hivebp.io',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -2554,8 +2458,8 @@ def keep_updating_simpleassets():
             isUpdatingSimpleAssetsData = False
 
 
-@app.route('/loader/insert-simple-mints')
-def keep_inserting_simple_mints():
+@app.route('/loader/insert-simple-mints/<collection>/<schema>')
+def keep_inserting_simple_mints(collection, schema):
     with app.app_context():
         global isStopped
         global isInsertingSimpleAssets
@@ -2564,7 +2468,7 @@ def keep_inserting_simple_mints():
             while not isStopped:
                 session = create_session()
                 try:
-                    funcs.insert_simple_mints(session)
+                    funcs.insert_simple_mints(session, collection, schema)
                 except SQLAlchemyError as err:
                     log_error('keep_inserting_simple_mints: {}'.format(err))
                     session.rollback()
