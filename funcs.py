@@ -2353,6 +2353,20 @@ def apply_simple_updates(session):
 
 
 @catch_and_log()
+def insert_simple_mints(session):
+    session_execute_logged(
+        session,
+        'INSERT INTO simpleassets_mints SELECT asset_id, name_id, image_id, COALESCE((SELECT MAX(mint) '
+        'FROM simpleassets_mints WHERE name_id = a.name_id AND image_id = a.image_id), 0) + 1 '
+        'FROM assets a '
+        'WHERE collection = \'gpk.topps\' AND schema = \'series1\' AND contract = \'simpleassets\' '
+        'AND asset_id > (SELECT MAX(asset_id) FROM simpleassets_mints) ORDER BY asset_id ASC LIMIT 1'
+    )
+
+    session.commit()
+
+
+@catch_and_log()
 def insert_atomic_mints(session):
     forked = session_execute_logged(session, 'SELECT * FROM handle_fork').first()
     if forked['forked'] and forked['block_num']:

@@ -41,6 +41,7 @@ isUpdatingAtomicAssetsMints = False
 isUpdatingAtomicAssetsData = False
 isUpdatingSimpleAssetsData = False
 isInsertingAtomicAssets = False
+isInsertingSimpleAssets = False
 isUpdatingAssetsData = False
 isLoadingPFPAttributes = False
 isUpdatingRWAXAssets = False
@@ -2551,6 +2552,33 @@ def keep_updating_simpleassets():
             return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
         finally:
             isUpdatingSimpleAssetsData = False
+
+
+@app.route('/loader/insert-simple-mints')
+def keep_inserting_simple_mints():
+    with app.app_context():
+        global isStopped
+        global isInsertingSimpleAssets
+        try:
+            isInsertingSimpleAssets = True
+            while not isStopped:
+                session = create_session()
+                try:
+                    funcs.insert_simple_mints(session)
+                except SQLAlchemyError as err:
+                    log_error('keep_inserting_simple_mints: {}'.format(err))
+                    session.rollback()
+                except RuntimeError as err:
+                    log_error('keep_inserting_simple_mints: {}'.format(err))
+                    session.rollback()
+                    time.sleep(30)
+                finally:
+                    session.remove()
+        except Exception as err:
+            log_error('keep_inserting_simple_mints: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+        finally:
+            isInsertingSimpleAssets = False
 
 
 @app.route('/loader/insert-atomic-mints')
