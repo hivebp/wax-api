@@ -41,6 +41,7 @@ isUpdatingAtomicAssetsMints = False
 isUpdatingAtomicAssetsData = False
 isUpdatingSimpleAssetsData = False
 isInsertingAtomicAssets = False
+isInsertingSimpleAssets = False
 isUpdatingAssetsData = False
 isLoadingPFPAttributes = False
 isUpdatingRWAXAssets = False
@@ -77,79 +78,13 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://apiwax.3dkrender.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://hyperion-wax.a-dex.xyz',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://hyperion.oiac.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api-wax.tacocrypto.io/hyperion',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://apiwax.3dkrender.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api.wax.alohaeos.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://wax.eosusa.io',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
     },
     {
-        'url': 'https://wax.eu.eosamsterdam.net',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://wax.eosphere.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://wax.greymass.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api-wax.eosauthority.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://apiwax.3dkrender.com',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://waxapi.ledgerwise.io',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -167,25 +102,7 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://wax.dapplica.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://history-wax-mainnet.wecan.dev',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://wax.eosrio.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api.waxeastern.cn',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -197,25 +114,13 @@ hyperions = [
         'limit': 1000,
     },
     {
-        'url': 'https://hyperion.wax.detroitledger.tech',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api.wax.liquidstudios.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
         'url': 'https://api.waxsweden.org',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
     },
     {
-        'url': 'https://wax-hyperion.alcor.exchange',
+        'url': 'https://wax.hivebp.io',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
@@ -2551,6 +2456,34 @@ def keep_updating_simpleassets():
             return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
         finally:
             isUpdatingSimpleAssetsData = False
+
+
+@app.route('/loader/insert-simple-mints/<collection>/<schema>')
+def keep_inserting_simple_mints(collection, schema):
+    with app.app_context():
+        global isStopped
+        global isInsertingSimpleAssets
+        try:
+            isInsertingSimpleAssets = True
+            rowcount = 1
+            while not isStopped and rowcount > 0:
+                session = create_session()
+                try:
+                    rowcount = funcs.insert_simple_mints(session, collection, schema)
+                except SQLAlchemyError as err:
+                    log_error('keep_inserting_simple_mints: {}'.format(err))
+                    session.rollback()
+                except RuntimeError as err:
+                    log_error('keep_inserting_simple_mints: {}'.format(err))
+                    session.rollback()
+                    time.sleep(30)
+                finally:
+                    session.remove()
+        except Exception as err:
+            log_error('keep_inserting_simple_mints: {}'.format(err))
+            return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+        finally:
+            isInsertingSimpleAssets = False
 
 
 @app.route('/loader/insert-atomic-mints')
