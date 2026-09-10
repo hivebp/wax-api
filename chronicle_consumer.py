@@ -744,7 +744,14 @@ def handle_transaction(action, block_num, timestamp, session):
                     'extendschema',
                     'setassetdata',
                     'deltemplate',
-                    'settempldata'
+                    'settempldata',
+                    'redtemplmax',
+                    'createtempl2',
+                    'logsetdatatl',
+                    'setschematyp',
+                    'createauswap',
+                    'acceptauswap',
+                    'rejectauswap'
                 ]) or (account == 'atomicmarket' and name in [
                     'purchasesale',
                     'cancelsale',
@@ -760,7 +767,11 @@ def handle_transaction(action, block_num, timestamp, session):
                     'logsalestart',
                     'canceltbuyo',
                     'fulfilltbuyo',
-                    'lognewtbuyo'
+                    'lognewtbuyo',
+                    'logroyattr',
+                    'logroyfound',
+                    'logroytempl',
+                    'logroydust'
                 ]) or (account == 'simpleassets' and name in [
                     'createlog',
                     'transfer',
