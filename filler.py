@@ -327,12 +327,12 @@ def get_valid_response(url, start_date, end_date):
 
 @app.route('/loader/accounting')
 def get_receive_row():
-    start_date = datetime.datetime(2025, 7, 1, 0, 0, 0, tzinfo=pytz.utc)
-    end_date = datetime.datetime(2025, 8, 1, 0, 0, 0, tzinfo=pytz.utc)
+    start_date = datetime.datetime(2026, 4, 1, 0, 0, 0, tzinfo=pytz.utc)
+    end_date = datetime.datetime(2026, 7, 1, 0, 0, 0, tzinfo=pytz.utc)
     trx = get_valid_response(
         '{}/v2/history/get_actions?'
         'account=waxhiveguild&filter=eosio.token:transfer&'
-        'skip=0&limit=1000&sort=asc&after={}&before={}&simple=false',
+        'skip=0&limit=100&sort=asc&after={}&before={}&simple=false',
         start_date, end_date
     )
 

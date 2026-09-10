@@ -742,7 +742,9 @@ def handle_transaction(action, block_num, timestamp, session):
                     'logbackasset',
                     'createschema',
                     'extendschema',
-                    'setassetdata'
+                    'setassetdata',
+                    'deltemplate',
+                    'settempldata'
                 ]) or (account == 'atomicmarket' and name in [
                     'purchasesale',
                     'cancelsale',

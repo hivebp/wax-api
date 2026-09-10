@@ -339,6 +339,7 @@ def assets():
     max_average = int(request.args.get('max_average', 0))
     recently_sold = request.args.get('recent')
     verified = request.args.get('verified', 'verified')
+    verified_defined = request.args.get('verified', None)
     favorites = request.args.get('favorites', 'false') == 'true'
     backed = request.args.get('backed', 'false') == 'true'
     contract = request.args.get('contract')
@@ -354,6 +355,9 @@ def assets():
 
     asset_ids = request.args.get('asset_ids')
     asset_ids = asset_ids.split(',') if asset_ids and ',' in asset_ids else ([asset_ids] if asset_ids else [])
+
+    if verified == 'verified' and not verified_defined and len(asset_ids) > 0:
+        verified = 'all'
 
     if collection:
         collection = _format_collection(collection)
