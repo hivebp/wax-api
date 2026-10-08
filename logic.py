@@ -180,10 +180,19 @@ def _get_attributes_object():
         '\'attribute_name\', attribute_name, \'string_value\', string_value, \'int_value\', int_value, '
         '\'float_value\', float_value, \'bool_value\', bool_value, \'floor_price\', floor_wax, '
         '\'rarity_score\', rarity_score, \'total_schema\', total_schema)) '
-        'FROM assets '
-        'INNER JOIN attributes ON attribute_id = ANY(attribute_ids) '
-        'LEFT JOIN attribute_stats USING(attribute_id) '
-        'WHERE asset_id = a.asset_id)'
+        'FROM ('
+        '   SELECT DISTINCT att.attribute_id, att.attribute_name, att.string_value, att.int_value, '
+        '   att.float_value, att.bool_value, ast.floor_wax, ast.rarity_score, ast.total_schema '
+        '   FROM assets sa '
+        '   LEFT JOIN templates t ON t.template_id = sa.template_id '
+        '   LEFT JOIN LATERAL unnest('
+        '       COALESCE(sa.attribute_ids, ARRAY[]::integer[]) '
+        '       || COALESCE(t.attribute_ids, ARRAY[]::integer[])'
+        '   ) aid(attribute_id) ON TRUE '
+        '   INNER JOIN attributes att ON att.attribute_id = aid.attribute_id '
+        '   LEFT JOIN attribute_stats ast ON ast.attribute_id = att.attribute_id '
+        '   WHERE sa.asset_id = a.asset_id'
+        ') trait_rows)'
     )
 
 

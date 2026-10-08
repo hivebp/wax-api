@@ -1334,11 +1334,259 @@ CREATE TABLE public.templates (
     transferable boolean,
     num_assets integer,
     attribute_ids integer[],
-    immutable_data_id integer
+    immutable_data_id integer,
+    mutable_data_id integer
 );
 
 
 ALTER TABLE public.templates OWNER TO postgres;
+
+--
+-- Name: templates2; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.templates2 (
+    transaction_id character varying(256),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    collection character varying(13),
+    schema character varying(16),
+    mutable_data_id integer,
+    template_id integer
+);
+
+
+ALTER TABLE public.templates2 OWNER TO postgres;
+
+--
+-- Name: templates2_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX templates2_block_num_idx ON public.templates2 USING btree (block_num);
+
+
+--
+-- Name: templates2_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX templates2_seq_idx ON public.templates2 USING btree (seq DESC);
+
+
+--
+-- Name: templates2_transaction_id_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX templates2_transaction_id_seq_idx ON public.templates2 USING btree (transaction_id, seq DESC);
+
+--
+-- Name: template_updates; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.template_updates (
+    template_id integer,
+    new_mdata_id integer,
+    old_mdata_id integer,
+    new_attribute_ids integer[],
+    old_attribute_ids integer[],
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    applied boolean DEFAULT false
+);
+
+
+ALTER TABLE public.template_updates OWNER TO postgres;
+
+--
+-- Name: template_updates_reversed; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.template_updates_reversed (
+    template_id integer,
+    new_mdata_id integer,
+    old_mdata_id integer,
+    new_attribute_ids integer[],
+    old_attribute_ids integer[],
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    applied boolean
+);
+
+
+ALTER TABLE public.template_updates_reversed OWNER TO postgres;
+
+--
+-- Name: template_updates_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_updates_block_num_idx ON public.template_updates USING btree (block_num);
+
+
+--
+-- Name: template_updates_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_updates_seq_idx ON public.template_updates USING btree (seq DESC);
+
+
+--
+-- Name: template_updates_reversed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_updates_reversed_block_num_idx ON public.template_updates_reversed USING btree (block_num);
+
+
+--
+-- Name: template_updates_reversed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_updates_reversed_seq_idx ON public.template_updates_reversed USING btree (seq DESC);
+
+--
+-- Name: template_max_updates; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.template_max_updates (
+    template_id integer,
+    new_max_supply bigint,
+    old_max_supply bigint,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    applied boolean DEFAULT false
+);
+
+
+ALTER TABLE public.template_max_updates OWNER TO postgres;
+
+--
+-- Name: template_max_updates_reversed; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.template_max_updates_reversed (
+    template_id integer,
+    new_max_supply bigint,
+    old_max_supply bigint,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    applied boolean
+);
+
+
+ALTER TABLE public.template_max_updates_reversed OWNER TO postgres;
+
+--
+-- Name: template_max_updates_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_max_updates_block_num_idx ON public.template_max_updates USING btree (block_num);
+
+
+--
+-- Name: template_max_updates_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_max_updates_seq_idx ON public.template_max_updates USING btree (seq DESC);
+
+
+--
+-- Name: template_max_updates_reversed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_max_updates_reversed_block_num_idx ON public.template_max_updates_reversed USING btree (block_num);
+
+
+--
+-- Name: template_max_updates_reversed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX template_max_updates_reversed_seq_idx ON public.template_max_updates_reversed USING btree (seq DESC);
+
+-- Name: removed_templates; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.removed_templates (
+    template_id integer,
+    collection character varying(13),
+    schema character varying(16),
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    name_id integer,
+    image_id integer,
+    video_id integer,
+    max_supply bigint,
+    burnable boolean,
+    transferable boolean,
+    num_assets integer,
+    attribute_ids integer[],
+    immutable_data_id integer,
+    mutable_data_id integer,
+    removed_seq bigint,
+    removed_block_num bigint
+);
+
+
+ALTER TABLE public.removed_templates OWNER TO postgres;
+
+--
+-- Name: removed_templates_template_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_templates_template_id_idx ON public.removed_templates USING btree (template_id);
+
+
+--
+-- Name: removed_templates_removed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_templates_removed_block_num_idx ON public.removed_templates USING btree (removed_block_num);
+
+
+--
+-- Name: removed_templates_removed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX removed_templates_removed_seq_idx ON public.removed_templates USING btree (removed_seq DESC);
+
+--
+-- Name: atomicmarket_royalty_payouts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.atomicmarket_royalty_payouts (
+    action character varying(13),
+    collection_name character varying(13),
+    asset_id bigint,
+    template_id integer,
+    rule_id bigint,
+    collection_author character varying(13),
+    recipient character varying(13),
+    amount double precision,
+    symbol character varying(12),
+    payouts json,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.atomicmarket_royalty_payouts OWNER TO postgres;
+
+--
+-- Name: atomicmarket_royalty_payouts_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX atomicmarket_royalty_payouts_block_num_idx ON public.atomicmarket_royalty_payouts USING btree (block_num);
+
+
+--
+-- Name: atomicmarket_royalty_payouts_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX atomicmarket_royalty_payouts_seq_idx ON public.atomicmarket_royalty_payouts USING btree (seq DESC);
 
 --
 -- Name: templates_minted_mv; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -4034,11 +4282,140 @@ CREATE TABLE public.schemas (
     seq bigint,
     block_num bigint,
     "timestamp" timestamp without time zone,
-    schema_format json
+    schema_format json,
+    types json
 );
 
 
 ALTER TABLE public.schemas OWNER TO postgres;
+
+--
+-- Name: schematypes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.schematypes (
+    collection character varying(13),
+    schema character varying(16),
+    new_types json,
+    old_types json,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    applied boolean DEFAULT false
+);
+
+
+ALTER TABLE public.schematypes OWNER TO postgres;
+
+--
+-- Name: schematypes_reversed; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.schematypes_reversed (
+    collection character varying(13),
+    schema character varying(16),
+    new_types json,
+    old_types json,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone,
+    applied boolean
+);
+
+
+ALTER TABLE public.schematypes_reversed OWNER TO postgres;
+
+--
+-- Name: schematypes_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX schematypes_block_num_idx ON public.schematypes USING btree (block_num);
+
+
+--
+-- Name: schematypes_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX schematypes_seq_idx ON public.schematypes USING btree (seq DESC);
+
+
+--
+-- Name: schematypes_reversed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX schematypes_reversed_block_num_idx ON public.schematypes_reversed USING btree (block_num);
+
+
+--
+-- Name: schematypes_reversed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX schematypes_reversed_seq_idx ON public.schematypes_reversed USING btree (seq DESC);
+
+--
+-- Name: authorswaps; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.authorswaps (
+    collection_name character varying(13),
+    current_author character varying(13),
+    new_author character varying(13),
+    owner boolean,
+    acceptance_date timestamp without time zone,
+    rejected boolean DEFAULT false,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.authorswaps OWNER TO postgres;
+
+--
+-- Name: authorswaps_reversed; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.authorswaps_reversed (
+    collection_name character varying(13),
+    current_author character varying(13),
+    new_author character varying(13),
+    owner boolean,
+    acceptance_date timestamp without time zone,
+    rejected boolean,
+    seq bigint,
+    block_num bigint,
+    "timestamp" timestamp without time zone
+);
+
+
+ALTER TABLE public.authorswaps_reversed OWNER TO postgres;
+
+--
+-- Name: authorswaps_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX authorswaps_block_num_idx ON public.authorswaps USING btree (block_num);
+
+
+--
+-- Name: authorswaps_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX authorswaps_seq_idx ON public.authorswaps USING btree (seq DESC);
+
+
+--
+-- Name: authorswaps_reversed_block_num_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX authorswaps_reversed_block_num_idx ON public.authorswaps_reversed USING btree (block_num);
+
+
+--
+-- Name: authorswaps_reversed_seq_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX authorswaps_reversed_seq_idx ON public.authorswaps_reversed USING btree (seq DESC);
 
 --
 -- Name: secondary_market_purchases; Type: TABLE; Schema: public; Owner: postgres
@@ -12928,4 +13305,3 @@ GRANT ALL ON SCHEMA public TO root;
 --
 -- PostgreSQL database dump complete
 --
-

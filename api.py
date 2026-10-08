@@ -1,6 +1,7 @@
 import json
 import os
 from functools import wraps
+from decimal import InvalidOperation
 
 import redis
 from flask import Flask, request, Response, jsonify
@@ -18,6 +19,9 @@ import time
 from flask_compress import Compress
 from db import db
 from cache import cache
+from requests.exceptions import RequestException
+from sqlalchemy.exc import SQLAlchemyError
+from accounting_report import AccountingError, month_bounds, run_accounting
 
 from ddtrace import patch_all
 
@@ -449,6 +453,32 @@ def filter_attributes_simple(collection):
     )
 
     return flaskify(oto_response.Response(search_res))
+
+
+@app.route('/api/accounting')
+def accounting():
+    try:
+        year = int(request.args.get('year', ''))
+        month = int(request.args.get('month', ''))
+        if not 1 <= year <= 9998:
+            raise ValueError('Invalid year')
+        month_bounds(year, month)
+    except (ValueError, OverflowError):
+        return jsonify(error='Enter a valid month (1-12) and year (1-9998).'), 400
+
+    try:
+        receipts = run_accounting(year, month, db.session)
+        return jsonify(year=year, month=month, receipts=receipts)
+    except AccountingError as err:
+        return jsonify(error=str(err)), 502
+    except (RequestException, ValueError, KeyError, TypeError, InvalidOperation):
+        logging.exception('Accounting history could not be loaded')
+        return jsonify(error='Could not load WAX history data.'), 502
+    except SQLAlchemyError:
+        logging.exception('Accounting USD rates could not be loaded')
+        return jsonify(error='Could not load accounting USD rates.'), 503
+    finally:
+        db.session.remove()
 
 
 @app.route('/api/collection-filters/<collection>')

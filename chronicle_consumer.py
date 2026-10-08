@@ -121,6 +121,129 @@ def handle_atomicassets_updates_reversed(session, block_num):
             raise err
 
 
+def handle_template_updates_reversed(session, block_num):
+    reverse_trxs = execute_sql(session,
+        'SELECT * FROM template_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        try:
+            execute_sql(
+                session,
+                'UPDATE templates SET mutable_data_id = :old_mdata_id, attribute_ids = :old_attribute_ids '
+                'WHERE template_id = :template_id',
+                {
+                    'template_id': trx['template_id'],
+                    'old_mdata_id': trx['old_mdata_id'],
+                    'old_attribute_ids': trx['old_attribute_ids']
+                }
+            )
+        except SQLAlchemyError as err:
+            log_error('handle_template_updates_reversed: {}'.format(err))
+            raise err
+        except Exception as err:
+            log_error('handle_template_updates_reversed: {}'.format(err))
+            raise err
+
+
+def handle_template_max_updates_reversed(session, block_num):
+    reverse_trxs = execute_sql(session,
+        'SELECT * FROM template_max_updates_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        try:
+            execute_sql(
+                session,
+                'UPDATE templates SET max_supply = :old_max_supply '
+                'WHERE template_id = :template_id',
+                {
+                    'template_id': trx['template_id'],
+                    'old_max_supply': trx['old_max_supply']
+                }
+            )
+        except SQLAlchemyError as err:
+            log_error('handle_template_max_updates_reversed: {}'.format(err))
+            raise err
+        except Exception as err:
+            log_error('handle_template_max_updates_reversed: {}'.format(err))
+            raise err
+
+
+def handle_schema_types_reversed(session, block_num):
+    reverse_trxs = execute_sql(session,
+        'SELECT * FROM schematypes_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        try:
+            execute_sql(
+                session,
+                'UPDATE schemas SET types = :old_types '
+                'WHERE collection = :collection AND schema = :schema',
+                {
+                    'collection': trx['collection'],
+                    'schema': trx['schema'],
+                    'old_types': trx['old_types']
+                }
+            )
+        except SQLAlchemyError as err:
+            log_error('handle_schema_types_reversed: {}'.format(err))
+            raise err
+        except Exception as err:
+            log_error('handle_schema_types_reversed: {}'.format(err))
+            raise err
+
+
+def handle_author_swaps_reversed(session, block_num):
+    reverse_trxs = execute_sql(session,
+        'SELECT * FROM authorswaps_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
+        {'block_num': block_num}
+    )
+
+    for trx in reverse_trxs:
+        try:
+            if trx['acceptance_date']:
+                execute_sql(
+                    session,
+                    'UPDATE collections SET author = :current_author '
+                    'WHERE collection = :collection_name',
+                    {
+                        'collection_name': trx['collection_name'],
+                        'current_author': trx['current_author']
+                    }
+                )
+
+                execute_sql(
+                    session,
+                    'UPDATE authorswaps SET acceptance_date = NULL '
+                    'WHERE collection_name = :collection_name AND seq = :seq',
+                    {
+                        'collection_name': trx['collection_name'],
+                        'seq': trx['seq']
+                    }
+                )
+            elif trx['rejected']:
+                execute_sql(
+                    session,
+                    'UPDATE authorswaps SET rejected = FALSE '
+                    'WHERE collection_name = :collection_name AND seq = :seq',
+                    {
+                        'collection_name': trx['collection_name'],
+                        'seq': trx['seq']
+                    }
+                )
+        except SQLAlchemyError as err:
+            log_error('handle_author_swaps_reversed: {}'.format(err))
+            raise err
+        except Exception as err:
+            log_error('handle_author_swaps_reversed: {}'.format(err))
+            raise err
+
+
 def handle_auction_bids_reversed(session, block_num):
     reverse_trxs = execute_sql(session,
         'SELECT * FROM auction_bids_reversed WHERE block_num >= :block_num ORDER BY seq ASC',
@@ -628,6 +751,10 @@ def handle_fork(block_num, unconfirmed_block, confirmed_block, session):
         handle_simpleassets_burns_reversed(session, block_num)
         handle_simpleassets_updates_reversed(session, block_num)
         handle_transfers_reversed(session, block_num)
+        handle_template_updates_reversed(session, block_num)
+        handle_template_max_updates_reversed(session, block_num)
+        handle_schema_types_reversed(session, block_num)
+        handle_author_swaps_reversed(session, block_num)
         handle_pack_time_updates_reversed(session, block_num)
         handle_pack_display_updates_reversed(session, block_num)
         handle_pack_template_updates_reversed(session, block_num)

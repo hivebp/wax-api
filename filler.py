@@ -204,6 +204,230 @@ def execute_sql(session, sql, args=None):
     return mappings
 
 
+NEW_ACTION_NAMES = {
+    'atomicassets': [
+        'deltemplate',
+        'settempldata',
+        'redtemplmax',
+        'createtempl2',
+        'logsetdatatl',
+        'setschematyp',
+        'createauswap',
+        'acceptauswap',
+        'rejectauswap'
+    ],
+    'atomicmarket': [
+        'logroyattr',
+        'logroyfound',
+        'logroytempl',
+        'logroydust'
+    ]
+}
+
+
+SUPPORTED_NEW_ACTION_NAMES = {
+    'atomicassets': {
+        'deltemplate',
+        'redtemplmax',
+        'createtempl2',
+        'logsetdatatl',
+        'setschematyp',
+        'createauswap',
+        'acceptauswap',
+        'rejectauswap'
+    },
+    'atomicmarket': {
+        'logroyattr',
+        'logroyfound',
+        'logroytempl',
+        'logroydust'
+    }
+}
+
+
+def _serialize_tx_row(row):
+    serialized = {}
+    for key, value in row.items():
+        if isinstance(value, datetime.datetime):
+            serialized[key] = value.isoformat()
+        else:
+            serialized[key] = value
+    return serialized
+
+
+def _get_new_contract_action_rows(session, limit_per_action=200, min_block_num=None, max_block_num=None,
+                                  only_not_ingested=False, ascending=False):
+    rows = []
+    counts = {}
+
+    for account in NEW_ACTION_NAMES.keys():
+        action_names = NEW_ACTION_NAMES[account]
+        for action_name in action_names:
+            where_clauses = []
+            args = {
+                'account': account,
+                'action_name': action_name,
+                'limit': limit_per_action,
+            }
+            if min_block_num is not None:
+                where_clauses.append('block_num >= :min_block_num')
+                args['min_block_num'] = min_block_num
+            if max_block_num is not None:
+                where_clauses.append('block_num <= :max_block_num')
+                args['max_block_num'] = max_block_num
+            if only_not_ingested:
+                where_clauses.append('NOT ingested')
+
+            where_sql = ''
+            if len(where_clauses) > 0:
+                where_sql = ' AND {}'.format(' AND '.join(where_clauses))
+
+            result = execute_sql(
+                session,
+                'SELECT * FROM chronicle_transactions '
+                'WHERE account = :account AND action_name = :action_name {where_sql} '
+                'ORDER BY block_num {order}, seq {order} LIMIT :limit '.format(
+                    where_sql=where_sql,
+                    order='ASC' if ascending else 'DESC'
+                ),
+                args
+            )
+
+            count = 0
+            for row in result:
+                rows.append(row)
+                count += 1
+
+            counts['{}:{}'.format(account, action_name)] = count
+
+    return rows, counts
+
+
+def query_new_contract_actions(session, limit_per_action=200, min_block_num=None, max_block_num=None,
+                               only_not_ingested=False):
+    rows, counts = _get_new_contract_action_rows(
+        session,
+        limit_per_action=limit_per_action,
+        min_block_num=min_block_num,
+        max_block_num=max_block_num,
+        only_not_ingested=only_not_ingested,
+        ascending=False
+    )
+    serialized_rows = []
+    for row in rows:
+        serialized_rows.append(_serialize_tx_row(row))
+
+    return {'rows': serialized_rows, 'counts': counts, 'total_rows': len(serialized_rows)}
+
+
+@app.route('/loader/insert-new-contract-actions')
+def insert_new_contract_actions():
+    session = create_session()
+    try:
+        limit_per_action = int(request.args.get('limit', '200'))
+        min_block_num = request.args.get('min_block_num', None)
+        min_block_num = int(min_block_num) if min_block_num is not None and min_block_num != '' else None
+        max_block_num = request.args.get('max_block_num', None)
+        max_block_num = int(max_block_num) if max_block_num is not None and max_block_num != '' else None
+        only_not_ingested = request.args.get('only_not_ingested', 'true').lower() == 'true'
+
+        txs, selected_counts = _get_new_contract_action_rows(
+            session,
+            limit_per_action=limit_per_action,
+            min_block_num=min_block_num,
+            max_block_num=max_block_num,
+            only_not_ingested=only_not_ingested,
+            ascending=True
+        )
+
+        parsed_counts = {}
+        skipped_counts = {}
+        parse_errors = []
+        inserted = 0
+        for tx in txs:
+            action_key = '{}:{}'.format(tx['account'], tx['action_name'])
+            if tx['account'] not in SUPPORTED_NEW_ACTION_NAMES or \
+                    tx['action_name'] not in SUPPORTED_NEW_ACTION_NAMES[tx['account']]:
+                if action_key not in skipped_counts:
+                    skipped_counts[action_key] = 0
+                skipped_counts[action_key] += 1
+                continue
+
+            action = {
+                'act': {
+                    'account': tx['account'],
+                    'name': tx['action_name'],
+                    'data': tx['data'],
+                    'authorization': [{'actor': tx['actor']}]
+                },
+                'trx_id': tx['transaction_id'],
+                'global_sequence': tx['seq'],
+                'block_num': tx['block_num'],
+                'timestamp': tx['timestamp']
+            }
+
+            try:
+                parse_action(session, action)
+                execute_sql(session, 'UPDATE chronicle_transactions SET ingested = TRUE WHERE seq = :seq', tx)
+                inserted += 1
+                if action_key not in parsed_counts:
+                    parsed_counts[action_key] = 0
+                parsed_counts[action_key] += 1
+            except Exception as err:
+                session.rollback()
+                parse_errors.append({'seq': tx['seq'], 'account': tx['account'], 'action_name': tx['action_name'],
+                                     'error': str(err)})
+                log_error('insert_new_contract_actions {}: {}'.format(tx['seq'], err))
+
+        session.commit()
+        return flaskify(oto_response.Response({
+            'selected_counts': selected_counts,
+            'parsed_counts': parsed_counts,
+            'skipped_counts': skipped_counts,
+            'inserted': inserted,
+            'error_count': len(parse_errors),
+            'errors': parse_errors[:200],
+            'total_selected': len(txs),
+            'filters': {
+                'limit': limit_per_action,
+                'min_block_num': min_block_num,
+                'max_block_num': max_block_num,
+                'only_not_ingested': only_not_ingested
+            }
+        }))
+    except SQLAlchemyError as err:
+        log_error('insert_new_contract_actions: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    except Exception as err:
+        log_error('insert_new_contract_actions: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        session.remove()
+
+
+@app.route('/loader/debug-new-contract-actions')
+def debug_new_contract_actions():
+    session = create_session()
+    try:
+        limit_per_action = int(request.args.get('limit', '200'))
+        min_block_num = request.args.get('min_block_num', None)
+        min_block_num = int(min_block_num) if min_block_num is not None and min_block_num != '' else None
+        max_block_num = request.args.get('max_block_num', None)
+        max_block_num = int(max_block_num) if max_block_num is not None and max_block_num != '' else None
+        only_not_ingested = request.args.get('only_not_ingested', 'false').lower() == 'true'
+
+        result = query_new_contract_actions(session, limit_per_action, min_block_num, max_block_num, only_not_ingested)
+        return flaskify(oto_response.Response(result))
+    except SQLAlchemyError as err:
+        log_error('debug_new_contract_actions: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    except Exception as err:
+        log_error('debug_new_contract_actions: {}'.format(err))
+        return flaskify(oto_response.Response('An unexpected Error occured', errors=err, status=500))
+    finally:
+        session.remove()
+
+
 def get_valid_response(url, start_date, end_date):
     hyperion = get_url(0)
     message = ''
@@ -1177,6 +1401,14 @@ def parse_action(session, action):
                 funcs.load_atomic_market_fulfill_template_buyo(session, action)
             elif name == 'lognewtbuyo':
                 funcs.load_atomic_market_lognew_template_buyo(session, action)
+            elif name == 'logroyattr':
+                funcs.load_royalty_payouts(session, action, name)
+            elif name == 'logroyfound':
+                funcs.load_royalty_payouts(session, action, name)
+            elif name == 'logroytempl':
+                funcs.load_royalty_payouts(session, action, name)
+            elif name == 'logroydust':
+                funcs.load_royalty_payouts(session, action, name)
         elif account == 'atomicassets':
             if name == 'logmint':
                 funcs.insert_atomic_asset(session, action)
@@ -1204,8 +1436,24 @@ def parse_action(session, action):
                 funcs.add_collection_author(session, action)
             elif name == 'remcolauth':
                 funcs.remove_collection_author(session, action)
+            elif name == 'createtempl2':
+                funcs.load_atomic_template2(session, action)
             elif name == 'lognewtempl':
                 funcs.insert_atomic_template(session, action)
+            elif name == 'setschematyp':
+                funcs.load_schema_types(session, action)
+            elif name == 'logsetdatatl':
+                funcs.load_template_update(session, action)
+            elif name == 'redtemplmax':
+                funcs.load_template_max_update(session, action)
+            elif name == 'deltemplate':
+                funcs.load_template_delete(session, action)
+            elif name == 'createauswap':
+                funcs.load_create_author_swap(session, action)
+            elif name == 'acceptauswap':
+                funcs.load_accept_author_swap(session, action)
+            elif name == 'rejectauswap':
+                funcs.load_reject_author_swap(session, action)
             elif name == 'createschema':
                 funcs.insert_schema(session, action)
             elif name == 'createcol':

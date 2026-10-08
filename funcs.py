@@ -2694,11 +2694,29 @@ def insert_atomic_template(session, action):
     new_template['max_supply'] = template['max_supply']
     new_template['collection'] = template['collection_name']
     new_template['schema'] = template['schema_name']
+
+    template2 = session_execute_logged(
+        session,
+        'SELECT t2.mutable_data_id, d.data AS mutable_data, t2.seq '
+        'FROM templates2 t2 '
+        'LEFT JOIN data d ON d.data_id = t2.mutable_data_id '
+        'WHERE t2.transaction_id = :transaction_id '
+        'AND t2.template_id IS NULL '
+        'AND t2.seq < :seq '
+        'ORDER BY t2.seq DESC '
+        'LIMIT 1',
+        {'transaction_id': new_template['transaction_id'], 'seq': new_template['seq']}
+    ).first()
+
     data = parse_data(template['immutable_data'])
+    if template2 and template2['mutable_data']:
+        data.update(parse_data(json.loads(template2['mutable_data'])))
+
     new_template['name'] = str(data['name']).strip()[0:255] if 'name' in data else None
     new_template['image'] = str(data['img']).strip()[0:255] if 'img' in data else None
     new_template['video'] = str(data['video']).strip()[0:255] if 'video' in data else None
     new_template['idata'] = json.dumps(template['immutable_data'])
+    new_template['mutable_data_id'] = template2['mutable_data_id'] if template2 else None
 
     new_template['attribute_ids'] = parse_attributes(
         session, new_template['collection'], new_template['schema'], data)
@@ -2709,13 +2727,15 @@ def insert_atomic_template(session, action):
         session,
         '{with_clause} '
         'INSERT INTO templates (template_id, collection, schema, seq, block_num, timestamp, name_id, image_id, '
-        'video_id, max_supply, burnable, transferable, num_assets, attribute_ids, immutable_data_id) '
+        'video_id, max_supply, burnable, transferable, num_assets, attribute_ids, immutable_data_id, '
+        'mutable_data_id) '
         'SELECT :template_id, :collection, :schema, :seq, :block_num, :timestamp, '
         '{name_column}, '
         '{image_column}, '
         '{video_column}, '
         ':max_supply, :burnable, :transferable, 0, :attribute_ids, '
-        '{idata_column} '
+        '{idata_column}, '
+        '{mutable_data_column} '
         'WHERE NOT EXISTS (SELECT seq FROM templates WHERE seq = :seq) '.format(
             with_clause=with_clause,
             name_column=(
@@ -2731,10 +2751,12 @@ def insert_atomic_template(session, action):
                 '(SELECT data_id FROM data WHERE md5(data) = md5(:idata) '
                 'UNION SELECT data_id FROM idata_insert_result)'
             ) if new_template['idata'] and new_template['idata'] != '{}' else 'NULL',
+            mutable_data_column=(
+                ':mutable_data_id'
+            ) if new_template['mutable_data_id'] else 'NULL',
         ),
         new_template
     )
-    session.commit()
 
     if new_template['attribute_ids'] and len(new_template['attribute_ids']) > 0:
         session_execute_logged(
@@ -2744,6 +2766,354 @@ def insert_atomic_template(session, action):
             'WHERE NOT EXISTS (SELECT seq FROM template_attributes_mapping WHERE seq = :seq)',
             new_template
         )
+
+    if template2:
+        session_execute_logged(
+            session,
+            'UPDATE templates2 SET template_id = :template_id '
+            'WHERE transaction_id = :transaction_id AND seq = :template2_seq',
+            {
+                'template_id': new_template['template_id'],
+                'transaction_id': new_template['transaction_id'],
+                'template2_seq': template2['seq']
+            }
+        )
+
+    session.commit()
+
+
+@catch_and_log()
+def load_atomic_template2(session, action):
+    template = _get_data(action)
+    new_template = load_transaction_basics(action)
+    new_template['collection'] = template['collection_name']
+    new_template['schema'] = template['schema_name']
+    new_template['mdata'] = json.dumps(template['mutable_data']) if 'mutable_data' in template else None
+
+    with_clause = construct_with_clause(new_template)
+
+    session_execute_logged(
+        session,
+        '{with_clause} '
+        'INSERT INTO templates2 (transaction_id, seq, block_num, timestamp, collection, schema, mutable_data_id) '
+        'SELECT :transaction_id, :seq, :block_num, :timestamp, :collection, :schema, {mdata_column} '
+        'WHERE NOT EXISTS (SELECT seq FROM templates2 WHERE seq = :seq) '.format(
+            with_clause=with_clause,
+            mdata_column=construct_mdata_column(new_template),
+        ),
+        new_template
+    )
+    session.commit()
+
+
+@catch_and_log()
+def load_schema_types(session, action):
+    schema = _get_data(action)
+    new_schema = load_transaction_basics(action)
+    if 'collection_name' not in schema:
+        return
+
+    new_schema['collection'] = schema['collection_name']
+    new_schema['schema'] = schema['schema_name']
+    new_schema['types'] = json.dumps(schema['schema_format_type']) if 'schema_format_type' in schema else None
+
+    session_execute_logged(
+        session,
+        'INSERT INTO schematypes (collection, schema, new_types, old_types, seq, block_num, timestamp) '
+        'SELECT :collection, :schema, :types, '
+        '(SELECT types FROM schemas WHERE collection = :collection AND schema = :schema), '
+        ':seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM schematypes WHERE seq = :seq)',
+        new_schema
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE schemas SET types = :types WHERE collection = :collection AND schema = :schema',
+        new_schema
+    )
+
+    session.commit()
+
+
+@catch_and_log()
+def load_template_update(session, action):
+    template_update = _get_data(action)
+    update = load_transaction_basics(action)
+    update['template_id'] = template_update['template_id']
+    update['mdata'] = json.dumps(template_update['new_data']) if 'new_data' in template_update else None
+
+    template = session_execute_logged(
+        session,
+        'SELECT t.collection, t.schema, t.attribute_ids, d.data AS idata '
+        'FROM templates t LEFT JOIN data d ON d.data_id = t.immutable_data_id '
+        'WHERE t.template_id = :template_id',
+        {'template_id': update['template_id']}
+    ).first()
+    if not template:
+        session.commit()
+        return
+
+    data = parse_data(json.loads(template['idata'])) if template['idata'] else {}
+    if 'new_data' in template_update and template_update['new_data']:
+        data.update(parse_data(template_update['new_data']))
+    update['new_attribute_ids'] = parse_attributes(session, template['collection'], template['schema'], data)
+    update['old_attribute_ids'] = template['attribute_ids']
+
+    with_clause = construct_with_clause(update)
+
+    session_execute_logged(
+        session,
+        '{with_clause} '
+        'INSERT INTO template_updates '
+        '(template_id, new_mdata_id, old_mdata_id, new_attribute_ids, old_attribute_ids, seq, block_num, timestamp) '
+        'SELECT :template_id, {mdata_column}, '
+        '(SELECT mutable_data_id FROM templates WHERE template_id = :template_id), '
+        ':new_attribute_ids, :old_attribute_ids, '
+        ':seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM template_updates WHERE seq = :seq) '.format(
+            with_clause=with_clause,
+            mdata_column=(
+                '(SELECT data_id FROM data WHERE md5(data) = md5(:mdata) '
+                'UNION SELECT data_id FROM mdata_insert_result)'
+            ) if update['mdata'] else 'NULL',
+        ),
+        update
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE templates SET mutable_data_id = {mdata_column}, attribute_ids = :new_attribute_ids '
+        'WHERE template_id = :template_id'.format(
+            mdata_column=(
+                '(SELECT data_id FROM data WHERE md5(data) = md5(:mdata) '
+                'UNION SELECT data_id FROM mdata_insert_result)'
+            ) if update['mdata'] else 'NULL'
+        ),
+        update
+    )
+
+    session.commit()
+
+
+@catch_and_log()
+def load_template_max_update(session, action):
+    template_update = _get_data(action)
+    update = load_transaction_basics(action)
+    update['template_id'] = template_update['template_id']
+    update['new_max_supply'] = template_update['new_max_supply']
+
+    session_execute_logged(
+        session,
+        'INSERT INTO template_max_updates (template_id, new_max_supply, old_max_supply, seq, block_num, timestamp) '
+        'SELECT :template_id, :new_max_supply, '
+        '(SELECT max_supply FROM templates WHERE template_id = :template_id), '
+        ':seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM template_max_updates WHERE seq = :seq)',
+        update
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE templates SET max_supply = :new_max_supply WHERE template_id = :template_id',
+        update
+    )
+
+    session.commit()
+
+
+@catch_and_log()
+def load_template_delete(session, action):
+    template_delete = _get_data(action)
+    update = load_transaction_basics(action)
+    update['template_id'] = template_delete['template_id']
+
+    session_execute_logged(
+        session,
+        'INSERT INTO removed_templates (template_id, collection, schema, seq, block_num, timestamp, name_id, '
+        'image_id, video_id, max_supply, burnable, transferable, num_assets, attribute_ids, immutable_data_id, '
+        'mutable_data_id, removed_seq, removed_block_num) '
+        'SELECT template_id, collection, schema, seq, block_num, timestamp, name_id, image_id, video_id, '
+        'max_supply, burnable, transferable, num_assets, attribute_ids, immutable_data_id, mutable_data_id, '
+        'seq, block_num '
+        'FROM templates WHERE template_id = :template_id '
+        'AND NOT EXISTS (SELECT template_id FROM removed_templates WHERE template_id = :template_id)',
+        update
+    )
+
+    session_execute_logged(
+        session,
+        'DELETE FROM templates WHERE template_id = :template_id',
+        update
+    )
+
+    session.commit()
+
+
+def _parse_asset_amount(asset_value):
+    if not asset_value:
+        return None, None
+    if isinstance(asset_value, dict) and 'amount' in asset_value and 'symbol' in asset_value:
+        return float(asset_value['amount']), asset_value['symbol']
+    parts = str(asset_value).split(' ')
+    if len(parts) != 2:
+        return None, None
+    return float(parts[0]), parts[1]
+
+
+@catch_and_log()
+def load_royalty_payouts(session, action, action_name):
+    data = _get_data(action)
+    payload = load_transaction_basics(action)
+    payload['collection_name'] = data['collection_name']
+    payload['action'] = action_name
+    payload['asset_id'] = data['asset_id'] if 'asset_id' in data else None
+    payload['template_id'] = data['template_id'] if 'template_id' in data else None
+    payload['rule_id'] = data['rule_id'] if 'rule_id' in data else None
+    payload['collection_author'] = data['collection_author'] if 'collection_author' in data else None
+
+    if action_name == 'logroydust':
+        amount, symbol = _parse_asset_amount(data['amount'])
+        session_execute_logged(
+            session,
+            'INSERT INTO atomicmarket_royalty_payouts '
+            '(action, collection_name, asset_id, template_id, rule_id, collection_author, recipient, amount, symbol, '
+            'payouts, seq, block_num, timestamp) '
+            'SELECT :action, :collection_name, :asset_id, :template_id, :rule_id, :collection_author, '
+            ':collection_author, :amount, :symbol, NULL, :seq, :block_num, :timestamp '
+            'WHERE NOT EXISTS (SELECT seq FROM atomicmarket_royalty_payouts WHERE seq = :seq)',
+            {**payload, 'amount': amount, 'symbol': symbol}
+        )
+        session.commit()
+        return
+
+    session_execute_logged(
+        session,
+        'INSERT INTO atomicmarket_royalty_payouts '
+        '(action, collection_name, asset_id, template_id, rule_id, collection_author, recipient, amount, symbol, '
+        'payouts, seq, block_num, timestamp) '
+        'SELECT :action, :collection_name, :asset_id, :template_id, :rule_id, :collection_author, '
+        'NULL, NULL, NULL, :payouts, :seq, :block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM atomicmarket_royalty_payouts WHERE seq = :seq)',
+        {**payload, 'payouts': json.dumps(data['payouts']) if 'payouts' in data else None}
+    )
+    session.commit()
+
+
+@catch_and_log()
+def load_create_author_swap(session, action):
+    swap = _get_data(action)
+    new_swap = load_transaction_basics(action)
+    new_swap['collection_name'] = swap['collection_name']
+    new_swap['new_author'] = swap['new_author']
+    new_swap['owner'] = swap['owner'] if 'owner' in swap else None
+
+    current_author = session_execute_logged(
+        session,
+        'SELECT author FROM collections WHERE collection = :collection_name',
+        {'collection_name': new_swap['collection_name']}
+    ).first()
+    new_swap['current_author'] = current_author['author'] if current_author else None
+    new_swap['acceptance_date'] = None
+    new_swap['rejected'] = False
+
+    session_execute_logged(
+        session,
+        'INSERT INTO authorswaps (collection_name, current_author, new_author, owner, acceptance_date, rejected, seq, '
+        'block_num, timestamp) '
+        'SELECT :collection_name, :current_author, :new_author, :owner, :acceptance_date, :rejected, :seq, '
+        ':block_num, :timestamp '
+        'WHERE NOT EXISTS (SELECT seq FROM authorswaps WHERE seq = :seq)',
+        new_swap
+    )
+    session.commit()
+
+
+@catch_and_log()
+def load_accept_author_swap(session, action):
+    swap = _get_data(action)
+    new_swap = load_transaction_basics(action)
+    new_swap['collection_name'] = swap['collection_name']
+
+    pending_swap = session_execute_logged(
+        session,
+        'SELECT collection_name, current_author, new_author, owner, acceptance_date, rejected, seq, block_num, timestamp '
+        'FROM authorswaps '
+        'WHERE collection_name = :collection_name '
+        'AND acceptance_date IS NULL '
+        'AND rejected = FALSE '
+        'ORDER BY seq DESC '
+        'LIMIT 1',
+        {'collection_name': new_swap['collection_name']}
+    ).first()
+    if not pending_swap:
+        session.commit()
+        return
+
+    session_execute_logged(
+        session,
+        'INSERT INTO authorswaps_reversed '
+        'SELECT collection_name, current_author, new_author, owner, acceptance_date, rejected, seq, block_num, timestamp '
+        'FROM authorswaps WHERE seq = :seq '
+        'AND NOT EXISTS (SELECT seq FROM authorswaps_reversed WHERE seq = :seq)',
+        {'seq': pending_swap['seq']}
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE authorswaps SET acceptance_date = :timestamp '
+        'WHERE seq = :seq',
+        {'seq': pending_swap['seq'], 'timestamp': new_swap['timestamp']}
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE collections SET author = :new_author '
+        'WHERE collection = :collection_name',
+        {'collection_name': new_swap['collection_name'], 'new_author': pending_swap['new_author']}
+    )
+
+    session.commit()
+
+
+@catch_and_log()
+def load_reject_author_swap(session, action):
+    swap = _get_data(action)
+    new_swap = load_transaction_basics(action)
+    new_swap['collection_name'] = swap['collection_name']
+
+    pending_swap = session_execute_logged(
+        session,
+        'SELECT collection_name, current_author, new_author, owner, acceptance_date, rejected, seq, block_num, timestamp '
+        'FROM authorswaps '
+        'WHERE collection_name = :collection_name '
+        'AND acceptance_date IS NULL '
+        'AND rejected = FALSE '
+        'ORDER BY seq DESC '
+        'LIMIT 1',
+        {'collection_name': new_swap['collection_name']}
+    ).first()
+    if not pending_swap:
+        session.commit()
+        return
+
+    session_execute_logged(
+        session,
+        'INSERT INTO authorswaps_reversed '
+        'SELECT collection_name, current_author, new_author, owner, acceptance_date, rejected, seq, block_num, timestamp '
+        'FROM authorswaps WHERE seq = :seq '
+        'AND NOT EXISTS (SELECT seq FROM authorswaps_reversed WHERE seq = :seq)',
+        {'seq': pending_swap['seq']}
+    )
+
+    session_execute_logged(
+        session,
+        'UPDATE authorswaps SET rejected = TRUE '
+        'WHERE seq = :seq',
+        {'seq': pending_swap['seq']}
+    )
+
+    session.commit()
 
 
 @catch_and_log()
