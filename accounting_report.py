@@ -1,6 +1,8 @@
 """Monthly WAX receipts, matching the filler's accounting report."""
 
+import logging
 import os
+import random
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -20,27 +22,52 @@ def month_bounds(year, month):
     return start, end
 
 
+HYPERIONS = [
+    "https://wax-history.eosdac.io",
+    "https://hyperion7.sentnl.io",
+    "https://history.waxsweden.org",
+]
+
+
+def get_actions(start, end):
+    configured = os.environ.get("WAX_HISTORY_URL")
+    urls = [configured.rstrip("/")] if configured else list(HYPERIONS)
+    if not configured:
+        random.shuffle(urls)
+    params = {
+        "account": "waxhiveguild",
+        "filter": "eosio.token:transfer",
+        "skip": 0,
+        "limit": 100,
+        "sort": "asc",
+        "after": start.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "before": end.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "simple": "false",
+    }
+    # Some Hyperion nodes have gaps in their index and answer with an empty
+    # list, so keep trying other nodes like filler.get_valid_response does.
+    payload = None
+    for url in urls:
+        try:
+            response = requests.get(f"{url}/v2/history/get_actions", params=params, timeout=60)
+            response.raise_for_status()
+            candidate = response.json()
+        except (requests.RequestException, ValueError):
+            logging.exception("Accounting history request to %s failed", url)
+            continue
+        if not isinstance(candidate, dict) or not isinstance(candidate.get("actions"), list):
+            continue
+        if candidate["actions"]:
+            return candidate
+        payload = candidate
+    if payload is None:
+        raise AccountingError("No WAX history server returned a valid response.")
+    return payload
+
+
 def run_accounting(year, month, session):
     start, end = month_bounds(year, month)
-    history_url = os.environ.get("WAX_HISTORY_URL", "https://wax.eosusa.io").rstrip("/")
-    response = requests.get(
-        f"{history_url}/v2/history/get_actions",
-        params={
-            "account": "waxhiveguild",
-            "filter": "eosio.token:transfer",
-            "skip": 0,
-            "limit": 100,
-            "sort": "asc",
-            "after": start.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            "before": end.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            "simple": "false",
-        },
-        timeout=60,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if not isinstance(payload, dict) or not isinstance(payload.get("actions"), list):
-        raise AccountingError("WAX history returned an invalid actions response.")
+    payload = get_actions(start, end)
 
     dates = {}
     while start <= end:
