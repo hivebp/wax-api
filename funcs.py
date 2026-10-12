@@ -2883,13 +2883,9 @@ def load_template_update(session, action):
 
     session_execute_logged(
         session,
-        'UPDATE templates SET mutable_data_id = {mdata_column}, attribute_ids = :new_attribute_ids '
-        'WHERE template_id = :template_id'.format(
-            mdata_column=(
-                '(SELECT data_id FROM data WHERE md5(data) = md5(:mdata) '
-                'UNION SELECT data_id FROM mdata_insert_result)'
-            ) if update['mdata'] else 'NULL'
-        ),
+        'UPDATE templates SET mutable_data_id = '
+        '(SELECT new_mdata_id FROM template_updates WHERE seq = :seq), attribute_ids = :new_attribute_ids '
+        'WHERE template_id = :template_id',
         update
     )
 
