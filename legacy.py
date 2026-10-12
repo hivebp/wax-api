@@ -523,7 +523,7 @@ def add_token(symbol, contract):
     os.system('{} wallet unlock -n nfthivecpu4u --password {}'.format(cleos, pw))
 
     os.system(
-        '{cleos} -u https://api3.hivebp.io push action nfthivecraft addtoken '
+        '{cleos} -u https://api.waxsweden.org push action nfthivecraft addtoken '
         '\'["{contract}", "{symbol}"]\' -p nfthivecraft@deploy'.format(
             cleos=cleos,
             contract=contract,
@@ -532,7 +532,7 @@ def add_token(symbol, contract):
     )
 
     os.system(
-        '{cleos} -u https://api3.hivebp.io push action nfthivepacks addtoken '
+        '{cleos} -u https://api.waxsweden.org push action nfthivepacks addtoken '
         '\'["{contract}", "{symbol}"]\' -p nfthivepacks@deploy'.format(
             cleos=cleos,
             contract=contract,
@@ -541,7 +541,7 @@ def add_token(symbol, contract):
     )
 
     logging.error(
-        '{cleos} -u https://api3.hivebp.io push action nfthivedrops addconftoken '
+        '{cleos} -u https://api.waxsweden.org push action nfthivedrops addconftoken '
         '\'["{contract}", "{symbol}"]\' -p nfthivedrops@deploy'.format(
             cleos=cleos,
             contract=contract,
@@ -550,7 +550,7 @@ def add_token(symbol, contract):
     )
 
     os.system(
-        '{cleos} -u https://api3.hivebp.io push action nfthivedrops addconftoken '
+        '{cleos} -u https://api.waxsweden.org push action nfthivedrops addconftoken '
         '\'["{contract}", "{symbol}"]\' -p nfthivedrops@deploy'.format(
             cleos=cleos,
             contract=contract,

@@ -129,19 +129,7 @@ hyperions = [
 
 apis = [
     {
-        'url': 'https://api.hivebp.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api2.hivebp.io',
-        'status': 200,
-        'blocks_behind': 0,
-        'limit': 1000,
-    },
-    {
-        'url': 'https://api3.hivebp.io',
+        'url': 'https://api.waxsweden.org',
         'status': 200,
         'blocks_behind': 0,
         'limit': 1000,
