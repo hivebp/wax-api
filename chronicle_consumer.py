@@ -1211,6 +1211,7 @@ class Server:
                 session.remove()
         except Exception as err:
             logging.error('distribute: {}'.format(err))
+            logging.error('Traceback: {}'.format(err.__traceback__))
             self.emitter.emit('error', {
                 'remoteAddress': config.chronicle_settings['host'],
                 'remoteFamily': 'IPv4',
