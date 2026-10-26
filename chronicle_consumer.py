@@ -1224,7 +1224,7 @@ class Server:
 
 
 server = Server()
-start_server = websockets.serve(server.ws_handler, "0.0.0.0", 8800, max_size=12000000)
+start_server = websockets.serve(server.ws_handler, "0.0.0.0", 8800,  max_size=64 * 1024 * 1024 )
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(start_server)
