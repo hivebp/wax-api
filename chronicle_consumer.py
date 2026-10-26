@@ -1160,6 +1160,7 @@ class Server:
             await self.unregister(ws)
 
     async def distribute(self, ws: WebSocketServerProtocol):
+        msg = None
         if not ws:
             logging.error('No Socket')
         try:
@@ -1203,6 +1204,7 @@ class Server:
                     except SQLAlchemyError as err:
                         log_error('distribute SQLAlchemyError: {}'.format(err))
                         raise err
+                    msg = None
             except SQLAlchemyError as err:
                 log_error('distribute SQLAlchemyError: {}'.format(err))
                 raise err
@@ -1210,8 +1212,10 @@ class Server:
                 session.commit()
                 session.remove()
         except Exception as err:
-            logging.error('distribute: {}'.format(err))
-            logging.error('Traceback: {}'.format(err.__traceback__))
+            logging.exception(
+                'distribute: %s; message=%r (None means no payload was delivered or processing already completed)',
+                err, msg
+            )
             self.emitter.emit('error', {
                 'remoteAddress': config.chronicle_settings['host'],
                 'remoteFamily': 'IPv4',
