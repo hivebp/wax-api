@@ -52,7 +52,7 @@ def _format_collection_thumbnail(collection, image=None, size=80):
     if not image:
         return image
     return 'https://resizer.atomichub.io/images/v1/preview?size={}&output=webp&ipfs={}'.format(
-        collection, size, image.replace('video:', '').replace('DUNGEONS-&-DRAGONS', 'DUNGEONS-%26-DRAGONS').strip()
+        size, image.replace('video:', '').replace('DUNGEONS-&-DRAGONS', 'DUNGEONS-%26-DRAGONS').strip()
     )
 
 
