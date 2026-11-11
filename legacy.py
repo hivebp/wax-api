@@ -472,7 +472,7 @@ def _format_video(video):
         return video
     elif video and 'https://gateway.pinata.cloud/ipfs' in video:
         video = video.replace('https://gateway.pinata.cloud/ipfs/', '')
-    return 'https://ipfs.hivebp.io/ipfs/{}'.format(video.replace('video:', '').strip())
+    return 'https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(video.replace('video:', '').strip())
 
 
 @cache.memoize(timeout=300)

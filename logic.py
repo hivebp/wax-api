@@ -28,12 +28,12 @@ def execute_sql(session, sql, args=None):
 def _format_video(video):
     if 'http' in video:
         return video
-    return 'https://ipfs.hivebp.io/ipfs/{}'.format(video.replace('video:', '').strip())
+    return 'https://https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(video.replace('video:', '').strip())
 
 
 def _format_image(image):
     if image and 'http' not in image and 'video:' not in image:
-        return 'https://ipfs.hivebp.io/ipfs/{}'.format(image)
+        return 'https://https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(image)
     return image if image else ''
 
 
@@ -41,27 +41,27 @@ def _format_thumbnail(image):
     if not image:
         return image
     if 'video:' in image:
-        return 'https://ipfs.hivebp.io/video?hash={}'.format(
+        return 'https://resizer.atomichub.io/images/v1/preview?size=320&output=webp&ipfs={}'.format(
             image.replace('DUNGEONS-&-DRAGONS', 'DUNGEONS-%26-DRAGONS').replace('video:', '').strip())
     else:
-        return 'https://ipfs.hivebp.io/thumbnail?hash={}'.format(
+        return 'https://resizer.atomichub.io/images/v1/preview?size=320&output=webp&ipfs={}'.format(
             image.replace('DUNGEONS-&-DRAGONS', 'DUNGEONS-%26-DRAGONS'))
 
 
 def _format_collection_thumbnail(collection, image=None, size=80):
     if not image:
         return image
-    return 'https://ipfs.hivebp.io/preview?collection={}&size={}&hash={}'.format(
+    return 'https://resizer.atomichub.io/images/v1/preview?size={}&output=webp&ipfs={}'.format(
         collection, size, image.replace('video:', '').replace('DUNGEONS-&-DRAGONS', 'DUNGEONS-%26-DRAGONS').strip()
     )
 
 
 def _format_preview(image):
-    return 'https://ipfs.hivebp.io/preview/{}'.format(image)
+    return 'https://resizer.atomichub.io/images/v1/preview?size=320&output=webp&ipfs={}'.format(image)
 
 
 def _format_banner(image):
-    return 'https://ipfs.hivebp.io/nfthive?ipfs={}'.format(image)
+    return 'https://resizer.atomichub.io/images/v1/preview?size=320&output=webp&ipfs={}'.format(image)
 
 
 def _parse_mdata(asset):
