@@ -28,12 +28,12 @@ def execute_sql(session, sql, args=None):
 def _format_video(video):
     if 'http' in video:
         return video
-    return 'https://https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(video.replace('video:', '').strip())
+    return 'https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(video.replace('video:', '').strip())
 
 
 def _format_image(image):
     if image and 'http' not in image and 'video:' not in image:
-        return 'https://https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(image)
+        return 'https://resizer.atomichub.io/images/v1/preview?size=1110&output=webp&ipfs={}'.format(image)
     return image if image else ''
 
 
